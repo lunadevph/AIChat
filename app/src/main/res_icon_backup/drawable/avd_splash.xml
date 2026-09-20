@@ -1,0 +1,82 @@
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt">
+
+    <aapt:attr name="android:drawable">
+        <vector
+            android:width="100dp"
+            android:height="100dp"
+            android:viewportWidth="12"
+            android:viewportHeight="12">
+
+            <group
+                android:name="star_group"
+                android:pivotX="6"
+                android:pivotY="6"
+                android:scaleX="0.4"
+                android:scaleY="0.4">
+
+                <!-- STAR -->
+                <path
+                    android:name="star_path"
+                    android:pathData="M6.6055 1.5515c-.2475-.502-.963-.502-1.2105 0L4.216 3.94l-2.6365.383c-.5535.0805-.775.761-.374 1.1515l1.9075 1.86-.45 2.625c-.095 0.5515.484 0.972 0.979 0.712l2.217-1.1385 2.358 1.24c0.495.26 1.074-.16.979-.712l-.45-2.625 1.9075-1.86c0.4-.39.1795-1.071-.374-1.1515L7.785 3.94 6.6055 1.5515Z"
+                    android:fillColor="#FFFFFF"
+                    android:fillAlpha="0"
+                    android:strokeColor="#FFFFFF"
+                    android:strokeWidth="0.4"
+                    android:strokeLineCap="round"
+                    android:strokeLineJoin="round"/>
+
+                <!-- SPARKLES -->
+                <path
+                    android:name="sparkles"
+                    android:pathData="M0.582 1.891a.375.375 0 0 0 .059.527l1.25 1a.375.375 0 1 0 .4685-.586l-1.25-1a.375.375 0 0 0-.527.059ZM11.418 9.109a.375.375 0 0 0-.0585-.527l-1.25-1a.375.375 0 0 0-.469.586l1.25 1a.375.375 0 0 0 .527-.059ZM0.641 8.582a.375.375 0 1 0 .4685.586l1.25-1a.375.375 0 0 0-.4685-.586l-1.25 1ZM11.418 1.891a.375.375 0 0 1-.0585.527l-1.25 1a.375.375 0 0 1-.469-.586l1.25-1a.375.375 0 0 1 .527.059Z"
+                    android:fillColor="#FFFFFF"
+                    android:fillAlpha="0"/>
+            </group>
+        </vector>
+    </aapt:attr>
+
+    <!-- 1. DRAW -->
+    <target android:name="star_path">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:propertyName="trimPathEnd"
+                android:duration="1200"
+                android:valueFrom="0"
+                android:valueTo="1"
+                android:valueType="floatType"
+                android:interpolator="@android:interpolator/fast_out_slow_in"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 2. FILL -->
+    <target android:name="star_path">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:propertyName="fillAlpha"
+                android:startOffset="1200"
+                android:duration="600"
+                android:valueFrom="0"
+                android:valueTo="1"
+                android:valueType="floatType"
+                android:interpolator="@android:interpolator/fast_out_slow_in"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 3. SPARKLES -->
+    <target android:name="sparkles">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:propertyName="fillAlpha"
+                android:startOffset="1800"
+                android:duration="500"
+                android:valueFrom="0"
+                android:valueTo="1"
+                android:valueType="floatType"
+                android:repeatCount="infinite"
+                android:repeatMode="reverse"
+                android:interpolator="@android:interpolator/accelerate_decelerate"/>
+        </aapt:attr>
+    </target>
+
+</animated-vector>

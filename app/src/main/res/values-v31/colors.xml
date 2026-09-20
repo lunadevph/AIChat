@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dynamic colors for Android 12+ -->
+    <color name="icon_gradient_start">@android:color/system_accent1_100</color>
+    <color name="icon_gradient_end">@android:color/system_accent1_300</color>
+</resources>
