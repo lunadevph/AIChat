@@ -49,10 +49,23 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = rootProject.file(properties["RELEASE_STORE_FILE"] as String)
-            storePassword = properties["RELEASE_STORE_PASSWORD"] as String
-            keyAlias = properties["RELEASE_KEY_ALIAS"] as String
-            keyPassword = properties["RELEASE_KEY_PASSWORD"] as String
+            val keystorePropsFile = rootProject.file("keystore.properties")
+            val keystoreProps = Properties()
+            if (keystorePropsFile.exists()) {
+                keystorePropsFile.inputStream().use { keystoreProps.load(it) }
+            }
+
+            fun getProp(name: String): String? {
+                return (keystoreProps[name] as? String) ?: (properties[name] as? String) ?: System.getenv(name)
+            }
+
+            val storeFilePath = getProp("RELEASE_STORE_FILE")
+            if (storeFilePath != null) {
+                storeFile = rootProject.file(storeFilePath)
+                storePassword = getProp("RELEASE_STORE_PASSWORD") ?: ""
+                keyAlias = getProp("RELEASE_KEY_ALIAS") ?: ""
+                keyPassword = getProp("RELEASE_KEY_PASSWORD") ?: ""
+            }
         }
     }
 
@@ -185,8 +198,32 @@ tasks.register("UpdateMirrors") {
             return@doLast
         }
 
-        val mirrorFile = File(mirrorDir, "mirror.json")
-        val jsonContent = """
+        try {
+            val isWindows = System.getProperty("os.name").lowercase().contains("windows")
+            val shell = if (isWindows) listOf("cmd.exe", "/c") else listOf("sh", "-c")
+
+            // 1. Pull latest changes first before modifying files
+            val pullCmd = "git pull --rebase origin main"
+            ProcessBuilder(shell + listOf(pullCmd))
+                .directory(mirrorDir)
+                .redirectErrorStream(true)
+                .start()
+                .waitFor()
+
+            // 2. Copy APK and update mirror.json
+            val apkDir = layout.buildDirectory.dir("outputs/apk/release").get().asFile
+            val apkFile = apkDir.listFiles { f -> f.extension == "apk" }?.firstOrNull()
+            if (apkFile != null && apkFile.exists()) {
+                val destApk = File(mirrorDir, "latest.apk")
+                apkFile.copyTo(destApk, overwrite = true)
+                println("UpdateMirrors: Copied release APK (${apkFile.name}) to ${destApk.absolutePath} (${destApk.length()} bytes)")
+            } else {
+                println("UpdateMirrors: Warning - release APK not found in $apkDir")
+            }
+
+            val rawDownloadUrl = "https://raw.githubusercontent.com/lunadevph/update-mirror/main/latest.apk"
+            val mirrorFile = File(mirrorDir, "mirror.json")
+            val jsonContent = """
 {
   "appPackageName": "com.android5.ai",
   "appLatestVersion": "$verName",
@@ -198,19 +235,16 @@ tasks.register("UpdateMirrors") {
   "updateStatus": "Latest release v$verName (Build $verCode)",
   "updateRequired": false,
   "updateLinkAvailable": true,
-  "downloadUrl": "https://github.com/lunadevph/AIChat/releases/latest"
+  "downloadUrl": "$rawDownloadUrl"
 }
 """.trimIndent() + "\n"
 
-        mirrorFile.writeText(jsonContent)
-        println("UpdateMirrors: Updated mirror.json to version $verName (code $verCode)")
+            mirrorFile.writeText(jsonContent)
+            println("UpdateMirrors: Updated mirror.json to version $verName (code $verCode)")
 
-        try {
-            val isWindows = System.getProperty("os.name").lowercase().contains("windows")
-            val shell = if (isWindows) listOf("cmd.exe", "/c") else listOf("sh", "-c")
-            val gitCmd = "git pull --rebase origin main && git add mirror.json && git commit -m \"Update mirror to v$verName (code $verCode)\" && git push origin main"
-
-            val process = ProcessBuilder(shell + listOf(gitCmd))
+            // 3. Stage, commit, and push
+            val commitPushCmd = "git add mirror.json latest.apk && git commit -m \"Update mirror and latest.apk to v$verName (code $verCode)\" && git push origin main"
+            val process = ProcessBuilder(shell + listOf(commitPushCmd))
                 .directory(mirrorDir)
                 .redirectErrorStream(true)
                 .start()
@@ -219,7 +253,7 @@ tasks.register("UpdateMirrors") {
             val exitCode = process.waitFor()
 
             if (exitCode == 0) {
-                println("UpdateMirrors: Successfully pushed update mirror to GitHub!")
+                println("UpdateMirrors: Successfully pushed update mirror and latest.apk to GitHub!")
             } else {
                 println("UpdateMirrors git output:\n$output")
             }
