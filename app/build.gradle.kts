@@ -208,7 +208,7 @@ tasks.register("UpdateMirrors") {
         try {
             val isWindows = System.getProperty("os.name").lowercase().contains("windows")
             val shell = if (isWindows) listOf("cmd.exe", "/c") else listOf("sh", "-c")
-            val gitCmd = "git add mirror.json && git commit -m \"Update mirror to v$verName (code $verCode)\" && git push origin main"
+            val gitCmd = "git pull --rebase origin main && git add mirror.json && git commit -m \"Update mirror to v$verName (code $verCode)\" && git push origin main"
 
             val process = ProcessBuilder(shell + listOf(gitCmd))
                 .directory(mirrorDir)
