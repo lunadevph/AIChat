@@ -127,6 +127,10 @@ class SettingsManager(context: Context) {
         get() = _prefs!!.getString("grok_icon", null)
         set(value) = _prefs!!.edit().putString("grok_icon", value).apply()
 
+    var opencodeZenIcon: String?
+        get() = _prefs!!.getString("opencode_zen_icon", null)
+        set(value) = _prefs!!.edit().putString("opencode_zen_icon", value).apply()
+
     var iconBaseUrl: String
         get() = _prefs!!.getString("icon_base_url", "https://raw.githubusercontent.com/android5/ai-chat/main/") ?: "https://raw.githubusercontent.com/android5/ai-chat/main/"
         set(value) = _prefs!!.edit().putString("icon_base_url", value).apply()

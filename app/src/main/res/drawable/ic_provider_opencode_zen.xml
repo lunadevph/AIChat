@@ -1,0 +1,14 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Dark circle background -->
+    <path
+        android:fillColor="#0D1117"
+        android:pathData="M12,2A10,10 0 1,0 22,12A10,10 0 0,0 12,2Z"/>
+    <!-- Stylized Zen / OpenCode 'Z' symbol in vibrant emerald/cyan gradient feel -->
+    <path
+        android:fillColor="#00DC82"
+        android:pathData="M7,7.5h10c0.55,0 1,0.45 1,1c0,0.31 -0.15,0.6 -0.39,0.78L10.2,15h6.8c0.55,0 1,0.45 1,1s-0.45,1 -1,1H7c-0.55,0 -1,-0.45 -1,-1c0,-0.31 0.15,-0.6 0.39,-0.78L13.8,9H7c-0.55,0 -1,-0.45 -1,-1s0.45,-1 1,-1z"/>
+</vector>

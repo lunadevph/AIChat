@@ -135,4 +135,18 @@
     <string name="crash_restart">Restart app</string>
     <string name="crash_copy">Copy</string>
     <string name="crash_stack_trace">Stack trace</string>
+
+    <!-- Chat Actions & A11y Strings -->
+    <string name="action_copy">Copy</string>
+    <string name="action_share">Share</string>
+    <string name="action_retry">Regenerate</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_copied">Copied to clipboard</string>
+    <string name="desc_action_copy">Copy message to clipboard</string>
+    <string name="desc_action_share">Share message</string>
+    <string name="desc_action_retry">Regenerate response</string>
+    <string name="desc_action_edit">Edit message and resend</string>
+    <string name="desc_status_icon">Update status indicator</string>
+    <string name="desc_download_update">Download update package</string>
+    <string name="desc_check_again">Check for updates again</string>
 </resources>

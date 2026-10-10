@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -246,7 +247,11 @@ class UpdateActivity : ComponentActivity() {
                                                     ButtonDefaults.buttonColors()
                                                 }
                                             ) {
-                                                Icon(Icons.Rounded.Download, null, Modifier.size(20.dp))
+                                                Icon(
+                                                    Icons.Rounded.Download,
+                                                    contentDescription = stringResource(R.string.desc_download_update),
+                                                    Modifier.size(20.dp)
+                                                )
                                                 Spacer(Modifier.width(8.dp))
                                                 Text(
                                                     if (s.config.updateRequired) "Download Required Update" else "Download Update",
@@ -258,7 +263,11 @@ class UpdateActivity : ComponentActivity() {
                                             onClick = { attempt++ },
                                             shapes = ExpressiveButtonShapes
                                         ) {
-                                            Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp))
+                                            Icon(
+                                                Icons.Rounded.Refresh,
+                                                contentDescription = stringResource(R.string.desc_check_again),
+                                                Modifier.size(18.dp)
+                                            )
                                             Spacer(Modifier.width(6.dp))
                                             Text("Check Again")
                                         }
@@ -366,7 +375,7 @@ private fun UpdateHeroIcon(state: UpdateUi) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     icon,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.desc_status_icon),
                     modifier = Modifier
                         .size(44.dp)
                         .then(
@@ -496,6 +505,41 @@ private fun UpdateAvailableCard(config: AppUpdateConfig) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
+            if (!config.changelog.isNullOrBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f),
+                    tonalElevation = 0.dp
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            "What\u2019s New",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        config.changelog.lines().filter { it.isNotBlank() }.forEach { line ->
+                            val text = line.removePrefix("- ").removePrefix("* ").trim()
+                            Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                                Text(
+                                    "\u2022",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(end = 8.dp)
+                                )
+                                Text(
+                                    text,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -535,6 +579,41 @@ private fun UpdateRequiredCard(config: AppUpdateConfig) {
                 color = MaterialTheme.colorScheme.onErrorContainer,
                 textAlign = TextAlign.Center
             )
+            if (!config.changelog.isNullOrBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f),
+                    tonalElevation = 0.dp
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            "What\u2019s New",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        config.changelog.lines().filter { it.isNotBlank() }.forEach { line ->
+                            val text = line.removePrefix("- ").removePrefix("* ").trim()
+                            Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                                Text(
+                                    "\u2022",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(end = 8.dp)
+                                )
+                                Text(
+                                    text,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -562,7 +641,7 @@ fun VersionInfoCard(
         ) {
             Icon(
                 icon,
-                null,
+                contentDescription = label,
                 modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.colorScheme.primary
             )

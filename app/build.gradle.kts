@@ -7,6 +7,8 @@ import java.util.Properties
 import java.util.Date
 import java.util.Locale
 import java.text.SimpleDateFormat
+import java.net.URL
+import java.net.HttpURLConnection
 
 val versionPropsFile = file("version.properties")
 
@@ -128,9 +130,17 @@ val bumpAppVersionsTask = tasks.register("BumpAppVersions") {
     }
 }
 
-// Run BumpAppVersions on every build
-tasks.named("preBuild") {
-    dependsOn(bumpAppVersionsTask)
+// Auto-bump on release builds unless -PnoBump is passed.
+// Never bump on debug builds.
+// Usage: gradlew assembleRelease -PnoBump (skips version bump)
+val isReleaseBuildRequested = gradle.startParameter.taskNames.any { name ->
+    name.contains("Release", ignoreCase = true)
+}
+
+if (isReleaseBuildRequested && !project.hasProperty("noBump")) {
+    tasks.named("preBuild") {
+        dependsOn(bumpAppVersionsTask)
+    }
 }
 
 tasks.register("bumpVersion") {
@@ -192,6 +202,15 @@ tasks.register("UpdateMirrors") {
         val verCode = (props["VERSION_CODE"] as? String)?.toIntOrNull() ?: 58
         val verName = (props["VERSION_NAME"] as? String) ?: "2.0.2"
 
+        // Read changelog
+        val changelogFile = file("changelog.txt")
+        val changelog = if (changelogFile.exists()) changelogFile.readText().trim() else ""
+        val changelogJson = changelog
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "")
+
         val mirrorDir = File(System.getProperty("user.home"), "update-mirror")
         if (!mirrorDir.exists()) {
             println("UpdateMirrors: Directory $mirrorDir does not exist, skipping mirror update.")
@@ -235,7 +254,8 @@ tasks.register("UpdateMirrors") {
   "updateStatus": "Latest release v$verName (Build $verCode)",
   "updateRequired": false,
   "updateLinkAvailable": true,
-  "downloadUrl": "$rawDownloadUrl"
+  "downloadUrl": "$rawDownloadUrl",
+  "changelog": "$changelogJson"
 }
 """.trimIndent() + "\n"
 
@@ -275,6 +295,111 @@ tasks.register("printVersion") {
         val props = loadVersionProps()
         println("App Version: ${props["VERSION_NAME"]} (Code: ${props["VERSION_CODE"]})")
     }
+}
+
+tasks.register("uploadGithubRelease") {
+    description = "Creates a GitHub Release and uploads the release APK as an asset"
+    group = "publishing"
+
+    doLast {
+        val props = loadVersionProps()
+        val verCode = (props["VERSION_CODE"] as? String)?.toIntOrNull() ?: 0
+        val verName = (props["VERSION_NAME"] as? String) ?: "0.0.0"
+        val tagName = "v$verName"
+
+        // Read changelog
+        val changelogFile = file("changelog.txt")
+        val changelogBody = if (changelogFile.exists()) changelogFile.readText().trim() else "Release $tagName"
+
+        // Read GitHub token
+        val tokenFile = rootProject.file("github_token.txt")
+        val token = when {
+            tokenFile.exists() -> tokenFile.readText().trim()
+            System.getenv("GITHUB_TOKEN") != null -> System.getenv("GITHUB_TOKEN")
+            else -> error("GitHub token not found. Create github_token.txt in project root or set GITHUB_TOKEN env var.")
+        }
+
+        val owner = "LunaDevPH"
+        val repo = "AIChat"
+
+        // Escape JSON
+        val bodyJson = changelogBody
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "")
+            .replace("\t", "\\t")
+
+        // 1. Create release via GitHub API
+        println("Creating GitHub release $tagName ...")
+        val createUrl = URL("https://api.github.com/repos/$owner/$repo/releases")
+        val conn = createUrl.openConnection() as HttpURLConnection
+        conn.requestMethod = "POST"
+        conn.setRequestProperty("Authorization", "Bearer $token")
+        conn.setRequestProperty("Accept", "application/vnd.github+json")
+        conn.setRequestProperty("Content-Type", "application/json")
+        conn.doOutput = true
+
+        val createBody = """{"tag_name":"$tagName","name":"$tagName (Build $verCode)","body":"$bodyJson","draft":false,"prerelease":false}"""
+        conn.outputStream.use { it.write(createBody.toByteArray()) }
+
+        val responseCode = conn.responseCode
+        val responseBody = (if (responseCode < 400) conn.inputStream else conn.errorStream)
+            .bufferedReader().readText()
+
+        if (responseCode !in 200..201) {
+            error("Failed to create release (HTTP $responseCode): $responseBody")
+        }
+
+        // Extract upload_url from response (simple regex since we can't depend on Gson here at task level)
+        val uploadUrlMatch = Regex("\"upload_url\"\\s*:\\s*\"([^\"]+)\"").find(responseBody)
+            ?: error("Could not find upload_url in response: $responseBody")
+        val uploadUrlTemplate = uploadUrlMatch.groupValues[1].replace("{?name,label}", "")
+
+        println("Release created! Uploading APK ...")
+
+        // 2. Upload APK asset
+        val apkDir = layout.buildDirectory.dir("outputs/apk/release").get().asFile
+        val apkFile = apkDir.listFiles { f -> f.extension == "apk" }?.firstOrNull()
+            ?: error("No release APK found in $apkDir. Run assembleRelease first.")
+
+        val uploadUrl = URL("$uploadUrlTemplate?name=AIChat-v$verName.apk")
+        val uploadConn = uploadUrl.openConnection() as HttpURLConnection
+        uploadConn.requestMethod = "POST"
+        uploadConn.setRequestProperty("Authorization", "Bearer $token")
+        uploadConn.setRequestProperty("Accept", "application/vnd.github+json")
+        uploadConn.setRequestProperty("Content-Type", "application/vnd.android.package-archive")
+        uploadConn.doOutput = true
+        uploadConn.setFixedLengthStreamingMode(apkFile.length())
+
+        apkFile.inputStream().use { input ->
+            uploadConn.outputStream.use { output ->
+                input.copyTo(output, bufferSize = 65536)
+            }
+        }
+
+        val uploadResponseCode = uploadConn.responseCode
+        if (uploadResponseCode !in 200..201) {
+            val uploadError = uploadConn.errorStream?.bufferedReader()?.readText() ?: "unknown"
+            error("Failed to upload APK (HTTP $uploadResponseCode): $uploadError")
+        }
+
+        println("=================================================")
+        println("  GitHub Release published successfully!")
+        println("  Tag: $tagName")
+        println("  APK: AIChat-v$verName.apk (${apkFile.length() / 1024 / 1024} MB)")
+        println("  URL: https://github.com/$owner/$repo/releases/tag/$tagName")
+        println("=================================================")
+    }
+}
+
+// Convenience: build, push mirror, and create GitHub release in one go
+// Usage: gradlew uploadRelease [-PnoBump]
+tasks.register("uploadRelease") {
+    description = "Builds release APK, updates mirror, and creates a GitHub Release"
+    group = "publishing"
+    dependsOn("assembleRelease")
+    finalizedBy("uploadGithubRelease")
 }
 
 dependencies {

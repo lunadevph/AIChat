@@ -1,0 +1,3 @@
+- Initial release of v2.9.9
+- Fixed updater version mismatch bug
+- Improved update system with changelog support

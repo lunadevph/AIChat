@@ -176,6 +176,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
 
                 val useStreaming = settingsManager.streamingEnabled
                 val isReasoning = isReasoningModel(settingsManager.selectedModel)
+                val isGoogle = settingsManager.selectedProvider == "Google"
                 val request = ChatRequest(
                     model = settingsManager.selectedModel,
                     messages = apiMessages,
@@ -187,8 +188,8 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                     topP = if (isReasoning) null else settingsManager.topP.toDouble(),
                     maxTokens = if (isReasoning) null else settingsManager.maxTokens,
                     maxCompletionTokens = if (isReasoning) settingsManager.maxTokens else null,
-                    frequencyPenalty = if (isReasoning) null else settingsManager.frequencyPenalty.toDouble(),
-                    presencePenalty = if (isReasoning) null else settingsManager.presencePenalty.toDouble()
+                    frequencyPenalty = if (isReasoning || isGoogle) null else settingsManager.frequencyPenalty.toDouble(),
+                    presencePenalty = if (isReasoning || isGoogle) null else settingsManager.presencePenalty.toDouble()
                 )
 
                 val isAnthropic = Providers.isAnthropic(settingsManager.selectedProvider)

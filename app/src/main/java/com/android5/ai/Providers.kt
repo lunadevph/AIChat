@@ -22,7 +22,8 @@ object Providers {
         Info("DeepSeek", "DeepSeek V4 Pro & Flash", "sk-", "https://platform.deepseek.com/api_keys"),
         Info("Claude", "Anthropic Claude Opus 4.1 & Sonnet 4", "sk-ant-", "https://console.anthropic.com/settings/keys"),
         Info("Mistral", "Mistral Large 3, Medium 3.5 & Codestral", "…", "https://console.mistral.ai/api-keys"),
-        Info("Grok", "xAI Grok 4.6 & 4.x family", "xai-", "https://console.x.ai")
+        Info("Grok", "xAI Grok 4.6 & 4.x family", "xai-", "https://console.x.ai"),
+        Info("OpenCode Zen", "Curated fast models for coding & reasoning", "opencode-", "https://opencode.ai/zen")
     )
 
     fun info(provider: String): Info = ALL.firstOrNull { it.name == provider }
@@ -52,6 +53,7 @@ object Providers {
         "Claude" -> "https://api.anthropic.com/v1/"
         "Mistral" -> "https://api.mistral.ai/v1/"
         "Grok" -> "https://api.x.ai/v1/"
+        "OpenCode Zen" -> "https://opencode.ai/zen/v1/"
         else -> "https://openrouter.ai/api/v1/"
     }
 
@@ -103,12 +105,13 @@ object Providers {
 
     fun defaultModel(provider: String): String = when (provider) {
         "OpenAI" -> "gpt-5.6-sol"
-        "Google" -> "gemini-3.7-flash"
-        "Groq" -> "llama-4-scout-17b-16e-instruct"
-        "DeepSeek" -> "deepseek-v4-pro"
+        "Google" -> "gemini-3.8-flash"
+        "Groq" -> "gpt-oss-120b"
+        "DeepSeek" -> "deepseek-v4-flash"
         "Claude" -> "claude-opus-4-1-20250805"
         "Mistral" -> "mistral-large-latest"
         "Grok" -> "grok-4.6"
+        "OpenCode Zen" -> "claude-sonnet-4-6"
         else -> "openrouter/free"
     }
 
@@ -134,17 +137,18 @@ object Providers {
         )
         "Google" -> listOf(
             // Gemini 3.x (2026)
+            ModelInfo(id = "gemini-3.8-flash", name = "Gemini 3.8 Flash", description = "Latest flagship workhorse for reasoning, coding & vision", architecture = Architecture(modality = "text+image->text")),
             ModelInfo(id = "gemini-3.7-flash", name = "Gemini 3.7 Flash", description = "Most intelligent workhorse for coding & agents", architecture = Architecture(modality = "text+image->text")),
             ModelInfo(id = "gemini-3.5-flash", name = "Gemini 3.5 Flash", description = "High-performance agentic & coding at scale", architecture = Architecture(modality = "text+image->text")),
             ModelInfo(id = "gemini-3.5-flash-lite", name = "Gemini 3.5 Flash-Lite", description = "Cost-efficient high-throughput model", architecture = Architecture(modality = "text+image->text")),
             ModelInfo(id = "gemini-3.1-pro", name = "Gemini 3.1 Pro (Preview)", description = "Frontier reasoning & advanced coding", architecture = Architecture(modality = "text+image->text")),
             ModelInfo(id = "gemini-3.1-flash-lite", name = "Gemini 3.1 Flash-Lite", description = "Budget-friendly classification & extraction", architecture = Architecture(modality = "text+image->text")),
-            // Previous gen (retiring Oct 2026)
-            ModelInfo(id = "gemini-2.5-pro", name = "Gemini 2.5 Pro", description = "Previous-gen complex task model (retiring Oct 2026)", architecture = Architecture(modality = "text+image->text")),
-            ModelInfo(id = "gemini-2.5-flash", name = "Gemini 2.5 Flash", description = "Previous-gen fast reasoning (retiring Oct 2026)", architecture = Architecture(modality = "text+image->text"))
+            // Previous gen
+            ModelInfo(id = "gemini-2.5-pro", name = "Gemini 2.5 Pro", description = "Previous-gen complex task model", architecture = Architecture(modality = "text+image->text")),
+            ModelInfo(id = "gemini-2.5-flash", name = "Gemini 2.5 Flash", description = "Previous-gen fast reasoning", architecture = Architecture(modality = "text+image->text"))
         )
         "Groq" -> listOf(
-            // Llama family
+            ModelInfo(id = "gpt-oss-120b", name = "GPT-OSS 120B", description = "Open-weight reasoning powerhouse running at high speed on Groq", architecture = Architecture(modality = "text->text")),
             ModelInfo(id = "llama-4-scout-17b-16e-instruct", name = "Llama 4 Scout 17B", description = "Meta MoE model with 16 experts, ultra-fast on Groq", architecture = Architecture(modality = "text+image->text")),
             ModelInfo(id = "llama-3.3-70b-versatile", name = "Llama 3.3 70B Versatile", description = "Versatile open language model", architecture = Architecture(modality = "text->text")),
             ModelInfo(id = "llama-3.2-90b-vision-preview", name = "Llama 3.2 90B Vision", description = "High-accuracy multimodal reasoning", architecture = Architecture(modality = "text+image->text")),
@@ -197,6 +201,17 @@ object Providers {
             // Previous gen
             ModelInfo(id = "grok-3", name = "Grok 3", description = "Previous-gen capable reasoning model", architecture = Architecture(modality = "text+image->text")),
             ModelInfo(id = "grok-3-mini", name = "Grok 3 Mini", description = "Lightweight fast thinking model", architecture = Architecture(modality = "text+image->text"))
+        )
+        "OpenCode Zen" -> listOf(
+            ModelInfo(id = "claude-sonnet-4-6", name = "Claude Sonnet 4.6", description = "Top-tier frontier coding & reasoning via Zen", architecture = Architecture(modality = "text+image->text")),
+            ModelInfo(id = "claude-opus-4-6", name = "Claude Opus 4.6", description = "Deep reasoning & architecture via Zen", architecture = Architecture(modality = "text+image->text")),
+            ModelInfo(id = "gpt-5.6-sol", name = "GPT-5.6 Sol", description = "OpenAI frontier model via Zen", architecture = Architecture(modality = "text+image->text")),
+            ModelInfo(id = "gemini-3.8-flash", name = "Gemini 3.8 Flash", description = "High-speed multimodal coding & vision via Zen", architecture = Architecture(modality = "text+image->text")),
+            ModelInfo(id = "deepseek-v4-flash", name = "DeepSeek V4 Flash", description = "Ultra-fast coding workhorse via Zen", architecture = Architecture(modality = "text->text")),
+            ModelInfo(id = "deepseek-v4-flash-free", name = "DeepSeek V4 Flash (Free)", description = "Free tier DeepSeek coding model", architecture = Architecture(modality = "text->text")),
+            ModelInfo(id = "qwen3.8-flash", name = "Qwen 3.8 Flash", description = "Alibaba frontier model via Zen", architecture = Architecture(modality = "text->text")),
+            ModelInfo(id = "nemotron-3-ultra-free", name = "Nemotron 3 Ultra (Free)", description = "Free NVIDIA frontier model via Zen", architecture = Architecture(modality = "text->text")),
+            ModelInfo(id = "big-pickle", name = "Big Pickle (Free)", description = "Fast free open-weight model via Zen", architecture = Architecture(modality = "text->text"))
         )
         else -> listOf(
             // Free models (OpenRouter)

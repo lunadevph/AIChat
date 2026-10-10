@@ -13,5 +13,6 @@ data class AppUpdateConfig(
     val updateStatus: String? = null,
     val updateRequired: Boolean = false,
     val updateLinkAvailable: Boolean = false,
-    val downloadUrl: String? = null
+    val downloadUrl: String? = null,
+    val changelog: String? = null
 )

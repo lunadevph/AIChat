@@ -23,8 +23,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.*
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -241,7 +244,9 @@ fun SettingsGroupItem(
     Surface(
         onClick = onClick,
         color = Color.Transparent,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { this.role = Role.Button }
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -617,7 +622,13 @@ fun SettingsSwitchRow(
         shape = RoundedCornerShape(22.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-        tonalElevation = 1.dp
+        tonalElevation = 1.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics {
+                this.role = Role.Switch
+                this.stateDescription = if (checked) "On" else "Off"
+            }
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -636,7 +647,7 @@ fun SettingsSwitchRow(
             ) {
                 Icon(
                     icon,
-                    null,
+                    contentDescription = null,
                     Modifier.size(22.dp),
                     tint = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -648,7 +659,10 @@ fun SettingsSwitchRow(
                 Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.width(8.dp))
-            Switch(checked = checked, onCheckedChange = onCheckedChange)
+            Switch(
+                checked = checked,
+                onCheckedChange = null // Handled by surface for whole-row touch target
+            )
         }
     }
 }
@@ -662,7 +676,14 @@ fun ParameterSliderRow(
     format: (Float) -> String,
     onValueChange: (Float) -> Unit
 ) {
-    Column {
+    val formattedValue = format(value)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics(mergeDescendants = true) {
+                this.stateDescription = "$label: $formattedValue"
+            }
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -678,7 +699,7 @@ fun ParameterSliderRow(
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
             ) {
                 Text(
-                    format(value),
+                    formattedValue,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,

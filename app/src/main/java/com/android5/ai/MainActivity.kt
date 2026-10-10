@@ -53,6 +53,10 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -306,7 +310,12 @@ fun ChatScreen(
                                         )
                                     },
                                 tonalElevation = if (selected) 2.dp else 0.dp,
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .semantics {
+                                        this.role = Role.Tab
+                                        this.selected = selected
+                                    }
                             ) {
                                 Row(
                                     modifier = Modifier
@@ -906,7 +915,7 @@ fun ChatScreen(
                                         onClick = {
                                             viewModel.stopGeneration()
                                         },
-                                        modifier = Modifier.size(44.dp),
+                                        modifier = Modifier.size(48.dp),
                                         shapes = ExpressiveIconButtonShapes,
                                         colors = IconButtonDefaults.filledIconButtonColors(
                                             containerColor = MaterialTheme.colorScheme.error,
@@ -934,7 +943,7 @@ fun ChatScreen(
                                             }
                                         },
                                         enabled = canSend,
-                                        modifier = Modifier.size(44.dp),
+                                        modifier = Modifier.size(48.dp),
                                         shapes = ExpressiveIconButtonShapes,
                                         colors = IconButtonDefaults.filledIconButtonColors(
                                             containerColor = MaterialTheme.colorScheme.primary,
@@ -1037,7 +1046,9 @@ fun ChatScreen(
                                             .copy(alpha = 0.4f)
                                     ),
                                     tonalElevation = 1.dp,
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .semantics { this.role = Role.Button }
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(
@@ -1056,7 +1067,7 @@ fun ChatScreen(
 
                                         Icon(
                                             Icons.AutoMirrored.Rounded.ArrowForward,
-                                            null,
+                                            contentDescription = title,
                                             Modifier.size(18.dp),
                                             tint = MaterialTheme.colorScheme.primary
                                         )
@@ -1077,8 +1088,17 @@ fun ChatScreen(
                     ) {
                         items(viewModel.messages) { message ->
                             MessageBubble(
-                                message,
-                                settingsManager
+                                message = message,
+                                settingsManager = settingsManager,
+                                onRetry = {
+                                    val lastUserMessage = viewModel.messages.lastOrNull { it.role == "user" }
+                                    if (lastUserMessage != null) {
+                                        viewModel.sendMessage(lastUserMessage.content, context)
+                                    }
+                                },
+                                onEdit = { content ->
+                                    inputText = content
+                                }
                             )
                         }
                     }
@@ -1133,7 +1153,8 @@ fun ChatScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 36.dp)
+                    .imePadding()
+                    .padding(bottom = 16.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(
@@ -1331,10 +1352,10 @@ fun ChatScreen(
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 440.dp)
+                            .heightIn(max = 520.dp)
                             .padding(horizontal = 20.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
-                        contentPadding = PaddingValues(bottom = 8.dp)
+                        contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp)
                     ) {
                         items(filteredModels) { model ->
                             val selected =
@@ -1664,7 +1685,9 @@ fun StreamingText(
 @Composable
 fun MessageBubble(
     message: Message,
-    settingsManager: SettingsManager
+    settingsManager: SettingsManager,
+    onRetry: () -> Unit = {},
+    onEdit: (String) -> Unit = {}
 ) {
     val isUser = message.role == "user"
 
@@ -2012,34 +2035,82 @@ fun MessageBubble(
                                 )
                             }
 
-                            if (!isUser) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(
-                                            end = 8.dp,
-                                            bottom = 4.dp
-                                        ),
-                                    horizontalArrangement =
-                                        Arrangement.End
+                            val context = LocalContext.current
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(
+                                        horizontal = 8.dp,
+                                        vertical = 4.dp
+                                    ),
+                                horizontalArrangement = if (isUser) Arrangement.Start else Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // 1. Copy Action
+                                IconButton(
+                                    onClick = {
+                                        clipboardManager.setText(
+                                            AnnotatedString(message.content)
+                                        )
+                                    },
+                                    modifier = Modifier.size(48.dp),
+                                    shapes = ExpressiveIconButtonShapes
                                 ) {
+                                    Icon(
+                                        Icons.Rounded.ContentCopy,
+                                        contentDescription = stringResource(R.string.desc_action_copy),
+                                        modifier = Modifier.size(17.dp),
+                                        tint = if (isUser) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                    )
+                                }
+
+                                // 2. Share Action
+                                IconButton(
+                                    onClick = {
+                                        val sendIntent = Intent().apply {
+                                            action = Intent.ACTION_SEND
+                                            putExtra(Intent.EXTRA_TEXT, message.content)
+                                            type = "text/plain"
+                                        }
+                                        context.startActivity(Intent.createChooser(sendIntent, null))
+                                    },
+                                    modifier = Modifier.size(48.dp),
+                                    shapes = ExpressiveIconButtonShapes
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.Share,
+                                        contentDescription = stringResource(R.string.desc_action_share),
+                                        modifier = Modifier.size(17.dp),
+                                        tint = if (isUser) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                    )
+                                }
+
+                                if (!isUser) {
+                                    // 3. Retry / Regenerate Action for AI Responses
                                     IconButton(
-                                        onClick = {
-                                            clipboardManager.setText(
-                                                AnnotatedString(
-                                                    message.content
-                                                )
-                                            )
-                                        },
+                                        onClick = onRetry,
                                         modifier = Modifier.size(48.dp),
                                         shapes = ExpressiveIconButtonShapes
                                     ) {
                                         Icon(
-                                            Icons.Rounded.ContentCopy,
-                                            contentDescription = stringResource(R.string.desc_copy_message),
+                                            Icons.Rounded.Refresh,
+                                            contentDescription = stringResource(R.string.desc_action_retry),
                                             modifier = Modifier.size(18.dp),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                                .copy(alpha = 0.6f)
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                        )
+                                    }
+                                } else {
+                                    // 4. Edit Action for User Messages
+                                    IconButton(
+                                        onClick = { onEdit(message.content) },
+                                        modifier = Modifier.size(48.dp),
+                                        shapes = ExpressiveIconButtonShapes
+                                    ) {
+                                        Icon(
+                                            Icons.Rounded.Edit,
+                                            contentDescription = stringResource(R.string.desc_action_edit),
+                                            modifier = Modifier.size(17.dp),
+                                            tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                                         )
                                     }
                                 }
