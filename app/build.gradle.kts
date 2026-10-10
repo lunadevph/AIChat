@@ -9,28 +9,36 @@ import java.util.Locale
 import java.text.SimpleDateFormat
 import java.net.URL
 import java.net.HttpURLConnection
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 val versionPropsFile = file("version.properties")
+
+// Calendar versioning: YY.MM.DD.build  (e.g. 261010.001)
+// VERSION_CODE is derived as YYMMDD * 1000 + build so it strictly increases every
+// build and sorts chronologically. YYMMDD tops out at 991231, giving a ceiling of
+// 992230999 -- comfortably inside Int.MAX (2147483647).
+val DAY_STAMP = DateTimeFormatter.ofPattern("yyMMdd")
+
+fun todayStamp(): String = LocalDate.now().format(DAY_STAMP)
+
+fun codeFor(stamp: String, build: Int): Int = stamp.toInt() * 1000 + build
+
+fun nameFor(stamp: String, build: Int): String = "$stamp.%03d".format(build)
 
 fun loadVersionProps(): Properties {
     val props = Properties()
     if (versionPropsFile.exists()) {
         versionPropsFile.inputStream().use { props.load(it) }
-    } else {
-        props["VERSION_CODE"] = "51"
-        props["VERSION_NAME"] = "2.0.1"
-        props["VERSION_MAJOR"] = "2"
-        props["VERSION_MINOR"] = "0"
-        props["VERSION_PATCH"] = "1"
-        props["BUILD_COUNTER"] = "1"
-        versionPropsFile.outputStream().use { props.store(it, "Version Properties") }
     }
     return props
 }
 
 val versionProps = loadVersionProps()
-val currentVersionCode = (versionProps["VERSION_CODE"] as? String)?.toIntOrNull() ?: 51
-val currentVersionName = (versionProps["VERSION_NAME"] as? String) ?: "2.0.1"
+val currentVersionCode = (versionProps["VERSION_CODE"] as? String)?.toIntOrNull()
+    ?: codeFor(todayStamp(), 1)
+val currentVersionName = (versionProps["VERSION_NAME"] as? String)
+    ?: nameFor(todayStamp(), 1)
 
 android {
     namespace = "com.android5.ai"
@@ -92,40 +100,31 @@ android {
 }
 
 val bumpAppVersionsTask = tasks.register("BumpAppVersions") {
-    description = "Increments versionCode and updates versionName in version.properties on every build"
+    description = "Stamps today's date into version.properties and increments the per-day build counter"
     group = "versioning"
     doLast {
         val props = loadVersionProps()
-        var code = (props["VERSION_CODE"] as? String)?.toIntOrNull() ?: 52
-        val major = (props["VERSION_MAJOR"] as? String)?.toIntOrNull() ?: 2
-        val minor = (props["VERSION_MINOR"] as? String)?.toIntOrNull() ?: 0
-        var patch = (props["VERSION_PATCH"] as? String)?.toIntOrNull() ?: 2
-        var buildCounter = (props["BUILD_COUNTER"] as? String)?.toIntOrNull() ?: 0
+        val stamp = todayStamp()
 
-        code += 1
-        buildCounter += 1
+        val storedStamp = props["VERSION_STAMP"] as? String
+        val storedBuild = (props["BUILD_COUNTER"] as? String)?.toIntOrNull() ?: 0
 
-        if (code % 20 == 0 || buildCounter >= 20) {
-            patch += 1
-            buildCounter = 1
-        }
+        // Counter resets to 1 on a new day; within the same day it keeps climbing.
+        val build = if (storedStamp == stamp && storedBuild > 0) storedBuild + 1 else 1
 
-        val newVersionName = "$major.$minor.$patch"
-        props["VERSION_CODE"] = code.toString()
-        props["VERSION_NAME"] = newVersionName
-        props["VERSION_MAJOR"] = major.toString()
-        props["VERSION_MINOR"] = minor.toString()
-        props["VERSION_PATCH"] = patch.toString()
-        props["BUILD_COUNTER"] = buildCounter.toString()
+        props["VERSION_STAMP"] = stamp
+        props["BUILD_COUNTER"] = build.toString()
+        props["VERSION_CODE"] = codeFor(stamp, build).toString()
+        props["VERSION_NAME"] = nameFor(stamp, build)
 
         versionPropsFile.outputStream().use {
-            props.store(it, "Auto-generated and bumped Version Properties")
+            props.store(it, "Auto-generated calendar version (YY.MM.DD.build)")
         }
 
         println("==================================================")
         println("  BumpAppVersions: Version Bumped Successfully!")
-        println("  Version Code: $code")
-        println("  Version Name: $newVersionName (Major: $major, Minor: $minor, Patch: $patch)")
+        println("  Version Name: ${props["VERSION_NAME"]}")
+        println("  Version Code: ${props["VERSION_CODE"]}")
         println("==================================================")
     }
 }
@@ -150,24 +149,17 @@ tasks.register("bumpVersion") {
 }
 
 tasks.register("bumpPatch") {
-    description = "Bumps patch version (e.g. 2.0.1 -> 2.0.2) and increments versionCode"
+    description = "Re-stamps today's date and resets the build counter to 001"
     group = "versioning"
     doLast {
         val props = loadVersionProps()
-        var code = (props["VERSION_CODE"] as? String)?.toIntOrNull() ?: 50
-        val major = (props["VERSION_MAJOR"] as? String)?.toIntOrNull() ?: 2
-        val minor = (props["VERSION_MINOR"] as? String)?.toIntOrNull() ?: 0
-        var patch = (props["VERSION_PATCH"] as? String)?.toIntOrNull() ?: 0
-
-        code += 1
-        patch += 1
-        val newVersionName = "$major.$minor.$patch"
-        props["VERSION_CODE"] = code.toString()
-        props["VERSION_NAME"] = newVersionName
-        props["VERSION_PATCH"] = patch.toString()
+        val stamp = todayStamp()
+        props["VERSION_STAMP"] = stamp
         props["BUILD_COUNTER"] = "1"
+        props["VERSION_CODE"] = codeFor(stamp, 1).toString()
+        props["VERSION_NAME"] = nameFor(stamp, 1)
         versionPropsFile.outputStream().use { props.store(it, "Version Properties") }
-        println("Bumped to $newVersionName (Code: $code)")
+println("Bumped to ${props["VERSION_NAME"]} (Code: ${props["VERSION_CODE"]})")
     }
 }
 
