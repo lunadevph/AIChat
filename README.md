@@ -81,7 +81,7 @@ Publishing tasks read a token from `github_token.txt` in the project root, or fr
 | Claude | `claude-opus-4-1-20250805` | Anthropic direct, uses `x-api-key` |
 | Mistral | `mistral-large-latest` | Large, Medium, Small, Codestral, Devstral |
 | Grok | `grok-4.6` | xAI 4.x family |
-| OpenCode Zen | `claude-sonnet-4-6` | Curated coding models, free tiers available |
+| OpenCode Zen | `claude-sonnet-4-6` | Curated coding models via OpenCode Console (free tier is OpenCode-client only) |
 
 Model IDs and default selections are defined in `app/src/main/java/com/android5/ai/Providers.kt`. Provider-specific quirks — Claude's separate auth header and version header, the different timeout profile for key validation versus chat — are handled there too.
 
