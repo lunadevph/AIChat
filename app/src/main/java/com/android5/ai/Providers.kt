@@ -263,15 +263,4 @@ object Providers {
         else -> KeyValidation.NetworkError("HTTP ${e.code()}")
     }
 
-    /**
-     * OpenCode Zen's free tier is locked to the OpenCode client itself. Requests
-     * from third-party apps are rejected with HTTP 403 `FreeTierError`
-     * ("OpenCode's free tier can only be used from within OpenCode"), for *any*
-     * API key. Because this app can never use them, free Zen models are filtered
-     * out of the model picker so users don't select a model that always fails.
-     */
-    fun isZenFreeModel(modelId: String): Boolean {
-        val id = modelId.lowercase()
-        return id.endsWith("-free") || id == "big-pickle"
-    }
 }

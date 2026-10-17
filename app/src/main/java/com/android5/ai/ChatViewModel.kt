@@ -117,10 +117,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 } else {
                     getApi().getModels(Providers.modelsUrl(provider))
                 }
-                val fetched = response.data.orEmpty().filter { model ->
-                    // OpenCode Zen free models are blocked for third-party clients.
-                    provider != "OpenCode Zen" || !Providers.isZenFreeModel(model.id)
-                }
+                val fetched = response.data.orEmpty()
                 if (fetched.isNotEmpty()) {
                     availableModels.clear()
                     availableModels.addAll(fetched.sortedBy { it.displayName })
@@ -260,6 +257,8 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 val errorMsg = when (e.code()) {
                     401 -> context.getString(R.string.err_unauthorized)
                     402 -> context.getString(R.string.err_insufficient_credits)
+                    // OpenCode Zen's free tier is restricted to the OpenCode client
+                    // itself: third-party requests get HTTP 403 `FreeTierError`.
                     403 -> if (settingsManager.selectedProvider == "OpenCode Zen") {
                         context.getString(R.string.err_opencode_zen_forbidden)
                     } else {
