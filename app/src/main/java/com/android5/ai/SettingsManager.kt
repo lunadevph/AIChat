@@ -16,6 +16,16 @@ class SettingsManager(context: Context) {
             _showThinkingState = mutableStateOf(_prefs!!.getBoolean("show_thinking", true))
             _webSearchState = mutableStateOf(_prefs!!.getBoolean("web_search_enabled", false))
             _themeModeState = mutableStateOf(_prefs!!.getString("theme_mode", "dynamic") ?: "dynamic")
+
+            // A provider can be retired in a later release; fall back to the default
+            // one so the app never points at an endpoint that no longer exists.
+            val storedProvider = _prefs!!.getString("selected_provider", "OpenRouter")
+            if (storedProvider != null && Providers.ALL.none { it.name == storedProvider }) {
+                _prefs!!.edit()
+                    .putString("selected_provider", "OpenRouter")
+                    .putString("selected_model", Providers.defaultModel("OpenRouter"))
+                    .apply()
+            }
         }
     }
 

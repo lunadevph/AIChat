@@ -1,2 +1,3 @@
 - Removed the OpenCode Zen provider; it is no longer offered in setup, settings or the model picker.
+- If you had OpenCode Zen selected, the app now falls back to the default provider instead of staying on the retired one.
 - All remaining user-facing text (update screen, setup screen, empty-state suggestions) now comes from translatable string resources.
