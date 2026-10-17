@@ -1,12 +1,12 @@
 # AI Chat
 
-A native Android client for chatting with large language models. Bring your own API key and pick a provider — OpenRouter, OpenAI, Google, Groq, DeepSeek, Claude, Mistral, Grok, or OpenCode Zen.
+A native Android client for chatting with large language models. Bring your own API key and pick a provider — OpenRouter, OpenAI, Google, Groq, DeepSeek, Claude, Mistral, or Grok.
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 ## Features
 
-- **9 providers, one interface.** Every provider is reached through an OpenAI-compatible endpoint, so switching providers never changes how you chat.
+- **8 providers, one interface.** Every provider is reached through an OpenAI-compatible endpoint, so switching providers never changes how you chat.
 - **Bring your own key.** Keys are encrypted on-device with AES-256-GCM via Android Keystore, and validated against the provider's API before being saved.
 - **Multiple saved keys.** Keep one key per provider and switch the active one without re-entering credentials.
 - **Vision input.** Attach images to messages on models that support multimodal input.
@@ -81,7 +81,6 @@ Publishing tasks read a token from `github_token.txt` in the project root, or fr
 | Claude | `claude-opus-4-1-20250805` | Anthropic direct, uses `x-api-key` |
 | Mistral | `mistral-large-latest` | Large, Medium, Small, Codestral, Devstral |
 | Grok | `grok-4.6` | xAI 4.x family |
-| OpenCode Zen | `claude-sonnet-4-6` | Curated coding models via OpenCode Console (free tier is OpenCode-client only) |
 
 Model IDs and default selections are defined in `app/src/main/java/com/android5/ai/Providers.kt`. Provider-specific quirks — Claude's separate auth header and version header, the different timeout profile for key validation versus chat — are handled there too.
 

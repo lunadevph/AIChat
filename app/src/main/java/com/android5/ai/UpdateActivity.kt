@@ -85,7 +85,7 @@ class UpdateActivity : ComponentActivity() {
 
                         state = UpdateUi.Done(config)
                     } catch (e: Exception) {
-                        state = UpdateUi.Failed(e.localizedMessage ?: "Could not reach the update server.")
+                        state = UpdateUi.Failed(e.localizedMessage.orEmpty())
                     }
                 }
 
@@ -95,7 +95,7 @@ class UpdateActivity : ComponentActivity() {
                             title = {},
                             navigationIcon = {
                                 IconButton(onClick = { finish() }, shapes = ExpressiveIconButtonShapes) {
-                                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back")
+                                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.desc_back))
                                 }
                             },
                             colors = TopAppBarDefaults.topAppBarColors(
@@ -121,7 +121,7 @@ class UpdateActivity : ComponentActivity() {
 
                         // App title
                         Text(
-                            "AI Chat",
+                            stringResource(R.string.app_name),
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -134,7 +134,7 @@ class UpdateActivity : ComponentActivity() {
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                         ) {
                             Text(
-                                "v${BuildConfig.VERSION_NAME}  \u00b7  Build ${BuildConfig.VERSION_CODE}",
+                                stringResource(R.string.update_version_badge, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -176,14 +176,14 @@ class UpdateActivity : ComponentActivity() {
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             VersionInfoCard(
-                                label = "Installed",
+                                label = stringResource(R.string.update_label_installed),
                                 version = BuildConfig.VERSION_NAME,
                                 code = BuildConfig.VERSION_CODE.toString(),
                                 icon = Icons.Rounded.PhoneAndroid,
                                 modifier = Modifier.weight(1f)
                             )
                             VersionInfoCard(
-                                label = "Latest",
+                                label = stringResource(R.string.update_label_latest),
                                 version = (state as? UpdateUi.Done)?.config?.appLatestVersion ?: "\u2014",
                                 code = (state as? UpdateUi.Done)?.config?.appLatestCodeVersion?.toString() ?: "\u2014",
                                 icon = Icons.Rounded.Cloud,
@@ -220,7 +220,7 @@ class UpdateActivity : ComponentActivity() {
                                         ) {
                                             Icon(Icons.Rounded.Refresh, null, Modifier.size(20.dp))
                                             Spacer(Modifier.width(8.dp))
-                                            Text("Retry", fontWeight = FontWeight.SemiBold)
+                                            Text(stringResource(R.string.btn_retry), fontWeight = FontWeight.SemiBold)
                                         }
                                     }
 
@@ -254,7 +254,10 @@ class UpdateActivity : ComponentActivity() {
                                                 )
                                                 Spacer(Modifier.width(8.dp))
                                                 Text(
-                                                    if (s.config.updateRequired) "Download Required Update" else "Download Update",
+                                                    stringResource(
+                                                        if (s.config.updateRequired) R.string.btn_download_required_update
+                                                        else R.string.btn_download_update
+                                                    ),
                                                     fontWeight = FontWeight.Bold
                                                 )
                                             }
@@ -269,7 +272,7 @@ class UpdateActivity : ComponentActivity() {
                                                 Modifier.size(18.dp)
                                             )
                                             Spacer(Modifier.width(6.dp))
-                                            Text("Check Again")
+                                            Text(stringResource(R.string.btn_check_again))
                                         }
                                     }
                                 }
@@ -403,7 +406,7 @@ private fun UpdateLoadingCard() {
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text(
-                "Checking for updates",
+                stringResource(R.string.update_status_checking),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
@@ -411,7 +414,7 @@ private fun UpdateLoadingCard() {
                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
             )
             Text(
-                "Contacting update server\u2026",
+                stringResource(R.string.update_status_contacting),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -434,13 +437,13 @@ private fun UpdateErrorCard(message: String) {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                "Connection Failed",
+                stringResource(R.string.update_status_failed),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.error
             )
             Text(
-                message,
+                message.ifBlank { stringResource(R.string.update_error_unreachable) },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onErrorContainer,
                 textAlign = TextAlign.Center
@@ -464,13 +467,13 @@ private fun UpdateUpToDateCard() {
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(
-                "You\u2019re up to date!",
+                stringResource(R.string.update_uptodate_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.tertiary
             )
             Text(
-                "AI Chat is running the latest version.",
+                stringResource(R.string.update_uptodate_sub),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -494,13 +497,13 @@ private fun UpdateAvailableCard(config: AppUpdateConfig) {
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(
-                "Update Available",
+                stringResource(R.string.update_available_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
             Text(
-                "Version ${config.appLatestVersion ?: "?"} is ready to download.",
+                stringResource(R.string.update_available_sub, config.appLatestVersion ?: "?"),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -515,7 +518,7 @@ private fun UpdateAvailableCard(config: AppUpdateConfig) {
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            "What\u2019s New",
+                            stringResource(R.string.update_whats_new),
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -567,14 +570,14 @@ private fun UpdateRequiredCard(config: AppUpdateConfig) {
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    "Update Required",
+                    stringResource(R.string.update_required_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.error
                 )
             }
             Text(
-                "Version ${config.appLatestVersion ?: "?"} is required to continue using the app.",
+                stringResource(R.string.update_required_sub, config.appLatestVersion ?: "?"),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onErrorContainer,
                 textAlign = TextAlign.Center
@@ -589,7 +592,7 @@ private fun UpdateRequiredCard(config: AppUpdateConfig) {
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            "What\u2019s New",
+                            stringResource(R.string.update_whats_new),
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.error
@@ -660,7 +663,7 @@ fun VersionInfoCard(
                 maxLines = 1
             )
             Text(
-                "Code $code",
+                stringResource(R.string.update_label_code, code),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline,
                 fontWeight = FontWeight.Medium

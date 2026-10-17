@@ -452,7 +452,7 @@ fun ChatScreen(
                         ) {
                             Icon(
                                 Icons.Rounded.Menu,
-                                "Menu"
+                                stringResource(R.string.desc_open_menu)
                             )
                         }
                     },
@@ -1021,14 +1021,14 @@ fun ChatScreen(
                         Spacer(Modifier.height(24.dp))
 
                         val suggestions = listOf(
-                            "⚡ Explain a complex concept simply" to
-                                "Explain quantum computing in simple terms with an everyday analogy.",
-                            "💻 Help me debug code" to
-                                "Help me find and fix common performance bottlenecks in Android Kotlin.",
-                            "✍️ Draft a clear email" to
-                                "Draft a polite and concise email requesting a project update.",
-                            "💡 Brainstorm creative ideas" to
-                                "Give me 5 creative ideas for a weekend coding project."
+                            stringResource(R.string.suggestion_explain_title) to
+                                stringResource(R.string.suggestion_explain_prompt),
+                            stringResource(R.string.suggestion_debug_title) to
+                                stringResource(R.string.suggestion_debug_prompt),
+                            stringResource(R.string.suggestion_email_title) to
+                                stringResource(R.string.suggestion_email_prompt),
+                            stringResource(R.string.suggestion_ideas_title) to
+                                stringResource(R.string.suggestion_ideas_prompt)
                         )
 
                         Column(
@@ -1951,7 +1951,9 @@ fun MessageBubble(
                                                             ) {
                                                                 lang.uppercase()
                                                             } else {
-                                                                "CODE"
+                                                                stringResource(
+                                                                    R.string.label_code_block
+                                                                ).uppercase()
                                                             },
                                                         style = MaterialTheme.typography.labelSmall,
                                                         fontWeight = FontWeight.Bold,

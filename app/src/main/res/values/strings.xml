@@ -3,7 +3,7 @@
 
     <!-- Setup Screen -->
     <string name="setup_welcome">Welcome to\nAI Chat</string>
-    <string name="setup_version" translatable="false">Version 2.0 (SunFlower)</string>
+    <string name="setup_version_format">Version %1$s</string>
     <string name="setup_subtitle">Connect your AI provider to begin.</string>
     <string name="label_provider">Provider</string>
     <string name="label_api_key">API Key</string>
@@ -36,6 +36,7 @@
     <string name="empty_models_found">No matching models found</string>
     <string name="label_conversations">Conversations</string>
     <string name="desc_new_chat">New Chat</string>
+    <string name="chat_default_title">New Chat</string>
 
     <!-- Settings Screen -->
     <string name="settings_title">Settings</string>
@@ -95,13 +96,15 @@
     <string name="err_not_found">Model not found. The selected model is currently unavailable.</string>
     <string name="err_rate_limit">Rate limit exceeded. Please wait a moment before trying again.</string>
     <string name="err_server">Server error. The provider is having issues.</string>
-    <string name="err_opencode_zen_forbidden">OpenCode Zen free models can only be used inside the OpenCode app. Add credits to your OpenCode Console account and pick a paid model.</string>
     <string name="err_api_code">API Error: %1$d</string>
     <string name="err_network">Network Error: %1$s</string>
+    <string name="err_detail_connection_failed">Connection failed</string>
 
     <!-- Additional Accessibility & UI Strings -->
     <string name="desc_delete_conversation">Delete conversation</string>
     <string name="desc_conversation_icon">Conversation</string>
+    <string name="desc_open_menu">Open menu</string>
+    <string name="label_code_block">Code</string>
     <string name="desc_remove_image">Remove image</string>
     <string name="desc_attached_image">Attached image</string>
     <string name="desc_user_image">User image</string>
@@ -150,4 +153,40 @@
     <string name="desc_status_icon">Update status indicator</string>
     <string name="desc_download_update">Download update package</string>
     <string name="desc_check_again">Check for updates again</string>
+    <string name="btn_retry">Retry</string>
+    <string name="btn_check_again">Check Again</string>
+
+    <!-- Update Screen -->
+    <string name="update_version_badge">v%1$s  ·  Build %2$d</string>
+    <string name="update_label_installed">Installed</string>
+    <string name="update_label_latest">Latest</string>
+    <string name="update_status_checking">Checking for updates</string>
+    <string name="update_status_contacting">Contacting update server…</string>
+    <string name="update_status_failed">Connection Failed</string>
+    <string name="update_error_unreachable">Could not reach the update server.</string>
+    <string name="update_uptodate_title">You’re up to date!</string>
+    <string name="update_uptodate_sub">AI Chat is running the latest version.</string>
+    <string name="update_available_title">Update Available</string>
+    <string name="update_available_sub">Version %1$s is ready to download.</string>
+    <string name="update_required_title">Update Required</string>
+    <string name="update_required_sub">Version %1$s is required to continue using the app.</string>
+    <string name="update_whats_new">What’s New</string>
+    <string name="btn_download_update">Download Update</string>
+    <string name="btn_download_required_update">Download Required Update</string>
+    <string name="desc_back">Back</string>
+    <string name="desc_hide_api_key">Hide API key</string>
+    <string name="desc_show_api_key">Show API key</string>
+
+    <!-- Empty-state suggestions -->
+    <string name="suggestion_explain_title">⚡ Explain a complex concept simply</string>
+    <string name="suggestion_explain_prompt">Explain quantum computing in simple terms with an everyday analogy.</string>
+    <string name="suggestion_debug_title">💻 Help me debug code</string>
+    <string name="suggestion_debug_prompt">Help me find and fix common performance bottlenecks in Android Kotlin.</string>
+    <string name="suggestion_email_title">✍️ Draft a clear email</string>
+    <string name="suggestion_email_prompt">Draft a polite and concise email requesting a project update.</string>
+    <string name="suggestion_ideas_title">💡 Brainstorm creative ideas</string>
+    <string name="suggestion_ideas_prompt">Give me 5 creative ideas for a weekend coding project.</string>
+
+    <string name="update_label_code">Code %1$s</string>
+    <string name="about_version_code">Version %1$s (Code %2$d)</string>
 </resources>

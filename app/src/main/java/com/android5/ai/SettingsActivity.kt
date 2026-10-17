@@ -1160,7 +1160,7 @@ fun AboutAppSheet(onDismiss: () -> Unit) {
                 color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
             ) {
                 Text(
-                    "Version ${BuildConfig.VERSION_NAME} (Code ${BuildConfig.VERSION_CODE})",
+                    stringResource(R.string.about_version_code, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),

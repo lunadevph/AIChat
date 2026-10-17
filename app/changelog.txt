@@ -1,1 +1,2 @@
-- OpenCode Zen: free models are now listed in the model picker (they stay OpenCode-client-only and report an error if used)
+- Removed the OpenCode Zen provider; it is no longer offered in setup, settings or the model picker.
+- All remaining user-facing text (update screen, setup screen, empty-state suggestions) now comes from translatable string resources.

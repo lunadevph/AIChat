@@ -46,8 +46,8 @@ Kotlin + Jetpack Compose (Material 3). See `README.md` for features and layout.
 - There is no unit/instrumentation test suite; validate changes by compiling
   (`assembleDebug`) and, for UI work, reasoning through the Compose state.
 - Network calls to provider APIs should be exercised deliberately — the live APIs
-  reject requests differently per provider (e.g. OpenCode Zen free tier returns
-  HTTP 403 `FreeTierError` for any third-party client).
+  reject requests differently per provider (invalid keys, rate limits and
+  account-level restrictions each surface as a different error).
 
 ## Versioning
 

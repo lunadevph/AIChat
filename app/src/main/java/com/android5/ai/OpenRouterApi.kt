@@ -30,8 +30,8 @@ interface OpenRouterApi {
         @Body request: ChatRequest
     ): ResponseBody
 
-    // Uses an absolute URL because some providers (e.g. OpenCode Zen) serve their
-    // model catalog and their chat completions endpoint from different base paths.
+    // Takes an absolute URL so a provider's model catalog can be fetched from a
+    // path that differs from its chat base URL (Claude's `/v1/models`, say).
     @GET
     suspend fun getModels(
         @Url url: String,

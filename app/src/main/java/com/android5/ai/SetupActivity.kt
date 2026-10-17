@@ -157,7 +157,7 @@ fun SetupScreen(
             color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
         ) {
             Text(
-                "Version ${BuildConfig.VERSION_NAME}",
+                stringResource(R.string.setup_version_format, BuildConfig.VERSION_NAME),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -226,7 +226,7 @@ fun SetupScreen(
                     ) {
                         Icon(
                             if (apiKeyVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                            contentDescription = if (apiKeyVisible) "Hide API key" else "Show API key",
+                            contentDescription = if (apiKeyVisible) stringResource(R.string.desc_hide_api_key) else stringResource(R.string.desc_show_api_key),
                             Modifier.size(22.dp)
                         )
                     }
@@ -270,7 +270,7 @@ fun SetupScreen(
                         }
                         is Providers.KeyValidation.NetworkError -> {
                             isValidating = false
-                            errorText = context.getString(R.string.err_network, result.detail ?: "connection failed")
+                            errorText = context.getString(R.string.err_network, result.detail ?: context.getString(R.string.err_detail_connection_failed))
                             shakeTrigger++
                         }
                     }

@@ -31,6 +31,8 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
     private val context = application.applicationContext
     private val gson = Gson()
     private val conversationStore = ConversationStore(context)
+    /** Title shown for a conversation that has not been auto-titled yet. */
+    private val defaultChatTitle = context.getString(R.string.chat_default_title)
 
     private fun getApi(): OpenRouterApi {
         return Providers.api(settingsManager.selectedProvider)
@@ -82,7 +84,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
     }
 
     fun createNewConversation() {
-        val newConv = Conversation(title = "New Chat")
+        val newConv = Conversation(title = defaultChatTitle)
         conversations.add(0, newConv)
         selectConversation(newConv)
         saveConversations()
@@ -238,7 +240,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                     nonStreamResponse(authHeader, xApiKeyHeader, anthropicHeader, request)
                 }
 
-                if (currentConversation?.title == "New Chat" && messages.size >= 2) {
+                if (currentConversation?.title == defaultChatTitle && messages.size >= 2) {
                     generateChatTitle(apiKey)
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -257,13 +259,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 val errorMsg = when (e.code()) {
                     401 -> context.getString(R.string.err_unauthorized)
                     402 -> context.getString(R.string.err_insufficient_credits)
-                    // OpenCode Zen's free tier is restricted to the OpenCode client
-                    // itself: third-party requests get HTTP 403 `FreeTierError`.
-                    403 -> if (settingsManager.selectedProvider == "OpenCode Zen") {
-                        context.getString(R.string.err_opencode_zen_forbidden)
-                    } else {
-                        context.getString(R.string.err_forbidden)
-                    }
+                    403 -> context.getString(R.string.err_forbidden)
                     404 -> context.getString(R.string.err_not_found)
                     429 -> context.getString(R.string.err_rate_limit)
                     500, 502, 503 -> context.getString(R.string.err_server)
