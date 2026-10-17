@@ -70,7 +70,7 @@ fun ProviderPicker(
                     ) {
                         Image(
                             painter = painterResource(providerIconRes(info.name)),
-                            contentDescription = info.name,
+                            contentDescription = null,
                             modifier = Modifier
                                 .size(if (compact) 28.dp else 34.dp)
                                 .clip(CircleShape)

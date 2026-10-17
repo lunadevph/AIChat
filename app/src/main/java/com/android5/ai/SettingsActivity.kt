@@ -97,7 +97,7 @@ class SettingsActivity : ComponentActivity() {
                             },
                             navigationIcon = {
                                 IconButton(onClick = { goBack() }, shapes = ExpressiveIconButtonShapes) {
-                                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.btn_cancel))
+                                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.desc_back))
                                 }
                             }
                         )
@@ -493,7 +493,9 @@ fun ApiKeyManagerSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) 
                                     IconButton(onClick = { keyVisible = !keyVisible }, shapes = ExpressiveIconButtonShapes) {
                                         Icon(
                                             if (keyVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                                            contentDescription = null,
+                                            contentDescription = stringResource(
+                                                if (keyVisible) R.string.desc_hide_api_key else R.string.desc_show_api_key
+                                            ),
                                             Modifier.size(20.dp)
                                         )
                                     }
@@ -548,7 +550,7 @@ fun ApiKeyManagerSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) 
                                                 }
                                                 is Providers.KeyValidation.NetworkError -> {
                                                     isValidating = false
-                                                    statusMessage = context.getString(R.string.err_network, result.detail ?: "failed")
+                                                    statusMessage = context.getString(R.string.err_network, result.detail ?: context.getString(R.string.err_detail_connection_failed))
                                                     isError = true
                                                 }
                                             }
@@ -617,6 +619,9 @@ fun SettingsSwitchRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
+    val onLabel = stringResource(R.string.desc_switch_on)
+    val offLabel = stringResource(R.string.desc_switch_off)
+
     Surface(
         onClick = { onCheckedChange(!checked) },
         shape = RoundedCornerShape(22.dp),
@@ -627,7 +632,7 @@ fun SettingsSwitchRow(
             .fillMaxWidth()
             .semantics {
                 this.role = Role.Switch
-                this.stateDescription = if (checked) "On" else "Off"
+                this.stateDescription = if (checked) onLabel else offLabel
             }
     ) {
         Row(

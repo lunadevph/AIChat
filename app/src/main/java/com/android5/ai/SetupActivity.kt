@@ -215,7 +215,7 @@ fun SetupScreen(
                 onDone = { focusManager.clearFocus() }
             ),
             leadingIcon = {
-                Icon(Icons.Rounded.Key, contentDescription = stringResource(R.string.label_api_key), tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.Rounded.Key, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             },
             trailingIcon = {
                 when {

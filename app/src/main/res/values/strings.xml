@@ -104,6 +104,8 @@
     <string name="desc_delete_conversation">Delete conversation</string>
     <string name="desc_conversation_icon">Conversation</string>
     <string name="desc_open_menu">Open menu</string>
+    <string name="desc_switch_on">On</string>
+    <string name="desc_switch_off">Off</string>
     <string name="label_code_block">Code</string>
     <string name="desc_remove_image">Remove image</string>
     <string name="desc_attached_image">Attached image</string>

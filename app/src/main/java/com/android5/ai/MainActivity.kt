@@ -163,22 +163,21 @@ fun ChatScreen(
         viewModel.selectedImageUri = uri
     }
 
-    LaunchedEffect(viewModel.messages.size) {
-        if (viewModel.messages.isNotEmpty()) {
-            listState.animateScrollToItem(viewModel.messages.size - 1)
-        }
-    }
-
+    // One effect keeps the view pinned to the newest message: instantly while a
+    // reply streams in, and with an animation once it lands. Two separate effects
+    // used to fire together on every new message and cancel each other's scroll.
+    val lastMessage = viewModel.messages.lastOrNull()
     LaunchedEffect(
         viewModel.messages.size,
-        viewModel.messages.lastOrNull()?.content,
-        viewModel.messages.lastOrNull()?.isStreaming
+        lastMessage?.content,
+        lastMessage?.isStreaming
     ) {
-        if (
-            viewModel.messages.isNotEmpty() &&
-            viewModel.messages.last().isStreaming
-        ) {
-            listState.scrollToItem(viewModel.messages.size - 1)
+        if (viewModel.messages.isEmpty()) return@LaunchedEffect
+        val lastIndex = viewModel.messages.lastIndex
+        if (lastMessage?.isStreaming == true) {
+            listState.scrollToItem(lastIndex)
+        } else {
+            listState.animateScrollToItem(lastIndex)
         }
     }
 

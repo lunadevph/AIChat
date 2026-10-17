@@ -100,11 +100,14 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         saveConversations()
     }
 
+    /** Provider whose catalog is currently held in [availableModels]. */
+    private var modelsProvider: String? = null
+
     fun fetchModels() {
         val provider = settingsManager.selectedProvider
         val apiKey = settingsManager.apiKey
         viewModelScope.launch {
-            try {
+            val fetched = try {
                 val response = if (!apiKey.isNullOrBlank()) {
                     if (Providers.isAnthropic(provider)) {
                         getApi().getModels(
@@ -119,20 +122,31 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 } else {
                     getApi().getModels(Providers.modelsUrl(provider))
                 }
-                val fetched = response.data.orEmpty()
-                if (fetched.isNotEmpty()) {
-                    availableModels.clear()
-                    availableModels.addAll(fetched.sortedBy { it.displayName })
-                } else {
-                    availableModels.clear()
-                    availableModels.addAll(Providers.defaultModels(provider).sortedBy { it.displayName })
-                }
+                response.data.orEmpty()
             } catch (e: Exception) {
-                availableModels.clear()
-                availableModels.addAll(Providers.defaultModels(provider).sortedBy { it.displayName })
+                null
             }
 
-            if (availableModels.none { it.id == settingsManager.selectedModel }) {
+            // The user may have switched provider while this request was in flight.
+            if (provider != settingsManager.selectedProvider) return@launch
+
+            if (fetched != null && fetched.isNotEmpty()) {
+                availableModels.clear()
+                availableModels.addAll(fetched.sortedBy { it.displayName })
+                modelsProvider = provider
+            } else if (fetched != null || modelsProvider != provider || availableModels.isEmpty()) {
+                // Empty catalog, or a failed fetch with nothing usable on screen:
+                // fall back to the built-in list for this provider.
+                availableModels.clear()
+                availableModels.addAll(Providers.defaultModels(provider).sortedBy { it.displayName })
+                modelsProvider = provider
+            }
+            // Otherwise the fetch failed but the catalog on screen is already this
+            // provider's, so keep it instead of downgrading to the built-in list.
+
+            if (modelsProvider == provider &&
+                availableModels.none { it.id == settingsManager.selectedModel }
+            ) {
                 settingsManager.selectedModel = Providers.defaultModel(provider)
             }
         }
