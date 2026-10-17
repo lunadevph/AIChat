@@ -3,4 +3,5 @@
 - All user-facing text now comes from translatable string resources, including the update, setup, settings and about screens.
 - A failed model-list refresh no longer replaces the full model catalog with a short built-in list, and no longer resets your chosen model.
 - The chat now scrolls to new replies in one smooth motion instead of two competing scrolls.
-- Accessibility: the back arrow, API-key show/hide toggle and switch states are announced correctly, and provider logos are no longer read twice.
+- Conversations, messages and models keep their identity when lists change, so the chat and pickers no longer reshuffle.
+- Accessibility: the back arrow, API-key show/hide toggle and switch states are announced correctly, and logos are no longer read twice.

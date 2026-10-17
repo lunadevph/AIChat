@@ -280,7 +280,7 @@ fun ChatScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(bottom = 16.dp)
                     ) {
-                        items(viewModel.conversations) { conv ->
+                        items(viewModel.conversations, key = { it.id }) { conv ->
                             val selected =
                                 viewModel.currentConversation?.id == conv.id
 
@@ -1068,7 +1068,7 @@ fun ChatScreen(
 
                                         Icon(
                                             Icons.AutoMirrored.Rounded.ArrowForward,
-                                            contentDescription = title,
+                                            contentDescription = null,
                                             Modifier.size(18.dp),
                                             tint = MaterialTheme.colorScheme.primary
                                         )
@@ -1087,7 +1087,7 @@ fun ChatScreen(
                         ),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(viewModel.messages) { message ->
+                        items(viewModel.messages, key = { it.id }) { message ->
                             MessageBubble(
                                 message = message,
                                 settingsManager = settingsManager,
@@ -1353,7 +1353,7 @@ fun ChatScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp)
                     ) {
-                        items(filteredModels) { model ->
+                        items(filteredModels, key = { it.id }) { model ->
                             val selected =
                                 settingsManager.selectedModel == model.id
 

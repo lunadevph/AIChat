@@ -132,13 +132,15 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
 
             if (fetched != null && fetched.isNotEmpty()) {
                 availableModels.clear()
-                availableModels.addAll(fetched.sortedBy { it.displayName })
+                availableModels.addAll(fetched.distinctBy { it.id }.sortedBy { it.displayName })
                 modelsProvider = provider
             } else if (fetched != null || modelsProvider != provider || availableModels.isEmpty()) {
                 // Empty catalog, or a failed fetch with nothing usable on screen:
                 // fall back to the built-in list for this provider.
                 availableModels.clear()
-                availableModels.addAll(Providers.defaultModels(provider).sortedBy { it.displayName })
+                availableModels.addAll(
+                    Providers.defaultModels(provider).distinctBy { it.id }.sortedBy { it.displayName }
+                )
                 modelsProvider = provider
             }
             // Otherwise the fetch failed but the catalog on screen is already this
