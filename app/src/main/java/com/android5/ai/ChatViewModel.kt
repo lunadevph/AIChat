@@ -513,11 +513,16 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
     }
 
     private fun generateChatTitle(apiKey: String) {
+        // The title request is fire-and-forget, so remember which conversation it
+        // belongs to: the user can open another chat while it is still in flight,
+        // and the reply used to be applied to whatever was current on arrival.
+        val conv = currentConversation ?: return
+        val firstMessage = messages.find { it.role == "user" }?.content ?: return
+
         viewModelScope.launch {
             try {
                 val summaryPrompt = "Generate a short title (max 4 words) for this chat. Return only the title."
-                val firstMessage = messages.find { it.role == "user" }?.content ?: return@launch
-                
+
                 val request = ChatRequest(
                     model = settingsManager.selectedModel,
                     messages = listOf(
@@ -532,17 +537,21 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                     anthropicVersion = if (isAnthropic) Providers.ANTHROPIC_VERSION else null,
                     request = request
                 )
-                response.choices.firstOrNull()?.message?.content?.trim()?.let { title ->
-                    if (title.isNotEmpty()) {
-                        currentConversation?.let { conv ->
-                            val updatedConv = conv.copy(title = title.removeSurrounding("\""))
-                            val index = conversations.indexOfFirst { it.id == conv.id }
-                            if (index != -1) conversations[index] = updatedConv
-                            currentConversation = updatedConv
-                            saveConversations()
-                        }
-                    }
-                }
+                val raw = response.choices.firstOrNull()?.message?.content ?: return@launch
+                // Keep the first line only and drop the quoting/bullet decoration
+                // models like to wrap titles in.
+                val title = raw.lineSequence().firstOrNull().orEmpty()
+                    .trim()
+                    .trim('"', '\'', '*', '#', ' ')
+                    .trim()
+                if (title.isEmpty()) return@launch
+
+                val index = conversations.indexOfFirst { it.id == conv.id }
+                if (index == -1) return@launch
+                val updatedConv = conversations[index].copy(title = title)
+                conversations[index] = updatedConv
+                if (currentConversation?.id == conv.id) currentConversation = updatedConv
+                saveConversations()
             } catch (e: Exception) {}
         }
     }

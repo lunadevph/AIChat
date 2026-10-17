@@ -2,6 +2,8 @@
 - If you had OpenCode Zen selected, the app now falls back to the default provider instead of staying on the retired one.
 - All user-facing text now comes from translatable string resources, including the update, setup, settings and about screens.
 - A failed model-list refresh no longer replaces the full model catalog with a short built-in list, and no longer resets your chosen model.
+- A generated chat title can no longer be written to the wrong conversation if you open another chat while it is being created.
 - The chat now scrolls to new replies in one smooth motion instead of two competing scrolls.
 - Conversations, messages and models keep their identity when lists change, so the chat and pickers no longer reshuffle.
+- Copying a code block that has no body no longer copies the language name instead.
 - Accessibility: the back arrow, API-key show/hide toggle and switch states are announced correctly, and logos are no longer read twice.

@@ -1911,7 +1911,7 @@ fun MessageBubble(
 
                                         val code =
                                             trimmedPart
-                                                .substringAfter("\n")
+                                                .substringAfter("\n", "")
                                                 .trim()
 
                                         Surface(
