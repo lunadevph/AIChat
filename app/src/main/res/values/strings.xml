@@ -95,6 +95,7 @@
     <string name="err_not_found">Model not found. The selected model is currently unavailable.</string>
     <string name="err_rate_limit">Rate limit exceeded. Please wait a moment before trying again.</string>
     <string name="err_server">Server error. The provider is having issues.</string>
+    <string name="err_opencode_zen_forbidden">OpenCode Zen free models can only be used inside the OpenCode app. Add credits to your OpenCode Console account and pick a paid model.</string>
     <string name="err_api_code">API Error: %1$d</string>
     <string name="err_network">Network Error: %1$s</string>
 

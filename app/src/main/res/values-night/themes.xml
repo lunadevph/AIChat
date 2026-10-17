@@ -5,7 +5,8 @@
     <item name="windowSplashScreenAnimatedIcon">@drawable/avd_splash</item>
     <item name="windowSplashScreenAnimationDuration">1500</item>
     <item name="postSplashScreenTheme">@style/Theme.AIChat</item>
-    <item name="android:windowLightStatusBar">true</item>
-    <item name="android:windowLightNavigationBar">true</item>
+    <!-- Black splash background: keep light (white) system bar icons. -->
+    <item name="android:windowLightStatusBar">false</item>
+    <item name="android:windowLightNavigationBar">false</item>
 </style>
 </resources>

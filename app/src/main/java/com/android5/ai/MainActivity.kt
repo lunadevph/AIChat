@@ -150,7 +150,9 @@ fun ChatScreen(
     var showMenu by remember { mutableStateOf(false) }
     var showModelSheet by remember { mutableStateOf(false) }
     var showClearConfirm by remember { mutableStateOf(false) }
-    var webSearchOn by remember { mutableStateOf(settingsManager.webSearchEnabled) }
+    // Derived from the persisted setting so a toggle changed in Settings is
+    // reflected here immediately (a remember{} copy went stale until restart).
+    val webSearchOn = settingsManager.webSearchEnabled
     var menuExpanded by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
@@ -273,7 +275,9 @@ fun ChatScreen(
                     Spacer(Modifier.height(12.dp))
 
                     LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(bottom = 16.dp)
                     ) {
@@ -828,9 +832,8 @@ fun ChatScreen(
                                                 }
                                             },
                                             onClick = {
-                                                webSearchOn = !webSearchOn
                                                 settingsManager.webSearchEnabled =
-                                                    webSearchOn
+                                                    !settingsManager.webSearchEnabled
                                                 menuExpanded = false
                                             }
                                         )
@@ -840,7 +843,6 @@ fun ChatScreen(
                                 if (webSearchOn) {
                                     Surface(
                                         onClick = {
-                                            webSearchOn = false
                                             settingsManager.webSearchEnabled = false
                                         },
                                         shape = RoundedCornerShape(50),
@@ -1090,12 +1092,7 @@ fun ChatScreen(
                             MessageBubble(
                                 message = message,
                                 settingsManager = settingsManager,
-                                onRetry = {
-                                    val lastUserMessage = viewModel.messages.lastOrNull { it.role == "user" }
-                                    if (lastUserMessage != null) {
-                                        viewModel.sendMessage(lastUserMessage.content, context)
-                                    }
-                                },
+                                onRetry = { viewModel.regenerateLast() },
                                 onEdit = { content ->
                                     inputText = content
                                 }

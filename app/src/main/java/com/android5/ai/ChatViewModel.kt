@@ -105,16 +105,25 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             try {
                 val response = if (!apiKey.isNullOrBlank()) {
                     if (Providers.isAnthropic(provider)) {
-                        getApi().getModels(authorization = null, xApiKey = apiKey, anthropicVersion = Providers.ANTHROPIC_VERSION)
+                        getApi().getModels(
+                            url = Providers.modelsUrl(provider),
+                            authorization = null,
+                            xApiKey = apiKey,
+                            anthropicVersion = Providers.ANTHROPIC_VERSION
+                        )
                     } else {
-                        getApi().getModels("Bearer $apiKey")
+                        getApi().getModels(Providers.modelsUrl(provider), "Bearer $apiKey")
                     }
                 } else {
-                    getApi().getModels(null)
+                    getApi().getModels(Providers.modelsUrl(provider))
                 }
-                if (!response.data.isNullOrEmpty()) {
+                val fetched = response.data.orEmpty().filter { model ->
+                    // OpenCode Zen free models are blocked for third-party clients.
+                    provider != "OpenCode Zen" || !Providers.isZenFreeModel(model.id)
+                }
+                if (fetched.isNotEmpty()) {
                     availableModels.clear()
-                    availableModels.addAll(response.data.sortedBy { it.displayName })
+                    availableModels.addAll(fetched.sortedBy { it.displayName })
                 } else {
                     availableModels.clear()
                     availableModels.addAll(Providers.defaultModels(provider).sortedBy { it.displayName })
@@ -132,33 +141,62 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
 
     fun sendMessage(content: String, activityContext: Context) {
         if (content.isBlank() && selectedImageUri == null) return
+        if (currentJob != null) return
 
         val imageUri = selectedImageUri
         val localPath = imageUri?.let { saveImageLocally(activityContext, it) }
-        
+
         val userMessage = Message(
-            role = "user", 
+            role = "user",
             content = content,
             localImageUrl = localPath
         )
         messages.add(userMessage)
         updateCurrentConversation()
-        
+
         selectedImageUri = null
-        val apiKey = settingsManager.apiKey ?: return
+        runCompletion()
+    }
+
+    /**
+     * Regenerates the most recent answer. It removes the assistant response(s)
+     * after the last user turn and re-runs the request *without* appending the
+     * user message again — the previous retry path called [sendMessage], which
+     * duplicated the user's message on every regeneration.
+     */
+    fun regenerateLast() {
+        if (currentJob != null) return
+        if (messages.none { it.role == "user" }) return
+        while (messages.isNotEmpty() && messages.last().role != "user") {
+            messages.removeAt(messages.lastIndex)
+        }
+        updateCurrentConversation()
+        runCompletion()
+    }
+
+    private fun runCompletion() {
+        val prompt = messages.lastOrNull { it.role == "user" }?.content ?: return
+        val apiKey = settingsManager.apiKey
+        if (apiKey.isNullOrBlank()) {
+            // Surface the problem instead of silently doing nothing when the
+            // selected provider has no usable key.
+            messages.add(Message(role = "assistant", content = context.getString(R.string.err_unauthorized)))
+            updateCurrentConversation()
+            return
+        }
 
         currentJob = viewModelScope.launch {
             val webSearchOn = settingsManager.webSearchEnabled
-            val isImageQuery = content.contains("image", ignoreCase = true) ||
-                    content.contains("photo", ignoreCase = true) ||
-                    content.contains("picture", ignoreCase = true) ||
-                    content.contains("show me", ignoreCase = true) ||
-                    content.contains("wallpaper", ignoreCase = true) ||
-                    content.contains("pic", ignoreCase = true)
+            val isImageQuery = prompt.contains("image", ignoreCase = true) ||
+                    prompt.contains("photo", ignoreCase = true) ||
+                    prompt.contains("picture", ignoreCase = true) ||
+                    prompt.contains("show me", ignoreCase = true) ||
+                    prompt.contains("wallpaper", ignoreCase = true) ||
+                    prompt.contains("pic", ignoreCase = true)
 
             loadingStatus = when {
                 webSearchOn || isImageQuery -> LoadingStatus.SEARCHING
-                content.contains("create", ignoreCase = true) && content.contains("image", ignoreCase = true) -> LoadingStatus.CREATING_IMAGE
+                prompt.contains("create", ignoreCase = true) && prompt.contains("image", ignoreCase = true) -> LoadingStatus.CREATING_IMAGE
                 else -> LoadingStatus.THINKING
             }
 
@@ -166,9 +204,9 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 var searchGrounding: String? = null
                 if (webSearchOn || isImageQuery) {
                     loadingStatus = LoadingStatus.SEARCHING
-                    val results = WebSearchService.search(content, maxResults = 5)
-                    val images = WebSearchService.searchImages(content, maxResults = 4)
-                    searchGrounding = WebSearchService.formatGroundingContext(content, results, images)
+                    val results = WebSearchService.search(prompt, maxResults = 5)
+                    val images = WebSearchService.searchImages(prompt, maxResults = 4)
+                    searchGrounding = WebSearchService.formatGroundingContext(prompt, results, images)
                     loadingStatus = LoadingStatus.THINKING
                 }
 
@@ -222,7 +260,11 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 val errorMsg = when (e.code()) {
                     401 -> context.getString(R.string.err_unauthorized)
                     402 -> context.getString(R.string.err_insufficient_credits)
-                    403 -> context.getString(R.string.err_forbidden)
+                    403 -> if (settingsManager.selectedProvider == "OpenCode Zen") {
+                        context.getString(R.string.err_opencode_zen_forbidden)
+                    } else {
+                        context.getString(R.string.err_forbidden)
+                    }
                     404 -> context.getString(R.string.err_not_found)
                     429 -> context.getString(R.string.err_rate_limit)
                     500, 502, 503 -> context.getString(R.string.err_server)

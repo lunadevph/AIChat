@@ -43,7 +43,14 @@ fun AIChatTheme(
     themeMode: String = "dynamic",
     content: @Composable () -> Unit
 ) {
-    val darkTheme = themeMode != "light"
+    // "light" is always light, "amoled" is always dark; "dynamic" follows the
+    // system light/dark setting (previously it was hard-coded to dark, so the
+    // "Dynamic (System)" option never respected a light system theme).
+    val darkTheme = when (themeMode) {
+        "light" -> false
+        "amoled" -> true
+        else -> isSystemInDarkTheme()
+    }
     val useDynamic = themeMode == "dynamic"
     val isAmoled = themeMode == "amoled"
 

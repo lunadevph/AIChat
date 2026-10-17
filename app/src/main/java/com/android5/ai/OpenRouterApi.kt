@@ -6,6 +6,7 @@ import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.GET
 import retrofit2.http.Streaming
+import retrofit2.http.Url
 
 interface OpenRouterApi {
     @POST("chat/completions")
@@ -29,8 +30,11 @@ interface OpenRouterApi {
         @Body request: ChatRequest
     ): ResponseBody
 
-    @GET("models")
+    // Uses an absolute URL because some providers (e.g. OpenCode Zen) serve their
+    // model catalog and their chat completions endpoint from different base paths.
+    @GET
     suspend fun getModels(
+        @Url url: String,
         @Header("Authorization") authorization: String? = null,
         @Header("x-api-key") xApiKey: String? = null,
         @Header("anthropic-version") anthropicVersion: String? = null

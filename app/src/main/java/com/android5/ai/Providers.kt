@@ -23,7 +23,7 @@ object Providers {
         Info("Claude", "Anthropic Claude Opus 4.1 & Sonnet 4", "sk-ant-", "https://console.anthropic.com/settings/keys"),
         Info("Mistral", "Mistral Large 3, Medium 3.5 & Codestral", "…", "https://console.mistral.ai/api-keys"),
         Info("Grok", "xAI Grok 4.6 & 4.x family", "xai-", "https://console.x.ai"),
-        Info("OpenCode Zen", "Curated fast models for coding & reasoning", "opencode-", "https://opencode.ai/zen")
+        Info("OpenCode Zen", "Curated coding models via OpenCode Console", "opencode-", "https://opencode.ai/console")
     )
 
     fun info(provider: String): Info = ALL.firstOrNull { it.name == provider }
@@ -53,8 +53,20 @@ object Providers {
         "Claude" -> "https://api.anthropic.com/v1/"
         "Mistral" -> "https://api.mistral.ai/v1/"
         "Grok" -> "https://api.x.ai/v1/"
-        "OpenCode Zen" -> "https://opencode.ai/zen/v1/"
+        "OpenCode Zen" -> "https://opencode.ai/inference/openai/v1/"
         else -> "https://openrouter.ai/api/v1/"
+    }
+
+    /**
+     * Base URL used to fetch a provider's model catalog.
+     *
+     * Most providers expose it as `{baseUrl}models`, but OpenCode Zen serves the
+     * OpenAI-compatible chat endpoint and the model list under different paths:
+     * chat lives at `…/inference/openai/v1/` while the catalog is `…/inference/v1/models`.
+     */
+    fun modelsUrl(provider: String): String = when (provider) {
+        "OpenCode Zen" -> "https://opencode.ai/inference/v1/models"
+        else -> baseUrl(provider) + "models"
     }
 
     fun isAnthropic(provider: String): Boolean = provider == "Claude"
@@ -83,6 +95,7 @@ object Providers {
                 }
                 "Claude" -> try {
                     val models = api(provider, forValidation = true).getModels(
+                        url = modelsUrl(provider),
                         authorization = null,
                         xApiKey = key,
                         anthropicVersion = ANTHROPIC_VERSION
@@ -92,7 +105,7 @@ object Providers {
                     handleHttpError(e)
                 }
                 else -> try {
-                    val models = api(provider, forValidation = true).getModels("Bearer $key")
+                    val models = api(provider, forValidation = true).getModels(modelsUrl(provider), "Bearer $key")
                     if (!models.data.isNullOrEmpty()) KeyValidation.Valid else KeyValidation.InvalidKey
                 } catch (e: HttpException) {
                     handleHttpError(e)
@@ -203,15 +216,29 @@ object Providers {
             ModelInfo(id = "grok-3-mini", name = "Grok 3 Mini", description = "Lightweight fast thinking model", architecture = Architecture(modality = "text+image->text"))
         )
         "OpenCode Zen" -> listOf(
+            // Frontier coding models (paid, via OpenCode Console)
             ModelInfo(id = "claude-sonnet-4-6", name = "Claude Sonnet 4.6", description = "Top-tier frontier coding & reasoning via Zen", architecture = Architecture(modality = "text+image->text")),
             ModelInfo(id = "claude-opus-4-6", name = "Claude Opus 4.6", description = "Deep reasoning & architecture via Zen", architecture = Architecture(modality = "text+image->text")),
+            ModelInfo(id = "claude-opus-4-5", name = "Claude Opus 4.5", description = "High-capability coding & analysis via Zen", architecture = Architecture(modality = "text+image->text")),
+            ModelInfo(id = "claude-haiku-4-5", name = "Claude Haiku 4.5", description = "Fast, low-cost Claude model via Zen", architecture = Architecture(modality = "text+image->text")),
             ModelInfo(id = "gpt-5.6-sol", name = "GPT-5.6 Sol", description = "OpenAI frontier model via Zen", architecture = Architecture(modality = "text+image->text")),
+            ModelInfo(id = "gpt-5.6-terra", name = "GPT-5.6 Terra", description = "Balanced OpenAI reasoning model via Zen", architecture = Architecture(modality = "text+image->text")),
+            ModelInfo(id = "gpt-5.5", name = "GPT-5.5", description = "Previous-gen OpenAI frontier via Zen", architecture = Architecture(modality = "text+image->text")),
+            ModelInfo(id = "gpt-5.1-codex-max", name = "GPT-5.1 Codex Max", description = "Agentic coding model via Zen", architecture = Architecture(modality = "text->text")),
             ModelInfo(id = "gemini-3.8-flash", name = "Gemini 3.8 Flash", description = "High-speed multimodal coding & vision via Zen", architecture = Architecture(modality = "text+image->text")),
-            ModelInfo(id = "deepseek-v4-flash", name = "DeepSeek V4 Flash", description = "Ultra-fast coding workhorse via Zen", architecture = Architecture(modality = "text->text")),
-            ModelInfo(id = "deepseek-v4-flash-free", name = "DeepSeek V4 Flash (Free)", description = "Free tier DeepSeek coding model", architecture = Architecture(modality = "text->text")),
+            ModelInfo(id = "gemini-3.7-flash", name = "Gemini 3.7 Flash", description = "Google agentic workhorse via Zen", architecture = Architecture(modality = "text+image->text")),
+            ModelInfo(id = "grok-4.6", name = "Grok 4.6", description = "xAI flagship coding & agent model via Zen", architecture = Architecture(modality = "text+image->text")),
+            ModelInfo(id = "grok-4.5", name = "Grok 4.5", description = "Opus-class coding model via Zen", architecture = Architecture(modality = "text+image->text")),
+            ModelInfo(id = "deepseek-v4.1-flash", name = "DeepSeek V4.1 Flash", description = "Fast, low-cost coding workhorse via Zen", architecture = Architecture(modality = "text->text")),
+            ModelInfo(id = "deepseek-v4-pro", name = "DeepSeek V4 Pro", description = "Flagship DeepSeek agentic model via Zen", architecture = Architecture(modality = "text->text")),
             ModelInfo(id = "qwen3.8-flash", name = "Qwen 3.8 Flash", description = "Alibaba frontier model via Zen", architecture = Architecture(modality = "text->text")),
-            ModelInfo(id = "nemotron-3-ultra-free", name = "Nemotron 3 Ultra (Free)", description = "Free NVIDIA frontier model via Zen", architecture = Architecture(modality = "text->text")),
-            ModelInfo(id = "big-pickle", name = "Big Pickle (Free)", description = "Fast free open-weight model via Zen", architecture = Architecture(modality = "text->text"))
+            ModelInfo(id = "qwen3.8-max", name = "Qwen 3.8 Max", description = "Alibaba flagship reasoning model via Zen", architecture = Architecture(modality = "text->text")),
+            ModelInfo(id = "kimi-k3", name = "Kimi K3", description = "Moonshot frontier long-context model via Zen", architecture = Architecture(modality = "text->text")),
+            ModelInfo(id = "kimi-k2.7-code", name = "Kimi K2.7 Code", description = "Specialized coding & agent model via Zen", architecture = Architecture(modality = "text->text")),
+            ModelInfo(id = "glm-5.3", name = "GLM 5.3", description = "Zhipu flagship coding model via Zen", architecture = Architecture(modality = "text->text")),
+            ModelInfo(id = "glm-5.3-flash", name = "GLM 5.3 Flash", description = "Fast Zhipu model via Zen", architecture = Architecture(modality = "text->text")),
+            ModelInfo(id = "minimax-m3", name = "MiniMax M3", description = "MiniMax agentic model via Zen", architecture = Architecture(modality = "text->text")),
+            ModelInfo(id = "mistral-large-4", name = "Mistral Large 4", description = "Mistral flagship multimodal model via Zen", architecture = Architecture(modality = "text+image->text"))
         )
         else -> listOf(
             // Free models (OpenRouter)
@@ -234,5 +261,17 @@ object Providers {
     private fun handleHttpError(e: HttpException): Providers.KeyValidation = when (e.code()) {
         401, 403 -> KeyValidation.InvalidKey
         else -> KeyValidation.NetworkError("HTTP ${e.code()}")
+    }
+
+    /**
+     * OpenCode Zen's free tier is locked to the OpenCode client itself. Requests
+     * from third-party apps are rejected with HTTP 403 `FreeTierError`
+     * ("OpenCode's free tier can only be used from within OpenCode"), for *any*
+     * API key. Because this app can never use them, free Zen models are filtered
+     * out of the model picker so users don't select a model that always fails.
+     */
+    fun isZenFreeModel(modelId: String): Boolean {
+        val id = modelId.lowercase()
+        return id.endsWith("-free") || id == "big-pickle"
     }
 }
