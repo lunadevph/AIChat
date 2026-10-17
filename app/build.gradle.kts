@@ -34,11 +34,46 @@ fun loadVersionProps(): Properties {
     return props
 }
 
+// Computes the version a release build should use: same calendar-versioning rule
+// as BumpAppVersions, but without writing anything. It is called during
+// configuration (so the new version is stamped into *this* build) and again by
+// the BumpAppVersions task (so it is persisted). Both reads see the same file,
+// so both produce the same value.
+fun nextBump(): Triple<String, Int, String> {
+    val props = loadVersionProps()
+    val stamp = todayStamp()
+
+    val storedStamp = props["VERSION_STAMP"] as? String
+    val storedBuild = (props["BUILD_COUNTER"] as? String)?.toIntOrNull() ?: 0
+
+    // Counter resets to 1 on a new day; within the same day it keeps climbing.
+    val build = if (storedStamp == stamp && storedBuild > 0) storedBuild + 1 else 1
+    return Triple(stamp, build, nameFor(stamp, build))
+}
+
+// Auto-bump on release builds unless -PnoBump is passed. Never bumps on debug builds.
+val noBumpRequested = project.hasProperty("noBump")
+val isReleaseBuildRequested = gradle.startParameter.taskNames.any { name ->
+    name.contains("Release", ignoreCase = true)
+}
+val shouldBump = isReleaseBuildRequested && !noBumpRequested
+
 val versionProps = loadVersionProps()
-val currentVersionCode = (versionProps["VERSION_CODE"] as? String)?.toIntOrNull()
-    ?: codeFor(todayStamp(), 1)
-val currentVersionName = (versionProps["VERSION_NAME"] as? String)
-    ?: nameFor(todayStamp(), 1)
+val currentVersion: Pair<Int, String> = if (shouldBump) {
+    // AGP resolves versionName/versionCode at configuration time, so the bump must
+    // be applied here -- a task-time-only bump would ship an APK still carrying the
+    // previous version (the write only lands on the *next* build).
+    val (stamp, build, name) = nextBump()
+    codeFor(stamp, build) to name
+} else {
+    val code = (versionProps["VERSION_CODE"] as? String)?.toIntOrNull()
+        ?: codeFor(todayStamp(), 1)
+    val name = (versionProps["VERSION_NAME"] as? String)
+        ?: nameFor(todayStamp(), 1)
+    code to name
+}
+val currentVersionCode = currentVersion.first
+val currentVersionName = currentVersion.second
 
 android {
     namespace = "com.android5.ai"
@@ -104,18 +139,14 @@ val bumpAppVersionsTask = tasks.register("BumpAppVersions") {
     group = "versioning"
     doLast {
         val props = loadVersionProps()
-        val stamp = todayStamp()
-
-        val storedStamp = props["VERSION_STAMP"] as? String
-        val storedBuild = (props["BUILD_COUNTER"] as? String)?.toIntOrNull() ?: 0
-
-        // Counter resets to 1 on a new day; within the same day it keeps climbing.
-        val build = if (storedStamp == stamp && storedBuild > 0) storedBuild + 1 else 1
+        // Same computation the release build used to stamp this APK, so the
+        // persisted version always matches the artifact that was built.
+        val (stamp, build, name) = nextBump()
 
         props["VERSION_STAMP"] = stamp
         props["BUILD_COUNTER"] = build.toString()
         props["VERSION_CODE"] = codeFor(stamp, build).toString()
-        props["VERSION_NAME"] = nameFor(stamp, build)
+        props["VERSION_NAME"] = name
 
         versionPropsFile.outputStream().use {
             props.store(it, "Auto-generated calendar version (YY.MM.DD.build)")
@@ -129,14 +160,11 @@ val bumpAppVersionsTask = tasks.register("BumpAppVersions") {
     }
 }
 
-// Auto-bump on release builds unless -PnoBump is passed.
-// Never bump on debug builds.
-// Usage: gradlew assembleRelease -PnoBump (skips version bump)
-val isReleaseBuildRequested = gradle.startParameter.taskNames.any { name ->
-    name.contains("Release", ignoreCase = true)
-}
-
-if (isReleaseBuildRequested && !project.hasProperty("noBump")) {
+// Wire the persisting bump task into release builds (unless -PnoBump). The value
+// stamped into this build was already resolved above (shouldBump).
+// Usage: gradlew assembleRelease            (bumps and stamps this build)
+//        gradlew assembleRelease -PnoBump   (skips the bump)
+if (shouldBump) {
     tasks.named("preBuild") {
         dependsOn(bumpAppVersionsTask)
     }

@@ -53,9 +53,14 @@ Kotlin + Jetpack Compose (Material 3). See `README.md` for features and layout.
 
 - `app/version.properties` is auto-generated calendar versioning (`YY.MM.DD.build`,
   e.g. `261017.001`); `VERSION_CODE = YYMMDD * 1000 + build`.
-- `assembleRelease` bumps it automatically via the `BumpAppVersions` task. Pass
-  `-PnoBump` to skip (e.g. when you already bumped and committed).
-- Bump with `./gradlew bumpVersion`, then build with `-PnoBump` so it is bumped once.
+- Release builds (`assembleRelease`, `uploadRelease`, …) bump the version once. AGP
+  resolves `versionName`/`versionCode` at **configuration** time, so the bumped
+  values are computed there and stamped into the APK, while `BumpAppVersions`
+  persists them to `version.properties` — the APK and the file always agree.
+- Pass `-PnoBump` to build without bumping (e.g. to rebuild an existing release).
+- To bump by hand: `./gradlew bumpVersion`, then build with `-PnoBump`.
+- Never publish a release whose APK version does not match `version.properties`;
+  that mismatch is exactly the bug the configuration-time resolve prevents.
 
 ## Release / publishing
 
