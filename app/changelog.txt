@@ -1,3 +1,8 @@
-- Initial release of v2.9.9
-- Fixed updater version mismatch bug
-- Improved update system with changelog support
+- OpenCode Zen: fixed chat and model-list endpoints (OpenAI-compatible base URL + separate model catalog path)
+- OpenCode Zen: hide free-tier models that reject third-party clients (HTTP 403)
+- Fixed the web search toggle not reflecting changes made in Settings
+- Retry/regenerate no longer duplicates the user message
+- Show an error when sending without a valid API key for the active provider
+- Dynamic (System) theme now follows the system light/dark setting
+- Fixed invisible system-bar icons on the night splash screen
+- Fixed the conversation drawer list being clipped at the bottom
