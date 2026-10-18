@@ -12,9 +12,11 @@ A native Android client for chatting with large language models. Bring your own 
 - **Vision input.** Attach images to messages on models that support multimodal input.
 - **Streaming responses.** Tokens render as they arrive, and generation can be stopped mid-flight.
 - **Web search.** Optional per-request toggle for up-to-date answers.
+- **Tool calls.** The assistant can read, write, search and delete files in a private workspace, save and compact its own memory, search the web and check the date and time, using tags such as `<read path="notes.md"/>`. Runs are shown in the transcript and can be switched off in settings.
 - **Memory.** Custom instructions, long-term user memory, and AI self-managed memory.
 - **Model parameters.** Temperature, top-P, max tokens, frequency penalty, and presence penalty, with reset-to-defaults.
 - **Conversation history.** Multiple stored conversations, with clear and delete.
+- **Material 3 Expressive.** Dynamic color, a flexible app bar, split button, toggle button, morphing loading and wavy progress indicators, the Material shape library and expressive type styles.
 - **Themes.** AMOLED dark, light, and dynamic system theming.
 - **In-app updates.** Checks a mirror for newer builds and installs them in place.
 
@@ -90,6 +92,7 @@ Model IDs and default selections are defined in `app/src/main/java/com/android5/
 app/src/main/java/com/android5/ai/
 ├── MainActivity.kt        Chat screen and Compose UI
 ├── ChatViewModel.kt       Chat state, streaming, model params
+├── AiTools.kt             In-band tool calls (<read/>, <write/>, <memory/>, …)
 ├── Providers.kt           Provider registry, endpoints, key validation
 ├── OpenRouterApi.kt       Retrofit chat API
 ├── SettingsManager.kt     Persisted preferences
