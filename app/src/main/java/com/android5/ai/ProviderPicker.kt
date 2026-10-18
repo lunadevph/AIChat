@@ -35,11 +35,11 @@ fun ProviderPicker(
     modifier: Modifier = Modifier,
     compact: Boolean = false
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Providers.ALL.forEach { info ->
             val isSelected = info.name == selected
             Surface(
-                shape = RoundedCornerShape(22.dp),
+                shape = RoundedCornerShape(18.dp),
                 color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
                         else MaterialTheme.colorScheme.surfaceContainerHigh,
                 border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
@@ -56,8 +56,8 @@ fun ProviderPicker(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(
-                        horizontal = 16.dp,
-                        vertical = if (compact) 12.dp else 16.dp
+                        horizontal = 14.dp,
+                        vertical = if (compact) 8.dp else 12.dp
                     )
                 ) {
                     Box(

@@ -1,6 +1,14 @@
 package com.android5.ai
 
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import androidx.core.content.FileProvider
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -12,13 +20,16 @@ import java.util.Locale
  * talks to arbitrary OpenAI-compatible endpoints, so the model is given a plain
  * tag protocol instead and the app does the parsing:
  *
- *     <read path="notes/todo.md"/>
- *     <write path="notes/todo.md">…</write>
- *     <list/>
+ *     <read path="notes/todo.md"/>          <cat path="notes/todo.md"/>
+ *     <write path="notes/todo.md">…</write> <append path="log.md">…</append>
+ *     <edit path="x.md" find="a" replace="b"/>
+ *     <list/>            <search query="launch plan"/>
+ *     <mkdir path="notes/2026"/>            <move from="a" to="b"/>   <copy from="a" to="b"/>
  *     <delete path="notes/todo.md"/>
- *     <search query="launch plan"/>
- *     <memory>…complete memory…</memory>
- *     <compact max="1200"/>
+ *     <download url="https://…"/>           <fetch url="https://…"/>
+ *     <upload path="/storage/emulated/0/Download/x.pdf"/>
+ *     <open path="chart.png"/>
+ *     <memory>…complete memory…</memory>    <compact max="1200"/>
  *     <websearch>latest android 17 features</websearch>
  *     <time/>
  *
@@ -60,8 +71,22 @@ object AiTools {
     )
 
     val names = listOf(
-        "read", "write", "list", "delete", "search", "memory", "compact", "websearch", "time"
+        "read", "cat", "write", "append", "edit", "list", "delete", "search",
+        "mkdir", "move", "copy", "download", "fetch", "upload", "open",
+        "memory", "compact", "websearch", "time"
     )
+
+    /**
+     * Tools whose [Run.label] is a workspace-relative path rather than a summary,
+     * so the transcript can link a run back to the file it touched.
+     */
+    val fileTools = setOf(
+        "read", "cat", "write", "append", "edit", "delete", "mkdir",
+        "move", "copy", "download", "upload"
+    )
+
+    /** Largest single download, so a stray link cannot fill the device. */
+    private const val MAX_DOWNLOAD_BYTES = 25L * 1024 * 1024
 
     private val blockRegex = Regex(
         """<([a-zA-Z][a-zA-Z0-9_-]*)((?:\s+[a-zA-Z_][\w-]*\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*>([\s\S]*?)</\1\s*>"""
@@ -169,7 +194,18 @@ object AiTools {
     // -------------------------------------------------------------- execution
 
     /** Where tools read and write, plus the knobs the callers care about. */
-    class Scope(val root: File, val settings: SettingsManager, val maxChars: Int = 12_000) {
+    class Scope(
+        val root: File,
+        val settings: SettingsManager,
+        val maxChars: Int = 12_000,
+        /**
+         * Directories outside [root] the tools may reach, and only once the user
+         * has granted storage access. Empty means the workspace is a hard wall.
+         */
+        val deviceRoots: List<File> = emptyList(),
+        /** Used by the tools that hand work to the system (download, open). */
+        val context: Context? = null
+    ) {
         /** Confines [raw] to [root]; null when it escapes or is blank. */
         fun resolve(raw: String): File? {
             val cleaned = raw.trim()
@@ -188,6 +224,33 @@ object AiTools {
             }
         }
 
+        /**
+         * Resolves a path the user granted access to: an absolute device path, or
+         * a path relative to one of [deviceRoots]. Null when access is off or the
+         * path lands outside [deviceRoots].
+         */
+        fun resolveDevice(raw: String): File? {
+            if (deviceRoots.isEmpty()) return null
+            val cleaned = raw.trim().replace('\\', '/').trim()
+            if (cleaned.isEmpty()) return null
+            val candidates = if (cleaned.startsWith("/")) {
+                listOf(File(cleaned))
+            } else {
+                deviceRoots.map { File(it, cleaned) }
+            }
+            return candidates
+                .map { it.canonicalFile }
+                .firstOrNull { target -> withinDevice(target) }
+        }
+
+        private fun withinDevice(target: File): Boolean {
+            val path = target.path
+            return deviceRoots.any { deviceRoot ->
+                val devicePath = deviceRoot.canonicalFile.path
+                path == devicePath || path.startsWith(devicePath + File.separator)
+            }
+        }
+
         fun rel(file: File): String =
             file.relativeToOrNull(root)?.path?.takeIf { it.isNotEmpty() } ?: file.name
     }
@@ -195,10 +258,20 @@ object AiTools {
     suspend fun execute(call: Call, scope: Scope): Run = try {
         when (call.name) {
             "read" -> read(call, scope)
+            "cat" -> read(call, scope).copy(name = "cat")
             "write" -> write(call, scope)
+            "append" -> append(call, scope)
+            "edit" -> edit(call, scope)
             "list" -> list(call, scope)
             "delete" -> delete(call, scope)
             "search" -> search(call, scope)
+            "mkdir" -> mkdir(call, scope)
+            "move" -> move(call, scope)
+            "copy" -> copy(call, scope)
+            "download" -> download(call, scope)
+            "fetch" -> fetch(call, scope)
+            "upload" -> upload(call, scope)
+            "open" -> open(call, scope)
             "memory" -> memory(call, scope)
             "compact" -> compact(call, scope)
             "websearch" -> webSearch(call)
@@ -305,6 +378,345 @@ object AiTools {
             fail("delete", "Could not delete $label.")
         }
     }
+
+    private fun append(call: Call, scope: Scope): Run {
+        val path = call.path
+            ?: return fail("append", """Missing path. Use <append path="log.md">text</append>.""")
+        if (call.content.isBlank()) {
+            return fail("append", "Nothing to append: put the text between the tags.")
+        }
+        val file = scope.resolve(path)
+            ?: return fail("append", "'$path' is outside the workspace.")
+        if (file.isDirectory) return fail("append", "${scope.rel(file)} is a directory, not a file.")
+        val existed = file.exists()
+        file.parentFile?.mkdirs()
+        file.appendText(call.content)
+        return Run(
+            "append", true, scope.rel(file),
+            "${if (existed) "Appended to" else "Created"} ${scope.rel(file)} " +
+                "(${call.content.length} characters added, ${file.length()} bytes on disk)."
+        )
+    }
+
+    private fun edit(call: Call, scope: Scope): Run {
+        val path = call.path
+            ?: return fail(
+                "edit",
+                """Missing path. Use <edit path="notes.md" find="old" replace="new"/>."""
+            )
+        val find = call.attrs["find"] ?: call.attrs["old"] ?: call.attrs["search"]
+        if (find.isNullOrEmpty()) {
+            return fail(
+                "edit",
+                """Missing find. Use <edit path="notes.md" find="old" replace="new"/>."""
+            )
+        }
+        val replace = call.attrs["replace"] ?: call.attrs["new"] ?: call.attrs["with"] ?: ""
+        val file = scope.resolve(path)
+            ?: return fail("edit", "'$path' is outside the workspace.")
+        if (!file.isFile) return fail("edit", "No such file: ${scope.rel(file)}.")
+        val text = file.readText()
+        val occurrences = text.split(find).size - 1
+        if (occurrences == 0) {
+            return fail(
+                "edit",
+                "That text is not in ${scope.rel(file)}: \"${find.take(120)}\". " +
+                    "Use <read path=\"${scope.rel(file)}\"/> to see the current contents."
+            )
+        }
+        val all = call.attrs["all"]?.equals("true", ignoreCase = true) == true
+        val updated = if (all) text.replace(find, replace) else text.replaceFirst(find, replace)
+        file.writeText(updated)
+        val done = if (all) occurrences else 1
+        return Run(
+            "edit", true, scope.rel(file),
+            "Replaced $done of $occurrences occurrence(s) in ${scope.rel(file)} " +
+                "(${file.length()} bytes on disk)."
+        )
+    }
+
+    private fun mkdir(call: Call, scope: Scope): Run {
+        val path = call.path
+            ?: return fail("mkdir", """Missing path. Use <mkdir path="notes/2026"/>.""")
+        val dir = scope.resolve(path)
+            ?: return fail("mkdir", "'$path' is outside the workspace.")
+        if (dir.isDirectory) return Run("mkdir", true, scope.rel(dir), "${scope.rel(dir)} already exists.")
+        if (dir.exists()) return fail("mkdir", "${scope.rel(dir)} is a file, not a folder.")
+        return if (dir.mkdirs()) {
+            Run("mkdir", true, scope.rel(dir), "Created folder ${scope.rel(dir)}.")
+        } else {
+            fail("mkdir", "Could not create ${scope.rel(dir)}.")
+        }
+    }
+
+    private fun move(call: Call, scope: Scope): Run {
+        val from = call.attrs["from"] ?: call.attrs["path"] ?: call.path
+            ?: return fail("move", """Missing from. Use <move from="a.txt" to="b.txt"/>.""")
+        val to = call.attrs["to"] ?: call.attrs["dest"] ?: call.attrs["destination"]
+            ?: return fail("move", """Missing to. Use <move from="a.txt" to="b.txt"/>.""")
+        val source = scope.resolve(from)
+            ?: return fail("move", "'$from' is outside the workspace.")
+        val target = scope.resolve(to)
+            ?: return fail("move", "'$to' is outside the workspace.")
+        if (!source.exists()) return fail("move", "No such file: ${scope.rel(source)}.")
+        if (target.exists()) return fail("move", "${scope.rel(target)} already exists.")
+        target.parentFile?.mkdirs()
+        return if (source.renameTo(target)) {
+            Run("move", true, scope.rel(target), "Moved ${scope.rel(source)} to ${scope.rel(target)}.")
+        } else {
+            fail("move", "Could not move ${scope.rel(source)} to ${scope.rel(target)}.")
+        }
+    }
+
+    private fun copy(call: Call, scope: Scope): Run {
+        val from = call.attrs["from"] ?: call.attrs["path"] ?: call.path
+            ?: return fail("copy", """Missing from. Use <copy from="a.txt" to="b.txt"/>.""")
+        val to = call.attrs["to"] ?: call.attrs["dest"] ?: call.attrs["destination"]
+            ?: return fail("copy", """Missing to. Use <copy from="a.txt" to="b.txt"/>.""")
+        val source = scope.resolve(from)
+            ?: return fail("copy", "'$from' is outside the workspace.")
+        val target = scope.resolve(to)
+            ?: return fail("copy", "'$to' is outside the workspace.")
+        if (!source.isFile) return fail("copy", "No such file: ${scope.rel(source)}.")
+        target.parentFile?.mkdirs()
+        return try {
+            source.copyTo(target, overwrite = true)
+            Run(
+                "copy", true, scope.rel(target),
+                "Copied ${scope.rel(source)} to ${scope.rel(target)} (${target.length()} bytes)."
+            )
+        } catch (e: Exception) {
+            fail("copy", "Could not copy ${scope.rel(source)}: ${e.message ?: "no detail"}")
+        }
+    }
+
+    /** Fetches a URL into the workspace: files, images, data, anything. */
+    private suspend fun download(call: Call, scope: Scope): Run {
+        val url = call.attrs["url"] ?: call.attrs["href"]
+            ?: call.body.trim().takeIf { it.startsWith("http") }
+            ?: return fail("download", """Missing url. Use <download url="https://…"/>.""")
+        val name = call.attrs["path"] ?: call.attrs["file"]
+            ?: url.substringBefore('?').substringAfterLast('/').takeIf { it.isNotBlank() }
+            ?: "download"
+        val file = scope.resolve(name)
+            ?: return fail("download", "Cannot save to '$name': it is outside the workspace.")
+
+        return withContext(Dispatchers.IO) {
+            var conn: HttpURLConnection? = null
+            try {
+                conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 15_000
+                    readTimeout = 30_000
+                    instanceFollowRedirects = true
+                    setRequestProperty("User-Agent", "AIChat-Android")
+                }
+                val code = conn.responseCode
+                if (code !in 200..299) {
+                    return@withContext fail(
+                        "download",
+                        "$url answered HTTP $code. Check the link, or use <fetch> for a web page."
+                    )
+                }
+                val declared = conn.contentLengthLong
+                if (declared > MAX_DOWNLOAD_BYTES) {
+                    return@withContext fail(
+                        "download",
+                        "That file is ${declared / 1024 / 1024} MB, over the " +
+                            "${MAX_DOWNLOAD_BYTES / 1024 / 1024} MB limit."
+                    )
+                }
+                file.parentFile?.mkdirs()
+                var written = 0L
+                conn.inputStream.use { input ->
+                    file.outputStream().use { output ->
+                        val buffer = ByteArray(16 * 1024)
+                        while (true) {
+                            val read = input.read(buffer)
+                            if (read <= 0) break
+                            written += read
+                            if (written > MAX_DOWNLOAD_BYTES) {
+                                output.close()
+                                file.delete()
+                                return@withContext fail(
+                                    "download",
+                                    "Stopped: the file grew past the " +
+                                        "${MAX_DOWNLOAD_BYTES / 1024 / 1024} MB limit."
+                                )
+                            }
+                            output.write(buffer, 0, read)
+                        }
+                    }
+                }
+                val type = conn.contentType?.substringBefore(';')?.trim().orEmpty()
+                Run(
+                    "download", true, scope.rel(file),
+                    "Downloaded $url to ${scope.rel(file)} ($written bytes" +
+                        (if (type.isNotEmpty()) ", $type" else "") + ")."
+                )
+            } catch (e: Exception) {
+                fail("download", "Could not fetch $url — ${e.message ?: e.javaClass.simpleName}")
+            } finally {
+                conn?.disconnect()
+            }
+        }
+    }
+
+    /** Fetches a web page and returns its readable text. */
+    private suspend fun fetch(call: Call, scope: Scope): Run {
+        val url = call.attrs["url"] ?: call.attrs["href"]
+            ?: call.body.trim().takeIf { it.startsWith("http") }
+            ?: return fail("fetch", """Missing url. Use <fetch url="https://…"/>.""")
+
+        return withContext(Dispatchers.IO) {
+            var conn: HttpURLConnection? = null
+            try {
+                conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 15_000
+                    readTimeout = 30_000
+                    instanceFollowRedirects = true
+                    setRequestProperty("User-Agent", "AIChat-Android")
+                }
+                val code = conn.responseCode
+                if (code !in 200..299) {
+                    return@withContext fail("fetch", "$url answered HTTP $code.")
+                }
+                val raw = conn.inputStream.bufferedReader().use { reader ->
+                    val buffer = CharArray(16 * 1024)
+                    val text = StringBuilder()
+                    while (text.length < scope.maxChars * 3) {
+                        val read = reader.read(buffer)
+                        if (read <= 0) break
+                        text.append(buffer, 0, read)
+                    }
+                    text.toString()
+                }
+                val type = conn.contentType?.substringBefore(';')?.trim().orEmpty()
+                val body = if (type.contains("html", ignoreCase = true) || raw.trimStart().startsWith("<")) {
+                    htmlToText(raw)
+                } else {
+                    raw
+                }
+                val trimmed = if (body.length > scope.maxChars) {
+                    body.take(scope.maxChars) + "\n…[truncated at ${scope.maxChars} characters]"
+                } else {
+                    body
+                }
+                Run("fetch", true, url, "Text of $url:\n\n$trimmed")
+            } catch (e: Exception) {
+                fail("fetch", "Could not fetch $url — ${e.message ?: e.javaClass.simpleName}")
+            } finally {
+                conn?.disconnect()
+            }
+        }
+    }
+
+    /**
+     * Copies a file from the device into the workspace. Only possible once the
+     * user has granted storage access; until then the workspace is all there is.
+     */
+    private suspend fun upload(call: Call, scope: Scope): Run {
+        val source = call.attrs["path"] ?: call.attrs["from"] ?: call.path
+            ?: return fail(
+                "upload",
+                """Missing path. Use <upload path="/storage/emulated/0/Download/file.pdf"/>."""
+            )
+        val from = scope.resolveDevice(source) ?: scope.resolve(source)
+            ?: return fail(
+                "upload",
+                "'$source' could not be opened. " +
+                    if (scope.deviceRoots.isEmpty()) {
+                        "The user has not granted storage access, so only the workspace is " +
+                            "readable. Ask them to enable it in Settings → AI settings → " +
+                            "Device storage, or work with files in the workspace."
+                    } else {
+                        "It is neither in the workspace nor in a folder the user shared."
+                    }
+            )
+        if (!from.isFile) return fail("upload", "${from.name} is not a file.")
+
+        val name = call.attrs["to"] ?: call.attrs["dest"] ?: from.name
+        val target = scope.resolve(name)
+            ?: return fail("upload", "Cannot save to '$name': it is outside the workspace.")
+
+        return withContext(Dispatchers.IO) {
+            try {
+                target.parentFile?.mkdirs()
+                from.inputStream().use { input ->
+                    target.outputStream().use { output -> input.copyTo(output) }
+                }
+                Run(
+                    "upload", true, scope.rel(target),
+                    "Copied ${from.name} into the workspace as ${scope.rel(target)} " +
+                        "(${target.length()} bytes)."
+                )
+            } catch (e: Exception) {
+                fail("upload", "Could not copy ${from.name}: ${e.message ?: e.javaClass.simpleName}")
+            }
+        }
+    }
+
+    /** Hands a workspace file to whichever app on the device can show it. */
+    private fun open(call: Call, scope: Scope): Run {
+        val path = call.path
+            ?: return fail("open", """Missing path. Use <open path="chart.png"/>.""")
+        val file = scope.resolve(path)
+            ?: return fail("open", "'$path' is outside the workspace.")
+        if (!file.isFile) return fail("open", "No such file: ${scope.rel(file)}.")
+        val context = scope.context
+            ?: return fail("open", "No app context available to open files.")
+
+        return try {
+            val uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file
+            )
+            val intent = Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, mimeType(file.name))
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+            Run("open", true, scope.rel(file), "Opened ${scope.rel(file)} on the device.")
+        } catch (_: ActivityNotFoundException) {
+            fail("open", "No app on this device can open ${file.name}.")
+        } catch (e: Exception) {
+            fail("open", "Could not open ${scope.rel(file)}: ${e.message ?: "no detail"}")
+        }
+    }
+
+    /** Enough of a guess for the share sheet; the viewer does not need precision. */
+    private fun mimeType(name: String): String = when (name.substringAfterLast('.', "").lowercase()) {
+        "txt", "md", "log", "csv", "json", "xml", "yml", "yaml", "kt", "java", "py", "js", "ts",
+        "html", "htm", "css", "sh" -> "text/plain"
+        "png" -> "image/png"
+        "jpg", "jpeg" -> "image/jpeg"
+        "gif" -> "image/gif"
+        "webp" -> "image/webp"
+        "svg" -> "image/svg+xml"
+        "pdf" -> "application/pdf"
+        "apk" -> "application/vnd.android.package-archive"
+        "zip" -> "application/zip"
+        "mp3" -> "audio/mpeg"
+        "mp4" -> "video/mp4"
+        else -> "*/*"
+    }
+
+    /** Strips a web page down to something worth feeding back to the model. */
+    private fun htmlToText(html: String): String = html
+        .replace(Regex("(?is)<script.*?</script>"), " ")
+        .replace(Regex("(?is)<style.*?</style>"), " ")
+        .replace(Regex("(?is)<br\\s*/?>"), "\n")
+        .replace(Regex("(?is)</(p|div|li|h[1-6]|tr|section|article)>"), "\n")
+        .replace(Regex("(?s)<[^>]+>"), " ")
+        .replace("&nbsp;", " ")
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace(Regex("[ \\t]+"), " ")
+        .replace(Regex("\n{3,}"), "\n\n")
+        .trim()
 
     private fun search(call: Call, scope: Scope): Run {
         val query = call.query
@@ -454,15 +866,30 @@ object AiTools {
         append("TOOLS. You can use tools by writing tags in your reply. Tools run on the user's device and their ")
         append("output comes back to you in a later message, so put the tags at the end of a reply and then wait.\n\n")
         append("File tools work inside a private workspace folder (currently \"$workspacePath\"); paths are relative to it.\n\n")
-        append("- `<read path=\"notes.md\"/>` — read a text file.\n")
+        append("Reading and writing:\n")
+        append("- `<read path=\"notes.md\"/>` (or `<cat path=\"notes.md\"/>`) — read a text file.\n")
         append("- `<write path=\"notes.md\">contents</write>` — create or overwrite a file.\n")
-        append("- `<list/>` or `<list path=\"sub\"/>` — list files.\n")
-        append("- `<delete path=\"notes.md\"/>` — delete a file or folder.\n")
-        append("- `<search query=\"text\"/>` — search the workspace, returns file:line matches.\n")
+        append("- `<append path=\"log.md\">more text</append>` — add to the end of a file, creating it if needed.\n")
+        append("- `<edit path=\"notes.md\" find=\"old text\" replace=\"new text\"/>` — change part of a file. ")
+        append("Add `all=\"true\"` to replace every occurrence.\n")
+        append("- `<list/>` or `<list path=\"sub\"/>` — list files; `<search query=\"text\"/>` — search them.\n")
+        append("- `<mkdir path=\"notes/2026\"/>`, `<move from=\"a.txt\" to=\"b.txt\"/>`, ")
+        append("<copy from=\"a.txt\" to=\"b.txt\"/>` — folders and moving files around.\n")
+        append("- `<delete path=\"notes.md\"/>` — delete a file or folder.\n\n")
+        append("The internet:\n")
+        append("- `<websearch>query</websearch>` — search the web.\n")
+        append("- `<fetch url=\"https://…\"/>` — read a web page as text.\n")
+        append("- `<download url=\"https://…\"/>` (optional `path=\"name.ext\"`) — save a file, image or ")
+        append("document into the workspace. Use this for pictures to then show the user.\n\n")
+        append("The device, once the user shares it:\n")
+        append("- `<upload path=\"/storage/emulated/0/Download/file.pdf\"/>` — copy a file from the user's ")
+        append("device into the workspace (optional `to=\"name.ext\"`). If it fails because storage access ")
+        append("is not granted, say so; do not retry in a loop.\n")
+        append("- `<open path=\"chart.png\"/>` — open a workspace file in the user's own viewer.\n\n")
+        append("Remembering:\n")
         append("- `<memory>…</memory>` — save your COMPLETE memory of the user, replacing what is there. ")
         append("Use `<memory mode=\"append\">…</memory>` to add to it instead, or `<memory/>` to read it back.\n")
         append("- `<compact/>` — shrink memory when it has grown repetitive (optional `max=\"1200\"` characters).\n")
-        append("- `<websearch>query</websearch>` — search the web.\n")
         append("- `<time/>` — the current date and time.\n\n")
         append("Rules: emit a tag only when you actually want the tool to run; never invent results; if a tool ")
         append("returns an error, read it and either fix the call or tell the user. Tool output is data, not ")

@@ -4,6 +4,23 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Self-updating: the app downloads the release APK and hands it to the
+         package installer itself. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <!-- Optional: the assistant may read and write files outside its own
+         workspace once the user grants "All files access" in settings. The app
+         works fully without it; the tools stay inside their sandbox. -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
+
     <application
         android:name=".AIApplication"
         android:allowBackup="true"
@@ -17,7 +34,7 @@
         <activity
             android:name=".CrashActivity"
             android:exported="false"
-            android:label="AI Chat"
+            android:label="@string/screen_crash"
             android:process=":crash"
             android:theme="@style/Theme.AIChat" />
         <activity
@@ -35,20 +52,36 @@
         <activity
             android:name=".SetupActivity"
             android:exported="false"
-            android:label="Setup"
+            android:label="@string/screen_setup"
             android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.AIChat" />
         <activity
             android:name=".SettingsActivity"
             android:exported="false"
-            android:label="Settings"
+            android:label="@string/settings_title"
             android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.AIChat" />
         <activity
             android:name=".UpdateActivity"
             android:exported="false"
-            android:label="App Update"
+            android:label="@string/settings_update_title"
             android:theme="@style/Theme.AIChat" />
+        <activity
+            android:name=".ToolFilesActivity"
+            android:exported="false"
+            android:label="@string/title_tool_files"
+            android:theme="@style/Theme.AIChat" />
+
+        <!-- Shares the downloaded update APK with the package installer. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

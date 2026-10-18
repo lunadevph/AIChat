@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Where a downloaded update APK is staged before the installer reads it. -->
+    <cache-path
+        name="updates"
+        path="updates/" />
+
+    <!-- The assistant's workspace, shared with a viewer when it opens a file. -->
+    <files-path
+        name="workspace"
+        path="workspace/" />
+</paths>

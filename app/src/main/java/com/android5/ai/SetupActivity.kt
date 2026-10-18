@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -17,7 +18,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.*
@@ -33,10 +37,13 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.android5.ai.ui.theme.AIChatTheme
 import com.android5.ai.ui.theme.ExpressiveButtonShapes
 import com.android5.ai.ui.theme.ExpressiveIconButtonShapes
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class SetupActivity : ComponentActivity() {
@@ -101,13 +108,22 @@ fun SetupScreen(
     var apiKey by remember { mutableStateOf(providerKeys[selectedProvider] ?: "") }
     var apiKeyVisible by remember { mutableStateOf(false) }
     var isValidating by remember { mutableStateOf(false) }
+    var isConnected by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
+    var networkTrouble by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val scrollState = rememberScrollState()
+    val context = LocalContext.current
 
     val animatableOffset = remember { Animatable(0f) }
     var shakeTrigger by remember { mutableStateOf(0) }
+
+    fun finish(key: String) {
+        val trimmed = key.trim()
+        if (trimmed.isNotBlank()) providerKeys[selectedProvider] = trimmed
+        onComplete(trimmed, selectedProvider, providerKeys.toMap())
+    }
 
     LaunchedEffect(shakeTrigger) {
         if (shakeTrigger > 0) {
@@ -119,39 +135,41 @@ fun SetupScreen(
         }
     }
 
+    // Hold on the confirmation for a beat so the user sees it land before the
+    // chat screen replaces this one.
+    LaunchedEffect(isConnected) {
+        if (isConnected) {
+            delay(700)
+            finish(apiKey)
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(scrollState)
             .imePadding()
-            .padding(horizontal = 24.dp, vertical = 24.dp),
-        horizontalAlignment = Alignment.Start
+            .padding(horizontal = 20.dp, vertical = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Surface(
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
-            modifier = Modifier.size(68.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    Icons.Rounded.AutoAwesome,
-                    contentDescription = stringResource(R.string.app_name),
-                    modifier = Modifier.size(36.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+
+        AppLogo(
+            size = 68.dp,
+            contentDescription = stringResource(R.string.app_name)
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
         Text(
             stringResource(R.string.setup_welcome),
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(4.dp))
+
+        Spacer(modifier = Modifier.height(6.dp))
         Surface(
             shape = RoundedCornerShape(50),
             color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
@@ -168,17 +186,22 @@ fun SetupScreen(
         Text(
             stringResource(R.string.setup_subtitle),
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(28.dp))
-        Text(
-            stringResource(R.string.label_provider),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
+        Spacer(modifier = Modifier.height(20.dp))
+
+        SetupSteps(current = if (isConnected) 3 else 2)
+
+        Spacer(modifier = Modifier.height(22.dp))
+
+        SetupSectionTitle(
+            step = 1,
+            title = stringResource(R.string.setup_step_provider),
+            done = true
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         ProviderPicker(
             selected = selectedProvider,
@@ -189,12 +212,20 @@ fun SetupScreen(
                 selectedProvider = newProvider
                 apiKey = providerKeys[newProvider] ?: settingsManager.getApiKey(newProvider) ?: ""
                 errorText = null
+                networkTrouble = false
             },
             compact = true,
             modifier = Modifier.fillMaxWidth()
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(22.dp))
+
+        SetupSectionTitle(
+            step = 2,
+            title = stringResource(R.string.setup_step_key),
+            done = isConnected
+        )
+        Spacer(modifier = Modifier.height(10.dp))
 
         OutlinedTextField(
             value = apiKey,
@@ -202,6 +233,7 @@ fun SetupScreen(
                 apiKey = it
                 providerKeys[selectedProvider] = it
                 errorText = null
+                networkTrouble = false
             },
             label = { Text(stringResource(R.string.label_api_key)) },
             placeholder = { Text(Providers.info(selectedProvider).keyPrefix + "…") },
@@ -219,7 +251,7 @@ fun SetupScreen(
             },
             trailingIcon = {
                 when {
-                    isValidating -> LoadingIndicator(
+                    isValidating || isConnected -> LoadingIndicator(
                         modifier = Modifier.size(20.dp),
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -251,20 +283,40 @@ fun SetupScreen(
             }
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Rounded.Lock,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                stringResource(R.string.setup_key_privacy),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
 
         val invalidKeyMsg = stringResource(R.string.error_invalid_key)
-        val context = LocalContext.current
         Button(
             onClick = {
                 focusManager.clearFocus()
                 scope.launch {
                     isValidating = true
+                    networkTrouble = false
                     when (val result = Providers.validateKey(selectedProvider, apiKey.trim())) {
                         is Providers.KeyValidation.Valid -> {
                             isValidating = false
                             providerKeys[selectedProvider] = apiKey.trim()
-                            onComplete(apiKey.trim(), selectedProvider, providerKeys.toMap())
+                            isConnected = true
                         }
                         is Providers.KeyValidation.InvalidKey -> {
                             isValidating = false
@@ -273,25 +325,181 @@ fun SetupScreen(
                         }
                         is Providers.KeyValidation.NetworkError -> {
                             isValidating = false
-                            errorText = context.getString(R.string.err_network, result.detail ?: context.getString(R.string.err_detail_connection_failed))
+                            errorText = context.getString(
+                                R.string.err_network,
+                                result.detail ?: context.getString(R.string.err_detail_connection_failed)
+                            )
+                            networkTrouble = true
                             shakeTrigger++
                         }
                     }
                 }
             },
-            enabled = apiKey.isNotBlank() && !isValidating,
+            enabled = apiKey.isNotBlank() && !isValidating && !isConnected,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
             shapes = ExpressiveButtonShapes
         ) {
-            Text(
-                stringResource(R.string.btn_get_started),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
+            if (isValidating) {
+                LoadingIndicator(
+                    modifier = Modifier.size(20.dp),
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    stringResource(R.string.setup_validating),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            } else if (isConnected) {
+                Icon(
+                    Icons.Rounded.CheckCircle,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    stringResource(R.string.setup_connected),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            } else {
+                Text(
+                    stringResource(R.string.btn_get_started),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
-        Spacer(modifier = Modifier.height(32.dp))
+
+        // Offline (or blocked region): let them keep the key and start anyway —
+        // the chat screen reports a connection problem far more usefully.
+        if (networkTrouble) {
+            Spacer(modifier = Modifier.height(6.dp))
+            TextButton(
+                onClick = { finish(apiKey) },
+                enabled = apiKey.isNotBlank(),
+                shapes = ExpressiveButtonShapes
+            ) {
+                Text(stringResource(R.string.btn_continue_anyway))
+            }
+        }
+
+        Spacer(modifier = Modifier.height(28.dp))
+    }
+}
+
+/** The three things setup asks for, with the one in progress lit up. */
+@Composable
+private fun SetupSteps(current: Int, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        val steps = listOf(
+            stringResource(R.string.setup_step_provider),
+            stringResource(R.string.setup_step_key),
+            stringResource(R.string.setup_step_chat)
+        )
+
+        steps.forEachIndexed { index, label ->
+            val step = index + 1
+            val active = step == current
+            val done = step < current
+
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = when {
+                    active -> MaterialTheme.colorScheme.primaryContainer
+                    done -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                    else -> MaterialTheme.colorScheme.surfaceContainerHigh
+                },
+                border = BorderStroke(
+                    1.dp,
+                    if (active) {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                    } else {
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                    }
+                ),
+                modifier = Modifier.weight(1f)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 7.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (done) {
+                        Icon(
+                            Icons.Rounded.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(13.dp),
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Spacer(Modifier.width(4.dp))
+                    }
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                        color = when {
+                            active -> MaterialTheme.colorScheme.onPrimaryContainer
+                            done -> MaterialTheme.colorScheme.onSecondaryContainer
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** A numbered heading for one setup step. */
+@Composable
+private fun SetupSectionTitle(step: Int, title: String, done: Boolean) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(26.dp)
+                .background(
+                    if (done) MaterialTheme.colorScheme.secondaryContainer
+                    else MaterialTheme.colorScheme.primaryContainer,
+                    CircleShape
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            if (done) {
+                Icon(
+                    Icons.Rounded.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(15.dp),
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            } else {
+                Text(
+                    step.toString(),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
+
+        Spacer(Modifier.width(10.dp))
+
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }
 

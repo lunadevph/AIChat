@@ -27,9 +27,6 @@ enum class LoadingStatus {
     IDLE, THINKING, SEARCHING, CREATING_IMAGE, STREAMING
 }
 
-/** Folder inside the app's private storage that the file tools may work in. */
-private const val WORKSPACE_DIR = "workspace"
-
 /** How many tool rounds a single reply may trigger before the app stops looping. */
 private const val MAX_TOOL_STEPS = 3
 
@@ -37,9 +34,15 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
     private val context = application.applicationContext
     private val gson = Gson()
     private val conversationStore = ConversationStore(context)
-    /** Sandbox the file tools may read and write; see [AiTools]. */
+    /** Sandbox the file tools may read and write; see [AiTools] and [ToolFiles]. */
     private val toolScope: AiTools.Scope
-        get() = AiTools.Scope(File(context.filesDir, WORKSPACE_DIR), settingsManager)
+        get() = AiTools.Scope(
+            root = File(context.filesDir, ToolFiles.DIR),
+            settings = settingsManager,
+            // Empty unless the user granted storage access in settings.
+            deviceRoots = DeviceStorage.roots(context),
+            context = context
+        )
     /** Title shown for a conversation that has not been auto-titled yet. */
     private val defaultChatTitle = context.getString(R.string.chat_default_title)
 
@@ -338,7 +341,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 "IMAGE DISPLAY CAPABILITY: You can display pictures and web images inline in your response by outputting Markdown image tags: `![Description](https://url/to/image.jpg)`. Use this whenever providing photos, pictures, diagrams, or visual examples."
             )
             if (toolsEnabled) {
-                append("\n\n").append(AiTools.describe(WORKSPACE_DIR))
+                append("\n\n").append(AiTools.describe(ToolFiles.DIR))
             } else {
                 // With tools switched off the model can still keep memory; it just
                 // does so with the older fenced block instead of the <memory> tool.
@@ -533,7 +536,14 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                     content = AiTools.strip(withoutMemory).trim(),
                     reasoning = turn.reasoning,
                     isStreaming = false,
-                    tools = runs.map { ToolRun(it.name, it.label, it.ok) }.ifEmpty { null }
+                    tools = runs.map { run ->
+                        // `label` is the workspace-relative path for the file
+                        // tools, which is exactly what the transcript needs to
+                        // link a run back to the file it touched.
+                        val filePath =
+                            if (run.name in AiTools.fileTools) run.label else null
+                        ToolRun(run.name, run.label, run.ok, filePath)
+                    }.ifEmpty { null }
                 )
             }
         }

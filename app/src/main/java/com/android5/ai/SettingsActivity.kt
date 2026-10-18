@@ -4,8 +4,10 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
@@ -50,6 +52,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.android5.ai.ui.theme.AIChatTheme
 import com.android5.ai.ui.theme.ExpressiveButtonShapes
 import com.android5.ai.ui.theme.ExpressiveIconButtonShapes
@@ -626,7 +631,7 @@ fun SettingsSwitchRow(
 
     Surface(
         onClick = { onCheckedChange(!checked) },
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
         tonalElevation = 1.dp,
@@ -641,25 +646,25 @@ fun SettingsSwitchRow(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp)
+                .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .size(42.dp)
+                    .size(38.dp)
                     .background(
                         if (checked) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
-                        RoundedCornerShape(14.dp)
+                        RoundedCornerShape(12.dp)
                     ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     icon,
                     contentDescription = null,
-                    Modifier.size(22.dp),
+                    Modifier.size(20.dp),
                     tint = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(2.dp))
@@ -724,24 +729,139 @@ fun ParameterSliderRow(
 }
 
 @Composable
-private fun ToolWorkspaceRow() {
+private fun StorageAccessRow() {
     val context = LocalContext.current
-    val dir = remember { File(context.filesDir, "workspace") }
-    var files by remember { mutableStateOf(emptyList<File>()) }
+    var granted by remember { mutableStateOf(DeviceStorage.granted(context)) }
 
-    fun refresh() {
-        files = if (dir.exists()) {
-            dir.walkTopDown().filter { it.isFile }.toList()
-        } else {
-            emptyList()
-        }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) {
+        granted = DeviceStorage.granted(context)
     }
 
-    LaunchedEffect(dir) { refresh() }
+    // Android 11+ grants this on a system screen, so the answer arrives while we
+    // are in the background: re-read it whenever this sheet comes back.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) granted = DeviceStorage.granted(context)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    val onLabel = stringResource(R.string.desc_switch_on)
+    val offLabel = stringResource(R.string.desc_switch_off)
 
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        onClick = {
+            if (granted) {
+                // Nothing to revoke in-app: the system screen owns the switch.
+                if (!DeviceStorage.needsRuntimeRequest()) {
+                    try {
+                        context.startActivity(DeviceStorage.settingsIntent(context))
+                    } catch (_: Exception) {
+                    }
+                }
+            } else if (DeviceStorage.needsRuntimeRequest()) {
+                permissionLauncher.launch(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            } else {
+                try {
+                    context.startActivity(DeviceStorage.settingsIntent(context))
+                } catch (_: Exception) {
+                }
+            }
+        },
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+        tonalElevation = 1.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics {
+                this.role = Role.Switch
+                this.stateDescription = if (granted) onLabel else offLabel
+            }
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .background(
+                        if (granted) MaterialTheme.colorScheme.primaryContainer
+                        else MaterialTheme.colorScheme.surfaceContainerHighest,
+                        RoundedCornerShape(12.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Rounded.FolderShared,
+                    contentDescription = null,
+                    Modifier.size(20.dp),
+                    tint = if (granted) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.setting_storage_access),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.height(1.dp))
+                Text(
+                    stringResource(
+                        if (granted) R.string.setting_storage_access_on
+                        else R.string.setting_storage_access_sub
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Switch(
+                checked = granted,
+                onCheckedChange = null // Handled by surface for whole-row touch target
+            )
+        }
+    }
+}
+
+@Composable
+private fun ToolWorkspaceRow() {
+    val context = LocalContext.current
+    val dir = remember { ToolFiles.root(context) }
+    var files by remember { mutableStateOf(ToolFiles.list(context)) }
+
+    fun refresh() {
+        files = ToolFiles.list(context)
+    }
+
+    // The history lives on its own screen, so re-count when we come back to this
+    // sheet rather than trusting the numbers we had before it opened.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) refresh()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    Surface(
+        onClick = {
+            context.startActivity(Intent(context, ToolFilesActivity::class.java))
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { this.role = Role.Button },
+        shape = RoundedCornerShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(
             1.dp,
@@ -752,15 +872,25 @@ private fun ToolWorkspaceRow() {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(start = 14.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                Icons.Rounded.Folder,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .background(
+                        MaterialTheme.colorScheme.surfaceContainerHighest,
+                        RoundedCornerShape(12.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Rounded.Folder,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
 
             Spacer(Modifier.width(12.dp))
 
@@ -770,7 +900,7 @@ private fun ToolWorkspaceRow() {
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold
                 )
-                Spacer(Modifier.height(2.dp))
+                Spacer(Modifier.height(1.dp))
                 Text(
                     text = if (files.isEmpty()) {
                         stringResource(R.string.setting_tools_workspace_empty)
@@ -780,7 +910,7 @@ private fun ToolWorkspaceRow() {
                             files.size,
                             android.text.format.Formatter.formatFileSize(
                                 context,
-                                files.sumOf { it.length() }
+                                files.sumOf { it.size }
                             )
                         )
                     },
@@ -792,7 +922,7 @@ private fun ToolWorkspaceRow() {
             if (files.isNotEmpty()) {
                 IconButton(
                     onClick = {
-                        dir.deleteRecursively()
+                        ToolFiles.clear(context)
                         refresh()
                     },
                     modifier = Modifier.size(48.dp),
@@ -806,6 +936,15 @@ private fun ToolWorkspaceRow() {
                     )
                 }
             }
+
+            Icon(
+                Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = stringResource(R.string.desc_open_tool_files),
+                modifier = Modifier
+                    .padding(start = 2.dp)
+                    .size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -919,6 +1058,8 @@ fun AISettingsSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
             )
 
             ToolWorkspaceRow()
+
+            StorageAccessRow()
 
             OutlinedTextField(
                 value = customInstructions,
@@ -1250,16 +1391,10 @@ fun AboutAppSheet(onDismiss: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Spacer(Modifier.height(8.dp))
-            Surface(
-                modifier = Modifier.size(76.dp),
-                shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
-                tonalElevation = 2.dp
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Rounded.AutoAwesome, null, Modifier.size(40.dp), MaterialTheme.colorScheme.primary)
-                }
-            }
+            AppLogo(
+                size = 72.dp,
+                contentDescription = stringResource(R.string.app_name)
+            )
             Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             
             Surface(

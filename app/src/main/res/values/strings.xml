@@ -1,10 +1,19 @@
 <resources>
     <string name="app_name" translatable="false">AI Chat</string>
+    <string name="screen_crash">AI Chat</string>
+    <string name="screen_setup">Setup</string>
 
     <!-- Setup Screen -->
     <string name="setup_welcome">Welcome to\nAI Chat</string>
     <string name="setup_version_format">Version %1$s</string>
     <string name="setup_subtitle">Connect your AI provider to begin.</string>
+    <string name="setup_step_provider">Provider</string>
+    <string name="setup_step_key">API key</string>
+    <string name="setup_step_chat">Chat</string>
+    <string name="setup_validating">Checking your key…</string>
+    <string name="setup_connected">You’re connected</string>
+    <string name="setup_key_privacy">Your key stays on this device and goes only to the provider you pick.</string>
+    <string name="btn_continue_anyway">Save it and continue anyway</string>
     <string name="label_provider">Provider</string>
     <string name="label_api_key">API Key</string>
     <string name="btn_get_started">Get Started</string>
@@ -34,6 +43,10 @@
     <string name="label_all_models">All</string>
     <string name="placeholder_search_models">Search models or capabilities...</string>
     <string name="empty_models_found">No matching models found</string>
+    <plurals name="label_model_count">
+        <item quantity="one">%1$d model</item>
+        <item quantity="other">%1$d models</item>
+    </plurals>
     <string name="label_conversations">Conversations</string>
     <string name="desc_new_chat">New Chat</string>
     <string name="chat_default_title">New Chat</string>
@@ -64,11 +77,29 @@
     <string name="desc_tool_ran">Tool %1$s completed</string>
     <string name="desc_tool_failed">Tool %1$s failed</string>
     <string name="label_tools_used">Tools used</string>
+    <string name="label_tool_used">%1$s wrote this file</string>
+    <string name="label_tool_failed">%1$s failed on this file</string>
+    <string name="btn_view_file">View file</string>
     <string name="desc_more_actions">More actions</string>
     <string name="setting_tools_workspace">Tool workspace</string>
     <string name="setting_tools_workspace_empty">The assistant has not written any files yet.</string>
     <string name="setting_tools_workspace_count">%1$d file(s) · %2$s</string>
     <string name="desc_clear_workspace">Delete every file the assistant wrote</string>
+    <string name="setting_storage_access">Device storage</string>
+    <string name="setting_storage_access_sub">Let the assistant read and save files in Downloads, Documents and pictures.</string>
+    <string name="setting_storage_access_on">The assistant can reach your shared folders. Tap to manage access.</string>
+    <string name="title_tool_files">Tool files</string>
+    <string name="desc_open_tool_files">Open the file history</string>
+    <string name="empty_tool_files_title">No files yet</string>
+    <string name="empty_tool_files_hint">Files the assistant writes with its tools show up here.</string>
+    <string name="label_file_meta">%1$s · %2$s</string>
+    <string name="error_file_missing">This file no longer exists.</string>
+    <string name="desc_delete_file">Delete file</string>
+    <string name="desc_delete_all_files">Delete every file</string>
+    <string name="title_delete_all_files">Delete all files?</string>
+    <string name="msg_delete_all_files">Every file the assistant wrote will be removed for good.</string>
+    <string name="btn_delete_all">Delete all</string>
+    <string name="btn_close">Close</string>
     <string name="label_custom_instructions">Custom Instructions</string>
     <string name="label_user_memory">User Memory (Long-term)</string>
     <string name="hint_custom_instructions">e.g. You are a professional coder...</string>
@@ -183,6 +214,17 @@
     <string name="update_whats_new">What’s New</string>
     <string name="btn_download_update">Download Update</string>
     <string name="btn_download_required_update">Download Required Update</string>
+    <string name="btn_download_install">Update Now</string>
+    <string name="btn_install_update">Install Update</string>
+    <string name="btn_open_browser">Open download page</string>
+    <string name="update_status_downloading">Downloading update…</string>
+    <string name="update_status_downloading_pct">Downloading update… %1$d%%</string>
+    <string name="update_status_downloaded">Downloaded %1$s · ready to install</string>
+    <string name="update_install_blocked_title">One more tap to install</string>
+    <string name="update_install_blocked">Android needs your permission before it will install the update. Open the setting below, turn on “Allow from this source”, then come back.</string>
+    <string name="btn_open_install_settings">Allow installs</string>
+    <string name="update_download_failed">Download failed — %1$s</string>
+    <string name="desc_update_progress">Update download progress</string>
     <string name="desc_back">Back</string>
     <string name="desc_hide_api_key">Hide API key</string>
     <string name="desc_show_api_key">Show API key</string>

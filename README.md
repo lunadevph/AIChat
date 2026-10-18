@@ -12,13 +12,15 @@ A native Android client for chatting with large language models. Bring your own 
 - **Vision input.** Attach images to messages on models that support multimodal input.
 - **Streaming responses.** Tokens render as they arrive, and generation can be stopped mid-flight.
 - **Web search.** Optional per-request toggle for up-to-date answers.
-- **Tool calls.** The assistant can read, write, search and delete files in a private workspace, save and compact its own memory, search the web and check the date and time, using tags such as `<read path="notes.md"/>`. Runs are shown in the transcript and can be switched off in settings.
+- **Tool calls.** The assistant works on the device with tags such as `<read path="notes.md"/>`, `<write>`, `<edit>`, `<append>`, `<list>`, `<search>`, `<mkdir>`, `<move>`, `<copy>`, `<delete>`, `<download url="…"/>`, `<fetch url="…"/>`, `<upload path="…"/>` and `<open>`, plus memory, web search and the clock. Runs are shown in the transcript and can be switched off in settings.
+- **Tool file history.** Everything the assistant writes is listed in its own screen — size, age, a preview, per-file delete and clear-all — and each reply links to the files it touched.
 - **Memory.** Custom instructions, long-term user memory, and AI self-managed memory.
 - **Model parameters.** Temperature, top-P, max tokens, frequency penalty, and presence penalty, with reset-to-defaults.
 - **Conversation history.** Multiple stored conversations, with clear and delete.
 - **Material 3 Expressive.** Dynamic color, a flexible app bar, split button, toggle button, morphing loading and wavy progress indicators, the Material shape library and expressive type styles.
 - **Themes.** AMOLED dark, light, and dynamic system theming.
-- **In-app updates.** Checks a mirror for newer builds and installs them in place.
+- **Self-updating.** Checks a mirror for newer builds, downloads the APK in-app with live progress and hands it to the installer — no browser hop. Falls back to the release page if the install is blocked.
+- **Optional device storage.** Off by default; when granted, the tools can also read and save files in the shared folders (Downloads, Documents, pictures) instead of only their own workspace.
 
 ## Requirements
 
@@ -91,8 +93,14 @@ Model IDs and default selections are defined in `app/src/main/java/com/android5/
 ```
 app/src/main/java/com/android5/ai/
 ├── MainActivity.kt        Chat screen and Compose UI
+├── ModelPickerSheet.kt    Model picker
 ├── ChatViewModel.kt       Chat state, streaming, model params
-├── AiTools.kt             In-band tool calls (<read/>, <write/>, <memory/>, …)
+├── AiTools.kt             In-band tool calls (<read/>, <write/>, <download/>, …)
+├── ToolFiles.kt           Workspace view used by the tool file history
+├── ToolFilesActivity.kt   Tool file history screen
+├── AppLogo.kt             The app's mark, one composable for every screen
+├── SelectionIndicator.kt  Fixed-width check slot for selectable rows
+├── DeviceStorage.kt       Optional access to the user's shared folders
 ├── Providers.kt           Provider registry, endpoints, key validation
 ├── OpenRouterApi.kt       Retrofit chat API
 ├── SettingsManager.kt     Persisted preferences
@@ -103,6 +111,7 @@ app/src/main/java/com/android5/ai/
 ├── WebSearchService.kt    Web search support
 ├── UpdateActivity.kt      In-app update flow
 ├── UpdateApi.kt           Update mirror client
+├── UpdateInstaller.kt     APK download and installer hand-off
 └── CrashActivity.kt       Crash handler
 ```
 

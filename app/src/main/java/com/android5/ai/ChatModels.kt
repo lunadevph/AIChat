@@ -67,7 +67,12 @@ data class ApiImageUrl(
 data class ToolRun(
     val name: String,
     val label: String = "",
-    val ok: Boolean = true
+    val ok: Boolean = true,
+    /**
+     * Workspace-relative path the call touched, for the file tools. Null for
+     * tools that do not work on one file, and for runs saved by older versions.
+     */
+    val path: String? = null
 )
 
 data class Message(

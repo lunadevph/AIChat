@@ -202,35 +202,25 @@ fun ChatScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 16.dp)
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
                 ) {
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(6.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
-                            modifier = Modifier.size(40.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Rounded.AutoAwesome,
-                                    contentDescription = stringResource(R.string.app_name),
-                                    Modifier.size(22.dp),
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        }
+                        AppLogo(
+                            size = 38.dp,
+                            contentDescription = stringResource(R.string.app_name)
+                        )
 
-                        Spacer(Modifier.width(12.dp))
+                        Spacer(Modifier.width(10.dp))
 
                         Column {
                             Text(
                                 stringResource(R.string.app_name),
-                                style = MaterialTheme.typography.titleLarge,
+                                style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
@@ -243,7 +233,7 @@ fun ChatScreen(
                         }
                     }
 
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(12.dp))
 
                     FilledTonalButton(
                         onClick = {
@@ -255,7 +245,7 @@ fun ChatScreen(
                         shapes = ExpressiveButtonShapes,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(48.dp)
+                            .height(46.dp)
                     ) {
                         Icon(
                             Icons.AutoMirrored.Rounded.NoteAdd,
@@ -271,20 +261,20 @@ fun ChatScreen(
                         )
                     }
 
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(10.dp))
 
                     HorizontalDivider(
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
                     )
 
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(8.dp))
 
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = PaddingValues(bottom = 16.dp)
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        contentPadding = PaddingValues(bottom = 12.dp)
                     ) {
                         items(viewModel.conversations, key = { it.id }) { conv ->
                             val selected =
@@ -297,7 +287,7 @@ fun ChatScreen(
                                         drawerState.close()
                                     }
                                 },
-                                shape = RoundedCornerShape(20.dp),
+                                shape = RoundedCornerShape(16.dp),
                                 color =
                                     if (selected) {
                                         MaterialTheme.colorScheme.primaryContainer
@@ -330,8 +320,8 @@ fun ChatScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(
-                                            horizontal = 14.dp,
-                                            vertical = 12.dp
+                                            horizontal = 12.dp,
+                                            vertical = 6.dp
                                         ),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
@@ -468,27 +458,7 @@ fun ChatScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer
-                                    .copy(alpha = 0.85f),
-                                border = BorderStroke(
-                                    1.dp,
-                                    MaterialTheme.colorScheme.primary
-                                        .copy(alpha = 0.35f)
-                                ),
-                                tonalElevation = 2.dp,
-                                modifier = Modifier.size(34.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        Icons.Rounded.AutoAwesome,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(19.dp),
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                            }
+                            AppLogo(size = 32.dp)
 
                             Text(
                                 text = stringResource(R.string.app_name),
@@ -684,8 +654,8 @@ fun ChatScreen(
                         .imePadding()
                         .navigationBarsPadding()
                         .padding(
-                            horizontal = 16.dp,
-                            vertical = 8.dp
+                            horizontal = 12.dp,
+                            vertical = 6.dp
                         )
                 ) {
                     AnimatedVisibility(
@@ -694,7 +664,7 @@ fun ChatScreen(
                         exit = fadeOut() + shrinkVertically(),
                         modifier = Modifier.padding(
                             start = 8.dp,
-                            bottom = 8.dp
+                            bottom = 6.dp
                         )
                     ) {
                         ThinkingIndicator(viewModel.loadingStatus)
@@ -702,7 +672,7 @@ fun ChatScreen(
 
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(32.dp),
+                        shape = RoundedCornerShape(28.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerHigh,
                         border = BorderStroke(
                             1.dp,
@@ -969,43 +939,27 @@ fun ChatScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        // Expressive decoration: the app's mark sits on one of the
-                        // Material shape library's "cookie" polygons, with a softer
-                        // clover peeking out from behind it.
+                        // Expressive decoration: the app's mark, with a softer clover
+                        // peeking out from behind it.
                         Box(
                             contentAlignment = Alignment.Center,
-                            modifier = Modifier.size(116.dp)
+                            modifier = Modifier.size(108.dp)
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(78.dp)
+                                    .size(72.dp)
                                     .offset(x = 20.dp, y = (-16).dp)
                                     .background(
                                         MaterialTheme.colorScheme.tertiaryContainer
-                                            .copy(alpha = 0.85f),
+                                            .copy(alpha = 0.7f),
                                         MaterialShapes.Clover4Leaf.toShape()
                                     )
                             )
 
-                            Box(
-                                modifier = Modifier
-                                    .size(92.dp)
-                                    .background(
-                                        MaterialTheme.colorScheme.primaryContainer,
-                                        MaterialShapes.Cookie9Sided.toShape()
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Rounded.AutoAwesome,
-                                    null,
-                                    Modifier.size(42.dp),
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            }
+                            AppLogo(size = 88.dp)
                         }
 
-                        Spacer(Modifier.height(20.dp))
+                        Spacer(Modifier.height(16.dp))
 
                         Text(
                             stringResource(R.string.empty_greeting),
@@ -1023,7 +977,7 @@ fun ChatScreen(
                             textAlign = TextAlign.Center
                         )
 
-                        Spacer(Modifier.height(24.dp))
+                        Spacer(Modifier.height(16.dp))
 
                         val suggestions = listOf(
                             stringResource(R.string.suggestion_explain_title) to
@@ -1038,14 +992,14 @@ fun ChatScreen(
 
                         Column(
                             modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             suggestions.forEach { (title, prompt) ->
                                 Surface(
                                     onClick = {
                                         inputText = prompt
                                     },
-                                    shape = RoundedCornerShape(20.dp),
+                                    shape = RoundedCornerShape(16.dp),
                                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
                                     border = BorderStroke(
                                         1.dp,
@@ -1059,8 +1013,8 @@ fun ChatScreen(
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(
-                                            horizontal = 16.dp,
-                                            vertical = 12.dp
+                                            horizontal = 14.dp,
+                                            vertical = 10.dp
                                         ),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
@@ -1088,10 +1042,10 @@ fun ChatScreen(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(
-                            horizontal = 16.dp,
-                            vertical = 12.dp
+                            horizontal = 14.dp,
+                            vertical = 10.dp
                         ),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(viewModel.messages, key = { it.id }) { message ->
                             MessageBubble(
@@ -1138,381 +1092,18 @@ fun ChatScreen(
     }
 
     if (showModelSheet) {
-        ModalBottomSheet(
-            onDismissRequest = {
+        ModelPickerSheet(
+            settingsManager = settingsManager,
+            models = viewModel.availableModels,
+            onDismiss = {
                 showModelSheet = false
             },
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        ) {
-            var visionOnly by remember {
-                mutableStateOf(false)
+            onSelect = { modelId ->
+                settingsManager.selectedModel = modelId
+                showModelSheet = false
+                viewModel.fetchModels()
             }
-
-            var searchQuery by remember {
-                mutableStateOf("")
-            }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .imePadding()
-                    .padding(bottom = 16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(
-                        horizontal = 20.dp,
-                        vertical = 8.dp
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer
-                                .copy(alpha = 0.7f),
-                            modifier = Modifier.size(40.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Image(
-                                    painter = painterResource(
-                                        providerIconRes(
-                                            settingsManager.selectedProvider
-                                        )
-                                    ),
-                                    contentDescription = null,
-                                    modifier = Modifier
-                                        .size(22.dp)
-                                        .clip(CircleShape)
-                                )
-                            }
-                        }
-
-                        Spacer(Modifier.width(12.dp))
-
-                        Column(
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(
-                                stringResource(R.string.menu_change_model),
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-
-                            Text(
-                                settingsManager.selectedProvider,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-
-                    Spacer(Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        FilterChip(
-                            selected = !visionOnly,
-                            onClick = {
-                                visionOnly = false
-                            },
-                            label = {
-                                Text(
-                                    stringResource(R.string.label_all_models),
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            },
-                            leadingIcon =
-                                if (!visionOnly) {
-                                    {
-                                        Icon(
-                                            Icons.Rounded.Check,
-                                            null,
-                                            Modifier.size(16.dp)
-                                        )
-                                    }
-                                } else {
-                                    null
-                                },
-                            shape = RoundedCornerShape(12.dp)
-                        )
-
-                        FilterChip(
-                            selected = visionOnly,
-                            onClick = {
-                                visionOnly = true
-                            },
-                            label = {
-                                Text(
-                                    stringResource(R.string.label_vision),
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Rounded.Visibility,
-                                    null,
-                                    Modifier.size(16.dp)
-                                )
-                            },
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                    }
-
-                    Spacer(Modifier.height(12.dp))
-
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = {
-                            searchQuery = it
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = {
-                            Text(
-                                stringResource(
-                                    R.string.placeholder_search_models
-                                )
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Rounded.Search,
-                                null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        },
-                        trailingIcon = {
-                            if (searchQuery.isNotEmpty()) {
-                                IconButton(
-                                    onClick = {
-                                        searchQuery = ""
-                                    },
-                                    shapes = ExpressiveIconButtonShapes
-                                ) {
-                                    Icon(
-                                        Icons.Rounded.Clear,
-                                        contentDescription = stringResource(R.string.btn_clear_text),
-                                        Modifier.size(18.dp)
-                                    )
-                                }
-                            }
-                        },
-                        shape = RoundedCornerShape(22.dp),
-                        singleLine = true
-                    )
-                }
-
-                val filteredModels =
-                    viewModel.availableModels.filter {
-                        val matchesSearch =
-                            (it.name?.contains(
-                                searchQuery,
-                                ignoreCase = true
-                            ) == true) ||
-                                it.displayName.contains(
-                                    searchQuery,
-                                    ignoreCase = true
-                                ) ||
-                                it.id.contains(
-                                    searchQuery,
-                                    ignoreCase = true
-                                ) ||
-                                (it.description?.contains(
-                                    searchQuery,
-                                    ignoreCase = true
-                                ) == true)
-
-                        val matchesVision =
-                            if (visionOnly) {
-                                it.capabilities.contains("vision")
-                            } else {
-                                true
-                            }
-
-                        matchesSearch && matchesVision
-                    }
-
-                if (filteredModels.isEmpty()) {
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(140.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            stringResource(R.string.empty_models_found),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 520.dp)
-                            .padding(horizontal = 20.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp)
-                    ) {
-                        items(filteredModels, key = { it.id }) { model ->
-                            val selected =
-                                settingsManager.selectedModel == model.id
-
-                            Surface(
-                                onClick = {
-                                    settingsManager.selectedModel = model.id
-                                    showModelSheet = false
-                                    viewModel.fetchModels()
-                                },
-                                shape = RoundedCornerShape(22.dp),
-                                color =
-                                    if (selected) {
-                                        MaterialTheme.colorScheme.primaryContainer
-                                            .copy(alpha = 0.65f)
-                                    } else {
-                                        MaterialTheme.colorScheme.surfaceContainerHigh
-                                    },
-                                border =
-                                    if (selected) {
-                                        BorderStroke(
-                                            2.dp,
-                                            MaterialTheme.colorScheme.primary
-                                        )
-                                    } else {
-                                        BorderStroke(
-                                            1.dp,
-                                            MaterialTheme.colorScheme.outlineVariant
-                                                .copy(alpha = 0.4f)
-                                        )
-                                    },
-                                tonalElevation =
-                                    if (selected) 2.dp else 0.dp,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .semantics {
-                                        this.role = Role.RadioButton
-                                        this.selected = selected
-                                    }
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(
-                                            horizontal = 16.dp,
-                                            vertical = 14.dp
-                                        ),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                model.displayName,
-                                                color = MaterialTheme.colorScheme.onSurface,
-                                                fontWeight = FontWeight.Bold,
-                                                style = MaterialTheme.typography.titleMedium,
-                                                modifier = Modifier.weight(
-                                                    1f,
-                                                    fill = false
-                                                )
-                                            )
-
-                                            if (
-                                                model.capabilities.contains(
-                                                    "vision"
-                                                )
-                                            ) {
-                                                Spacer(Modifier.width(6.dp))
-
-                                                Surface(
-                                                    shape = RoundedCornerShape(50),
-                                                    color = MaterialTheme.colorScheme.secondaryContainer
-                                                        .copy(alpha = 0.8f)
-                                                ) {
-                                                    Row(
-                                                        verticalAlignment = Alignment.CenterVertically,
-                                                        modifier = Modifier.padding(
-                                                            horizontal = 6.dp,
-                                                            vertical = 2.dp
-                                                        )
-                                                    ) {
-                                                        Icon(
-                                                            Icons.Rounded.Visibility,
-                                                            contentDescription = null,
-                                                            modifier = Modifier.size(12.dp),
-                                                            tint = MaterialTheme.colorScheme.onSecondaryContainer
-                                                        )
-
-                                                        Spacer(Modifier.width(3.dp))
-
-                                                        Text(
-                                                            stringResource(
-                                                                R.string.label_vision
-                                                            ),
-                                                            style = MaterialTheme.typography.labelSmall,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        val cleanDesc =
-                                            model.description?.removePrefix(
-                                                "models/"
-                                            )
-
-                                        if (!cleanDesc.isNullOrBlank()) {
-                                            Spacer(Modifier.height(2.dp))
-
-                                            Text(
-                                                cleanDesc,
-                                                maxLines = 2,
-                                                overflow = TextOverflow.Ellipsis,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-
-                                        if (
-                                            model.id != model.displayName &&
-                                            !model.id.equals(
-                                                model.displayName,
-                                                ignoreCase = true
-                                            )
-                                        ) {
-                                            Spacer(Modifier.height(2.dp))
-
-                                            Text(
-                                                model.cleanId,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    .copy(alpha = 0.65f)
-                                            )
-                                        }
-                                    }
-
-                                    Spacer(Modifier.width(12.dp))
-
-                                    SelectionIndicator(selected)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        )
     }
 }
 
@@ -1991,8 +1582,8 @@ fun MessageBubble(
                                         Markdown(
                                             content = part,
                                             modifier = Modifier.padding(
-                                                horizontal = 16.dp,
-                                                vertical = 10.dp
+                                                horizontal = 14.dp,
+                                                vertical = 8.dp
                                             ),
                                             colors = markdownColor(
                                                 text = contentColor
@@ -2009,8 +1600,8 @@ fun MessageBubble(
                                 Markdown(
                                     content = content,
                                     modifier = Modifier.padding(
-                                        horizontal = 16.dp,
-                                        vertical = 12.dp
+                                        horizontal = 14.dp,
+                                        vertical = 10.dp
                                     ),
                                     colors = markdownColor(
                                         text = contentColor
@@ -2028,8 +1619,8 @@ fun MessageBubble(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(
-                                        horizontal = 8.dp,
-                                        vertical = 4.dp
+                                        horizontal = 4.dp,
+                                        vertical = 0.dp
                                     ),
                                 horizontalArrangement = if (isUser) Arrangement.Start else Arrangement.End,
                                 verticalAlignment = Alignment.CenterVertically
@@ -2131,6 +1722,9 @@ private fun toolIcon(name: String) = when (name) {
  */
 @Composable
 fun ToolRunRow(tools: List<ToolRun>, alignment: Alignment.Horizontal) {
+    var expandedIndex by remember(tools) { mutableStateOf(-1) }
+    val context = LocalContext.current
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -2148,16 +1742,28 @@ fun ToolRunRow(tools: List<ToolRun>, alignment: Alignment.Horizontal) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            tools.forEach { tool ->
-                val description = stringResource(
+            tools.forEachIndexed { index, tool ->
+                // Only the file tools can be opened; the rest stay plain pills.
+                val contentDescription = stringResource(
                     if (tool.ok) R.string.desc_tool_ran else R.string.desc_tool_failed,
                     tool.name
                 )
+                val openable = !tool.path.isNullOrBlank()
+                val expanded = expandedIndex == index
 
                 Surface(
+                    onClick = {
+                        expandedIndex = if (expanded) -1 else index
+                    },
+                    enabled = openable,
                     shape = RoundedCornerShape(50),
                     color = if (tool.ok) {
-                        MaterialTheme.colorScheme.secondaryContainer
+                        if (expanded) {
+                            MaterialTheme.colorScheme.secondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.secondaryContainer
+                                .copy(alpha = 0.75f)
+                        }
                     } else {
                         MaterialTheme.colorScheme.errorContainer
                     },
@@ -2167,7 +1773,10 @@ fun ToolRunRow(tools: List<ToolRun>, alignment: Alignment.Horizontal) {
                         MaterialTheme.colorScheme.onErrorContainer
                     },
                     tonalElevation = 1.dp,
-                    modifier = Modifier.semantics { contentDescription = description }
+                    modifier = Modifier.semantics {
+                        this.contentDescription = contentDescription
+                        if (openable) this.role = Role.Button
+                    }
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
@@ -2188,6 +1797,82 @@ fun ToolRunRow(tools: List<ToolRun>, alignment: Alignment.Horizontal) {
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.widthIn(max = 200.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        val expandedTool = tools.getOrNull(expandedIndex)
+        if (expandedTool?.path != null) {
+            Spacer(Modifier.height(6.dp))
+
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                border = BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                ),
+                tonalElevation = 1.dp,
+                modifier = Modifier.widthIn(max = 320.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(
+                        start = 12.dp,
+                        end = 4.dp,
+                        top = 6.dp,
+                        bottom = 6.dp
+                    ),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        toolIcon(expandedTool.name),
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+
+                    Spacer(Modifier.width(10.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stringResource(
+                                if (expandedTool.ok) {
+                                    R.string.label_tool_used
+                                } else {
+                                    R.string.label_tool_failed
+                                },
+                                expandedTool.name
+                            ),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+
+                        Text(
+                            expandedTool.path,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    TextButton(
+                        onClick = {
+                            context.startActivity(
+                                Intent(context, ToolFilesActivity::class.java)
+                                    .putExtra(
+                                        ToolFilesActivity.EXTRA_FILE,
+                                        expandedTool.path
+                                    )
+                            )
+                        }
+                    ) {
+                        Text(
+                            stringResource(R.string.btn_view_file),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 }

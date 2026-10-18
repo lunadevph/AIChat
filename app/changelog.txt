@@ -1,21 +1,13 @@
-- The chat you have open is no longer drawn shorter than the others in the history drawer, and it now offers the same delete button as every other chat.
-- In the model, provider and appearance pickers, the selected row's label is no longer squeezed or cut short by the check mark.
-- The model, provider and appearance pickers now tell screen readers which option is selected, and each chat row no longer reads out a redundant "Conversation" label before its title.
-- When the assistant saves a file whose contents include a code block, the code is now saved with the file instead of being dropped, and a tool tag that it is only showing you inside a code block is no longer run.
-- The assistant can now use tools. It can read and write files in a private workspace, list and search them, delete them, save or read its own memory, compact that memory, search the web and look up the date and time — all by writing simple tags such as <read path="notes.md"/> in its reply.
-- Every tool the assistant runs is shown as a small pill above its reply, so you can see what it did.
-- AI settings has a new "Tool calls" switch to turn the assistant's tools off, and a "Tool workspace" row showing the files it has written, with a button to clear them.
-- Saving memory now uses a <memory> tag, and <compact/> shrinks memory when it has grown repetitive.
-- The chat header is now a Material 3 Expressive flexible app bar that shows the current model as its subtitle and folds away as you scroll.
-- The composer now uses an expressive split button: one half sends (or stops), the other opens the attach menu, and web search is a toggle button beside the input.
-- Loading states use the Material 3 Expressive morphing loading indicator, and update checks use the wavy progress indicator.
-- The empty chat screen uses shapes from the Material shape library, and headings use the expressive type styles.
-- Removed the OpenCode Zen provider; it is no longer offered in setup, settings or the model picker.
-- If you had OpenCode Zen selected, the app now falls back to the default provider instead of staying on the retired one.
-- All user-facing text now comes from translatable string resources, including the update, setup, settings and about screens.
-- A failed model-list refresh no longer replaces the full model catalog with a short built-in list, and no longer resets your chosen model.
-- A generated chat title can no longer be written to the wrong conversation if you open another chat while it is being created.
-- The chat now scrolls to new replies in one smooth motion instead of two competing scrolls.
-- Conversations, messages and models keep their identity when lists change, so the chat and pickers no longer reshuffle.
-- Copying a code block that has no body no longer copies the language name instead.
-- Accessibility: the back arrow, API-key show/hide toggle and switch states are announced correctly, and logos are no longer read twice.
+- The model picker has been redesigned: your provider's logo sits at the top, the model you are using is shown in a pill beneath it, and the list below is much denser, so far more models fit on screen at once.
+- The model picker now shows how many models match what you are searching for.
+- The app's logo is the same mark everywhere — drawer, chat header, empty chat screen, setup and about — on a soft gradient blob instead of the old flat square.
+- The whole interface is more compact: tighter chat rows, message spacing, settings rows, model and provider lists, and a slimmer composer, so more fits on screen without shrinking anything you tap.
+- The assistant can now do a lot more with your files: <cat> reads one, <edit> changes part of one, <append> adds to the end, and <mkdir>, <move> and <copy> manage folders and duplicate files.
+- The assistant can also work with the internet and your device: <download> saves a file from a link into its workspace, <fetch> reads a web page as text, <upload> copies a file from your device in, and <open> opens a file it made in your own viewer.
+- There is a new "Tool files" screen listing every file the assistant has written — with its size, when it was last changed, a preview you can select and copy, a delete button, and one button to clear them all.
+- In the chat, tapping a tool pill now opens a small panel showing the file that reply touched, with a button to view it.
+- AI settings has a new "Device storage" switch. Off by default, it lets the assistant read and save files in your shared folders (Downloads, Documents, pictures) instead of only its own workspace.
+- The app now updates itself: it downloads the new version inside the app with live progress and hands it to the installer, instead of opening a download page in your browser. There is still a button to open the download page if you prefer.
+- If Android needs your permission before it will install the update, the update screen explains it and takes you straight to the setting.
+- Setup is now a clear three-step flow with a progress row, a note that your key never leaves the device, a proper "checking your key" and "you're connected" state, and a way to save your key and continue anyway when your provider cannot be reached.
+- The app now names itself properly in the task switcher and recents screen instead of showing hard-coded text on those screens.
