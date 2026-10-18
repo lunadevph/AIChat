@@ -74,6 +74,10 @@ Kotlin + Jetpack Compose (Material 3). See `README.md` for features and layout.
   the `RELEASE_STORE_FILE` / `RELEASE_STORE_PASSWORD` / `RELEASE_KEY_ALIAS` /
   `RELEASE_KEY_PASSWORD` Gradle properties / environment variables.
 - Publishing reads a token from `github_token.txt` (gitignored) or `GITHUB_TOKEN`.
+- `UpdateMirrors` pushes the mirror with the ambient git credential by default; if that
+  credential cannot write to `update-mirror` (the Codespaces GitHub App often cannot),
+  it uses a dedicated token from `mirror_token.txt` (gitignored) or `MIRROR_TOKEN`
+  instead. When the push is refused, push `~/update-mirror` again with a token that can.
 - `uploadGithubRelease` tags the release as `v$VERSION_NAME` at the branch HEAD at
   creation time. Push commits **before** releasing so the tag matches the built code.
 

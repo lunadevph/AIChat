@@ -14,6 +14,7 @@ local.properties
 keystore.properties
 
 github_token.txt
+mirror_token.txt
 hs_err_pid*.log
 replay_pid*.log
 heapdump*.hprof

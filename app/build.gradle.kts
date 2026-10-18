@@ -283,19 +283,50 @@ tasks.register("UpdateMirrors") {
             println("UpdateMirrors: Updated mirror.json to version $verName (code $verCode)")
 
             // 3. Stage, commit, and push
-            val commitPushCmd = "git add mirror.json latest.apk && git commit -m \"Update mirror and latest.apk to v$verName (code $verCode)\" && git push origin main"
+            //
+            // The mirror repo is separate from the app repo and the ambient
+            // credential (a GitHub App token) does not always have write access to
+            // it. A dedicated token can be supplied through MIRROR_TOKEN or
+            // mirror_token.txt (gitignored); without one the push uses whatever
+            // git is already configured with.
+            val mirrorToken =
+                System.getenv("MIRROR_TOKEN")?.trim()?.takeIf { it.isNotEmpty() }
+                    ?: rootProject.file("mirror_token.txt")
+                        .takeIf { it.exists() }
+                        ?.readText()
+                        ?.trim()
+                        ?.takeIf { it.isNotEmpty() }
+
+            val pushRef =
+                if (mirrorToken != null) {
+                    "https://x-access-token:$mirrorToken@github.com/lunadevph/update-mirror.git"
+                } else {
+                    "origin"
+                }
+
+            val commitPushCmd = "git add mirror.json latest.apk && git commit -m \"Update mirror and latest.apk to v$verName (code $verCode)\" && git push $pushRef main"
             val process = ProcessBuilder(shell + listOf(commitPushCmd))
                 .directory(mirrorDir)
                 .redirectErrorStream(true)
                 .start()
 
-            val output = process.inputStream.bufferedReader().readText()
+            val rawOutput = process.inputStream.bufferedReader().readText()
             val exitCode = process.waitFor()
+
+            // Never echo the token back into the build log.
+            val output = mirrorToken?.let { rawOutput.replace(it, "***") } ?: rawOutput
 
             if (exitCode == 0) {
                 println("UpdateMirrors: Successfully pushed update mirror and latest.apk to GitHub!")
             } else {
                 println("UpdateMirrors git output:\n$output")
+                if (mirrorToken == null) {
+                    println(
+                        "UpdateMirrors: the push was refused. If this token cannot write to " +
+                            "lunadevph/update-mirror, put a token that can in mirror_token.txt " +
+                            "or MIRROR_TOKEN, then push $mirrorDir manually."
+                    )
+                }
             }
         } catch (e: Exception) {
             println("UpdateMirrors: Error pushing mirror: ${e.message}")
