@@ -77,7 +77,8 @@ Kotlin + Jetpack Compose (Material 3). See `README.md` for features and layout.
 - `UpdateMirrors` pushes the mirror with the ambient git credential by default; if that
   credential cannot write to `update-mirror` (the Codespaces GitHub App often cannot),
   it uses a dedicated token from `mirror_token.txt` (gitignored) or `MIRROR_TOKEN`
-  instead. When the push is refused, push `~/update-mirror` again with a token that can.
+  instead. When the push is refused, `./gradlew UpdateMirrors` re-runs and pushes the
+  backlog once a usable token is in place (it commits only when the mirror changed).
 - `uploadGithubRelease` tags the release as `v$VERSION_NAME` at the branch HEAD at
   creation time. Push commits **before** releasing so the tag matches the built code.
 

@@ -304,7 +304,10 @@ tasks.register("UpdateMirrors") {
                     "origin"
                 }
 
-            val commitPushCmd = "git add mirror.json latest.apk && git commit -m \"Update mirror and latest.apk to v$verName (code $verCode)\" && git push $pushRef main"
+            // `git commit` fails when nothing changed, which would stop the chain
+            // before the push and strand commits that already exist locally (a
+            // backlog from an earlier refused push), so commit only if staged.
+            val commitPushCmd = "git add mirror.json latest.apk && (git diff --cached --quiet || git commit -m \"Update mirror and latest.apk to v$verName (code $verCode)\") && git push $pushRef main"
             val process = ProcessBuilder(shell + listOf(commitPushCmd))
                 .directory(mirrorDir)
                 .redirectErrorStream(true)
