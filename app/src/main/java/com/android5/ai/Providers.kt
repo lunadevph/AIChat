@@ -26,10 +26,40 @@ object Providers {
         Info("NVIDIA", "Nemotron, Llama & Qwen on NVIDIA NIM", "nvapi-", "https://build.nvidia.com/settings/api-keys")
     )
 
-    fun info(provider: String): Info = ALL.firstOrNull { it.name == provider }
-        ?: ALL.first()
-
     fun names(): List<String> = ALL.map { it.name }
+
+    fun info(provider: String, custom: List<Custom> = emptyList()): Info =
+        ALL.firstOrNull { it.name == provider }
+            ?: custom(custom, provider)?.info()
+            ?: ALL.first()
+
+    /**
+     * A provider the user added themselves: any OpenAI-compatible endpoint, with
+     * an optional hand-listed catalog. Everything else about it — the Bearer
+     * header, the `/models` catalog fetch, key validation — is the generic path,
+     * so a custom provider needs no special case anywhere else in the app.
+     */
+    data class Custom(
+        val name: String,
+        val baseUrl: String,
+        val tagline: String = "",
+        val keyPrefix: String = "",
+        val models: List<String> = emptyList(),
+        val defaultModel: String? = null
+    ) {
+        /** How the picker and the key manager describe this provider. */
+        fun info(): Info = Info(
+            name = name,
+            tagline = tagline.ifBlank { "Your own OpenAI-compatible endpoint" },
+            keyPrefix = keyPrefix,
+            keyUrl = ""
+        )
+    }
+
+    /** The providers a picker or the key manager lists: built-ins, then the user's own. */
+    fun all(custom: List<Custom> = emptyList()): List<Info> = ALL + custom.map { it.info() }
+
+    fun custom(custom: List<Custom>, name: String): Custom? = custom.firstOrNull { it.name == name }
 
     const val ANTHROPIC_VERSION = "2023-06-01"
 
@@ -45,7 +75,7 @@ object Providers {
         .writeTimeout(60, TimeUnit.SECONDS)
         .build()
 
-    fun baseUrl(provider: String): String = when (provider) {
+    fun baseUrl(provider: String, custom: List<Custom> = emptyList()): String = when (provider) {
         "OpenAI" -> "https://api.openai.com/v1/"
         "Google" -> "https://generativelanguage.googleapis.com/v1beta/openai/"
         "Groq" -> "https://api.groq.com/openai/v1/"
@@ -54,17 +84,22 @@ object Providers {
         "Mistral" -> "https://api.mistral.ai/v1/"
         "Grok" -> "https://api.x.ai/v1/"
         "NVIDIA" -> "https://integrate.api.nvidia.com/v1/"
-        else -> "https://openrouter.ai/api/v1/"
+        else -> custom(custom, provider)?.baseUrl ?: "https://openrouter.ai/api/v1/"
     }
 
     /** Base URL used to fetch a provider's model catalog. */
-    fun modelsUrl(provider: String): String = baseUrl(provider) + "models"
+    fun modelsUrl(provider: String, custom: List<Custom> = emptyList()): String =
+        baseUrl(provider, custom) + "models"
 
     fun isAnthropic(provider: String): Boolean = provider == "Claude"
 
-    fun api(provider: String, forValidation: Boolean = false): OpenRouterApi =
+    fun api(
+        provider: String,
+        custom: List<Custom> = emptyList(),
+        forValidation: Boolean = false
+    ): OpenRouterApi =
         Retrofit.Builder()
-            .baseUrl(baseUrl(provider))
+            .baseUrl(baseUrl(provider, custom))
             .client(if (forValidation) validationClient else chatClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
@@ -76,7 +111,11 @@ object Providers {
         data class NetworkError(val detail: String?) : KeyValidation()
     }
 
-    suspend fun validateKey(provider: String, key: String): KeyValidation {
+    suspend fun validateKey(
+        provider: String,
+        key: String,
+        custom: List<Custom> = emptyList()
+    ): KeyValidation {
         if (key.isBlank()) return KeyValidation.InvalidKey
         return try {
             when (provider) {
@@ -95,8 +134,11 @@ object Providers {
                 } catch (e: HttpException) {
                     handleHttpError(e)
                 }
+                // Every other provider, including the user's own, is an
+                // OpenAI-compatible endpoint: Bearer auth and a /models catalog.
                 else -> try {
-                    val models = api(provider, forValidation = true).getModels(modelsUrl(provider), "Bearer $key")
+                    val models = api(provider, custom, forValidation = true)
+                        .getModels(modelsUrl(provider, custom), "Bearer $key")
                     if (!models.data.isNullOrEmpty()) KeyValidation.Valid else KeyValidation.InvalidKey
                 } catch (e: HttpException) {
                     handleHttpError(e)
@@ -107,7 +149,7 @@ object Providers {
         }
     }
 
-    fun defaultModel(provider: String): String = when (provider) {
+    fun defaultModel(provider: String, custom: List<Custom> = emptyList()): String = when (provider) {
         "OpenAI" -> "gpt-5.6-sol"
         "Google" -> "gemini-3.8-flash"
         "Groq" -> "gpt-oss-120b"
@@ -116,10 +158,12 @@ object Providers {
         "Mistral" -> "mistral-large-latest"
         "Grok" -> "grok-4.6"
         "NVIDIA" -> "nvidia/llama-3.3-nemotron-super-49b-v1.5"
-        else -> "openrouter/free"
+        else -> custom(custom, provider)?.defaultModel
+            ?: custom(custom, provider)?.models?.firstOrNull()
+            ?: "openrouter/free"
     }
 
-    fun defaultModels(provider: String): List<ModelInfo> = when (provider) {
+    fun defaultModels(provider: String, custom: List<Custom> = emptyList()): List<ModelInfo> = when (provider) {
         "OpenAI" -> listOf(
             // GPT-5.6 family (Aug 2026)
             ModelInfo(id = "gpt-5.6-sol", name = "GPT-5.6 Sol", description = "Premier flagship for complex reasoning & coding", architecture = Architecture(modality = "text+image->text")),
@@ -218,22 +262,32 @@ object Providers {
             ModelInfo(id = "qwen/qwen3-coder-480b-a35b-instruct", name = "Qwen 3 Coder 480B", description = "Agentic coding model for large codebases", architecture = Architecture(modality = "text->text")),
             ModelInfo(id = "mistralai/mistral-nemotron", name = "Mistral Nemotron", description = "Mistral tuned by NVIDIA, tool-use focused", architecture = Architecture(modality = "text->text"))
         )
-        else -> listOf(
-            // Free models (OpenRouter)
-            ModelInfo(id = "openrouter/free", name = "Auto (Free Router)", description = "Auto-selects best free model for your request", architecture = Architecture(modality = "text+image->text")),
-            ModelInfo(id = "google/gemini-3.5-flash:free", name = "Gemini 3.5 Flash (Free)", description = "Free Google agentic workhorse model", architecture = Architecture(modality = "text+image->text")),
-            ModelInfo(id = "meta-llama/llama-4-scout:free", name = "Llama 4 Scout (Free)", description = "Free Meta MoE model with vision", architecture = Architecture(modality = "text+image->text")),
-            ModelInfo(id = "nvidia/nemotron-3-ultra:free", name = "Nemotron 3 Ultra (Free)", description = "Free NVIDIA frontier model", architecture = Architecture(modality = "text->text")),
-            ModelInfo(id = "qwen/qwen-3.8-32b:free", name = "Qwen 3.8 32B (Free)", description = "Free Alibaba latest reasoning model", architecture = Architecture(modality = "text->text")),
-            ModelInfo(id = "deepseek/deepseek-r1:free", name = "DeepSeek R1 (Free)", description = "Free open reasoning model", architecture = Architecture(modality = "text->text")),
-            ModelInfo(id = "openai/gpt-oss-120b:free", name = "GPT-OSS 120B (Free)", description = "Free OpenAI open-weight reasoning model", architecture = Architecture(modality = "text->text")),
-            ModelInfo(id = "mistralai/mistral-small-4:free", name = "Mistral Small 4 (Free)", description = "Free efficient Mistral hybrid model", architecture = Architecture(modality = "text->text")),
-            // Paid popular models
-            ModelInfo(id = "openai/gpt-5.6-sol", name = "GPT-5.6 Sol", description = "OpenAI's premier flagship via OpenRouter", architecture = Architecture(modality = "text+image->text")),
-            ModelInfo(id = "anthropic/claude-opus-4.1", name = "Claude Opus 4.1", description = "Most powerful Claude via OpenRouter", architecture = Architecture(modality = "text+image->text")),
-            ModelInfo(id = "x-ai/grok-4.6", name = "Grok 4.6", description = "xAI flagship via OpenRouter", architecture = Architecture(modality = "text+image->text")),
-            ModelInfo(id = "google/gemini-3.7-flash", name = "Gemini 3.7 Flash", description = "Google workhorse via OpenRouter", architecture = Architecture(modality = "text+image->text"))
-        )
+        else -> {
+            // A custom provider: the catalog the user wrote down, or a single
+            // placeholder when they left it for the app to fetch from /models.
+            val customModels = custom(custom, provider)?.models
+                ?.map { modelId -> ModelInfo(id = modelId, name = modelId) }
+            if (!customModels.isNullOrEmpty()) {
+                customModels
+            } else {
+                listOf(
+                    // Free models (OpenRouter)
+                    ModelInfo(id = "openrouter/free", name = "Auto (Free Router)", description = "Auto-selects best free model for your request", architecture = Architecture(modality = "text+image->text")),
+                    ModelInfo(id = "google/gemini-3.5-flash:free", name = "Gemini 3.5 Flash (Free)", description = "Free Google agentic workhorse model", architecture = Architecture(modality = "text+image->text")),
+                    ModelInfo(id = "meta-llama/llama-4-scout:free", name = "Llama 4 Scout (Free)", description = "Free Meta MoE model with vision", architecture = Architecture(modality = "text+image->text")),
+                    ModelInfo(id = "nvidia/nemotron-3-ultra:free", name = "Nemotron 3 Ultra (Free)", description = "Free NVIDIA frontier model", architecture = Architecture(modality = "text->text")),
+                    ModelInfo(id = "qwen/qwen-3.8-32b:free", name = "Qwen 3.8 32B (Free)", description = "Free Alibaba latest reasoning model", architecture = Architecture(modality = "text->text")),
+                    ModelInfo(id = "deepseek/deepseek-r1:free", name = "DeepSeek R1 (Free)", description = "Free open reasoning model", architecture = Architecture(modality = "text->text")),
+                    ModelInfo(id = "openai/gpt-oss-120b:free", name = "GPT-OSS 120B (Free)", description = "Free OpenAI open-weight reasoning model", architecture = Architecture(modality = "text->text")),
+                    ModelInfo(id = "mistralai/mistral-small-4:free", name = "Mistral Small 4 (Free)", description = "Free efficient Mistral hybrid model", architecture = Architecture(modality = "text->text")),
+                    // Paid popular models
+                    ModelInfo(id = "openai/gpt-5.6-sol", name = "GPT-5.6 Sol", description = "OpenAI's premier flagship via OpenRouter", architecture = Architecture(modality = "text+image->text")),
+                    ModelInfo(id = "anthropic/claude-opus-4.1", name = "Claude Opus 4.1", description = "Most powerful Claude via OpenRouter", architecture = Architecture(modality = "text+image->text")),
+                    ModelInfo(id = "x-ai/grok-4.6", name = "Grok 4.6", description = "xAI flagship via OpenRouter", architecture = Architecture(modality = "text+image->text")),
+                    ModelInfo(id = "google/gemini-3.7-flash", name = "Gemini 3.7 Flash", description = "Google workhorse via OpenRouter", architecture = Architecture(modality = "text+image->text"))
+                )
+            }
+        }
     }
 
     private fun handleHttpError(e: HttpException): Providers.KeyValidation = when (e.code()) {

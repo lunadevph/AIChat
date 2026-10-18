@@ -141,21 +141,22 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
     fun fetchModels() {
         val provider = settingsManager.selectedProvider
         val apiKey = settingsManager.apiKey
+        val custom = settingsManager.customProviders
         viewModelScope.launch {
             val fetched = try {
                 val response = if (!apiKey.isNullOrBlank()) {
                     if (Providers.isAnthropic(provider)) {
                         getApi().getModels(
-                            url = Providers.modelsUrl(provider),
+                            url = Providers.modelsUrl(provider, custom),
                             authorization = null,
                             xApiKey = apiKey,
                             anthropicVersion = Providers.ANTHROPIC_VERSION
                         )
                     } else {
-                        getApi().getModels(Providers.modelsUrl(provider), "Bearer $apiKey")
+                        getApi().getModels(Providers.modelsUrl(provider, custom), "Bearer $apiKey")
                     }
                 } else {
-                    getApi().getModels(Providers.modelsUrl(provider))
+                    getApi().getModels(Providers.modelsUrl(provider, custom))
                 }
                 response.data.orEmpty()
             } catch (e: Exception) {
@@ -171,10 +172,12 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 modelsProvider = provider
             } else if (fetched != null || modelsProvider != provider || availableModels.isEmpty()) {
                 // Empty catalog, or a failed fetch with nothing usable on screen:
-                // fall back to the built-in list for this provider.
+                // fall back to the list for this provider.
                 availableModels.clear()
                 availableModels.addAll(
-                    Providers.defaultModels(provider).distinctBy { it.id }.sortedBy { it.displayName }
+                    Providers.defaultModels(provider, custom)
+                        .distinctBy { it.id }
+                        .sortedBy { it.displayName }
                 )
                 modelsProvider = provider
             }
@@ -184,7 +187,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             if (modelsProvider == provider &&
                 availableModels.none { it.id == settingsManager.selectedModel }
             ) {
-                settingsManager.selectedModel = Providers.defaultModel(provider)
+                settingsManager.selectedModel = Providers.defaultModel(provider, custom)
             }
         }
     }

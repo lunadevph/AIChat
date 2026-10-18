@@ -135,7 +135,7 @@ class SettingsActivity : ComponentActivity() {
                                     subtitle = stringResource(R.string.settings_api_keys_subtitle),
                                     icon = Icons.Rounded.Key,
                                     badgeColor = MaterialTheme.colorScheme.primary,
-                                    trailingBadge = "$configuredCount/${Providers.ALL.size}",
+                                    trailingBadge = "$configuredCount/${Providers.all(settingsManager.customProviders).size}",
                                     onClick = { showApiKeyManager = true }
                                 )
                                 HorizontalDivider(
@@ -308,6 +308,11 @@ fun SettingsGroupItem(
 fun ApiKeyManagerSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
     var activeProvider by remember { mutableStateOf(settingsManager.selectedProvider) }
     var expandedProvider by remember { mutableStateOf<String?>(activeProvider) }
+    // The list only changes when a provider is added or removed, so it is
+    // re-read rather than parsed on every frame.
+    var customVersion by remember { mutableIntStateOf(0) }
+    val customProviders = remember(customVersion) { settingsManager.customProviders }
+    var showCustomSheet by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val context = LocalContext.current
@@ -372,7 +377,8 @@ fun ApiKeyManagerSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) 
                 }
             }
 
-            Providers.ALL.forEach { info ->
+            Providers.all(customProviders).forEach { info ->
+                val isCustom = Providers.custom(customProviders, info.name) != null
                 var providerKey by remember(info.name) {
                     mutableStateOf(settingsManager.getApiKey(info.name) ?: "")
                 }
@@ -519,7 +525,7 @@ fun ApiKeyManagerSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) 
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                GetKeyLink(info.name)
+                                GetKeyLink(info.name, customProviders)
                                 if (statusMessage != null) {
                                     Text(
                                         statusMessage!!,
@@ -545,7 +551,7 @@ fun ApiKeyManagerSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) 
                                         scope.launch {
                                             isValidating = true
                                             statusMessage = null
-                                            when (val result = Providers.validateKey(info.name, providerKey.trim())) {
+                                            when (val result = Providers.validateKey(info.name, providerKey.trim(), customProviders)) {
                                                 is Providers.KeyValidation.Valid -> {
                                                     isValidating = false
                                                     settingsManager.setApiKey(info.name, providerKey.trim())
@@ -611,10 +617,67 @@ fun ApiKeyManagerSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) 
                                         Icon(Icons.Rounded.DeleteOutline, stringResource(R.string.btn_clear_key), Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
                                     }
                                 }
+
+                                // Only the user's own providers can be removed;
+                                // a built-in is part of the app.
+                                if (isCustom) {
+                                    OutlinedIconButton(
+                                        onClick = {
+                                            focusManager.clearFocus()
+                                            settingsManager.setApiKey(info.name, null)
+                                            settingsManager.customProviders =
+                                                customProviders.filterNot { it.name == info.name }
+                                            if (activeProvider == info.name) {
+                                                settingsManager.selectedProvider = "OpenRouter"
+                                                activeProvider = "OpenRouter"
+                                            }
+                                            if (expandedProvider == info.name) expandedProvider = null
+                                            customVersion++
+                                            statusMessage = null
+                                        },
+                                        shapes = ExpressiveIconButtonShapes,
+                                        modifier = Modifier.size(44.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Rounded.DeleteForever,
+                                            stringResource(R.string.desc_delete_provider, info.name),
+                                            Modifier.size(18.dp),
+                                            tint = MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
                 }
+            }
+
+            Spacer(Modifier.height(6.dp))
+            OutlinedButton(
+                onClick = { showCustomSheet = true },
+                shape = RoundedCornerShape(18.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+            ) {
+                Icon(Icons.Rounded.Add, contentDescription = null, Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    stringResource(R.string.btn_add_provider),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            if (showCustomSheet) {
+                CustomProviderSheet(
+                    settingsManager = settingsManager,
+                    onDismiss = { showCustomSheet = false },
+                    onSaved = { name ->
+                        customVersion++
+                        expandedProvider = name
+                    }
+                )
             }
         }
     }

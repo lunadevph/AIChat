@@ -118,6 +118,27 @@
     <string name="settings_api_keys_subtitle">Manage &amp; switch saved keys across all providers</string>
     <string name="sheet_api_keys_title">API Key Manager</string>
     <string name="sheet_api_keys_subtitle">Store, test, and switch between your AI provider API keys.</string>
+    <string name="btn_add_provider">Add provider</string>
+    <string name="custom_provider_title">Add a custom provider</string>
+    <string name="custom_provider_subtitle">Point the assistant at any OpenAI-compatible endpoint — your own server, a proxy, or a gateway.</string>
+    <string name="label_provider_name">Name</string>
+    <string name="label_provider_url">Base URL</string>
+    <string name="label_provider_tagline">Description (optional)</string>
+    <string name="label_provider_key_prefix">Key prefix (optional)</string>
+    <string name="label_provider_models">Models, comma separated (optional)</string>
+    <string name="label_provider_default_model">Default model (optional)</string>
+    <string name="custom_provider_saved">%1$s was added. Add its key below to use it.</string>
+    <string name="custom_provider_deleted">%1$s was removed.</string>
+    <string name="custom_provider_name_hint">My endpoint</string>
+    <string name="custom_provider_url_hint">https://api.example.com/v1/</string>
+    <string name="custom_provider_tagline_hint">What this endpoint is for</string>
+    <string name="custom_provider_key_prefix_help">Shown as a hint in the key field, like the built-ins have.</string>
+    <string name="custom_provider_models_help">Leave empty to fetch the catalog from the endpoint.</string>
+    <string name="custom_provider_name_blank">Give the provider a name.</string>
+    <string name="custom_provider_name_builtin">That name belongs to a built-in provider.</string>
+    <string name="custom_provider_name_taken">You already added a provider with that name.</string>
+    <string name="custom_provider_url_invalid">Enter a full URL starting with http:// or https://</string>
+    <string name="desc_delete_provider">Remove %1$s</string>
     <string name="badge_active">Active</string>
     <string name="badge_configured">Configured</string>
     <string name="badge_not_configured">Not set</string>
@@ -232,6 +253,7 @@
     <string name="update_download_failed">Download failed — %1$s</string>
     <string name="desc_update_progress">Update download progress</string>
     <string name="desc_back">Back</string>
+    <string name="desc_close">Close</string>
     <string name="desc_hide_api_key">Hide API key</string>
     <string name="desc_show_api_key">Show API key</string>
 

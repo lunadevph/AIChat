@@ -6,7 +6,7 @@ A native Android client for chatting with large language models. Bring your own 
 
 ## Features
 
-- **9 providers, one interface.** Every provider is reached through an OpenAI-compatible endpoint, so switching providers never changes how you chat.
+- **9 providers, one interface.** Every provider is reached through an OpenAI-compatible endpoint, so switching providers never changes how you chat. Add your own: any OpenAI-compatible base URL with an optional hand-listed model catalog, from Settings → AI & Provider → API Keys.
 - **Bring your own key.** Keys are encrypted on-device with AES-256-GCM via Android Keystore, and validated against the provider's API before being saved.
 - **Multiple saved keys.** Keep one key per provider and switch the active one without re-entering credentials.
 - **Vision input.** Attach images to messages on models that support multimodal input.

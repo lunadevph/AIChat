@@ -20,7 +20,11 @@ class SettingsManager(context: Context) {
             // A provider can be retired in a later release; fall back to the default
             // one so the app never points at an endpoint that no longer exists.
             val storedProvider = _prefs!!.getString("selected_provider", "OpenRouter")
-            if (storedProvider != null && Providers.ALL.none { it.name == storedProvider }) {
+            val customProviders = customProviders
+            if (storedProvider != null &&
+                Providers.ALL.none { it.name == storedProvider } &&
+                customProviders.none { it.name == storedProvider }
+            ) {
                 _prefs!!.edit()
                     .putString("selected_provider", "OpenRouter")
                     .putString("selected_model", Providers.defaultModel("OpenRouter"))
@@ -73,7 +77,28 @@ class SettingsManager(context: Context) {
 
     fun hasApiKey(provider: String): Boolean = !getApiKey(provider).isNullOrBlank()
 
-    fun getAllConfiguredProviders(): List<String> = Providers.ALL.map { it.name }.filter { hasApiKey(it) }
+    fun getAllConfiguredProviders(): List<String> =
+        (Providers.ALL.map { it.name } + customProviders.map { it.name }).filter { hasApiKey(it) }
+
+    /**
+     * Providers the user added themselves, in the order they added them. They
+     * live alongside the built-in ones everywhere a provider name is used — the
+     * key store already keys off the name, so a custom provider's key is stored
+     * and migrated like any other.
+     */
+    var customProviders: List<Providers.Custom>
+        get() {
+            val json = _prefs!!.getString("custom_providers", null) ?: return emptyList()
+            val type = object : TypeToken<List<Providers.Custom>>() {}.type
+            return try {
+                _gson!!.fromJson<List<Providers.Custom>>(json, type) ?: emptyList()
+            } catch (e: Exception) {
+                emptyList()
+            }
+        }
+        set(value) {
+            _prefs!!.edit().putString("custom_providers", _gson!!.toJson(value)).apply()
+        }
 
     var apiKey: String?
         get() = getApiKey(selectedProvider)
@@ -212,7 +237,9 @@ class SettingsManager(context: Context) {
         }
 
     val isSetupComplete: Boolean
-        get() = !apiKey.isNullOrBlank() || Providers.ALL.any { hasApiKey(it.name) }
+        get() = !apiKey.isNullOrBlank() ||
+            Providers.ALL.any { hasApiKey(it.name) } ||
+            customProviders.any { hasApiKey(it.name) }
 
     companion object {
         private var _prefs: SharedPreferences? = null

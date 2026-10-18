@@ -97,9 +97,10 @@ fun SetupScreen(
     onComplete: (String, String, Map<String, String>) -> Unit
 ) {
     var selectedProvider by remember { mutableStateOf(settingsManager.selectedProvider) }
+    var customProviders by remember { mutableStateOf(settingsManager.customProviders) }
     val providerKeys = remember {
         mutableStateMapOf<String, String>().apply {
-            Providers.ALL.forEach { p ->
+            Providers.all(customProviders).forEach { p ->
                 val saved = settingsManager.getApiKey(p.name)
                 if (!saved.isNullOrBlank()) this[p.name] = saved
             }
@@ -215,7 +216,8 @@ fun SetupScreen(
                 networkTrouble = false
             },
             compact = true,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            providers = Providers.all(customProviders)
         )
 
         Spacer(modifier = Modifier.height(22.dp))
@@ -236,7 +238,7 @@ fun SetupScreen(
                 networkTrouble = false
             },
             label = { Text(stringResource(R.string.label_api_key)) },
-            placeholder = { Text(Providers.info(selectedProvider).keyPrefix + "…") },
+            placeholder = { Text(Providers.info(selectedProvider, customProviders).keyPrefix + "…") },
             isError = errorText != null,
             singleLine = true,
             keyboardOptions = KeyboardOptions(
@@ -312,7 +314,7 @@ fun SetupScreen(
                 scope.launch {
                     isValidating = true
                     networkTrouble = false
-                    when (val result = Providers.validateKey(selectedProvider, apiKey.trim())) {
+                    when (val result = Providers.validateKey(selectedProvider, apiKey.trim(), customProviders)) {
                         is Providers.KeyValidation.Valid -> {
                             isValidating = false
                             providerKeys[selectedProvider] = apiKey.trim()

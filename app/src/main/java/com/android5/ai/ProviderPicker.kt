@@ -33,10 +33,11 @@ fun ProviderPicker(
     selected: String,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
-    compact: Boolean = false
+    compact: Boolean = false,
+    providers: List<Providers.Info> = Providers.ALL
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Providers.ALL.forEach { info ->
+        providers.forEach { info ->
             val isSelected = info.name == selected
             Surface(
                 shape = RoundedCornerShape(18.dp),
@@ -99,10 +100,13 @@ fun ProviderPicker(
 }
 
 @Composable
-fun GetKeyLink(provider: String) {
+fun GetKeyLink(provider: String, custom: List<Providers.Custom> = emptyList()) {
     val uriHandler = LocalUriHandler.current
+    val keyUrl = Providers.info(provider, custom).keyUrl
+    // A custom provider has no key page of its own.
+    if (keyUrl.isBlank()) return
     Surface(
-        onClick = { uriHandler.openUri(Providers.info(provider).keyUrl) },
+        onClick = { uriHandler.openUri(keyUrl) },
         shape = RoundedCornerShape(50),
         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
