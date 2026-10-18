@@ -1,26 +1,27 @@
 # AI Chat
 
-A native Android client for chatting with large language models. Bring your own API key and pick a provider — OpenRouter, OpenAI, Google, Groq, DeepSeek, Claude, Mistral, or Grok.
+A native Android client for chatting with large language models. Bring your own API key and pick a provider — OpenRouter, OpenAI, Google, Groq, DeepSeek, Claude, Mistral, Grok, or NVIDIA NIM.
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 ## Features
 
-- **8 providers, one interface.** Every provider is reached through an OpenAI-compatible endpoint, so switching providers never changes how you chat.
+- **9 providers, one interface.** Every provider is reached through an OpenAI-compatible endpoint, so switching providers never changes how you chat.
 - **Bring your own key.** Keys are encrypted on-device with AES-256-GCM via Android Keystore, and validated against the provider's API before being saved.
 - **Multiple saved keys.** Keep one key per provider and switch the active one without re-entering credentials.
 - **Vision input.** Attach images to messages on models that support multimodal input.
 - **Streaming responses.** Tokens render as they arrive, and generation can be stopped mid-flight, including while a retry is counting down.
 - **Retries instead of errors.** A rate-limited request (HTTP 429) is held and retried with a doubling backoff, honouring the provider's Retry-After, with the countdown shown in the transcript.
 - **Web search.** Optional per-request toggle for up-to-date answers.
-- **Tool calls.** The assistant works on the device with tags such as `<read path="notes.md"/>`, `<write>`, `<edit>`, `<append>`, `<list>`, `<search>`, `<mkdir>`, `<move>`, `<copy>`, `<delete>`, `<download url="…"/>`, `<fetch url="…"/>`, `<upload path="…"/>` and `<open>`, plus memory, web search and the clock. Runs are shown in the transcript and can be switched off in settings. Models are told to write these tags as plain text; if one uses its provider's native function-calling format instead — which some providers reject outright and others answer with a blank reply — the app detects it and asks once more with that spelled out.
-- **Tool file history.** Everything the assistant writes is listed in its own screen — size, age, a preview, per-file delete and clear-all — and each reply links to the files it touched.
+- **Tool calls.** The assistant works on the device with tags such as `<read path="notes.md"/>`, `<write>`, `<edit>`, `<replace>` (regex), `<append>`, `<list>`, `<search>`, `<find>`, `<stat>`, `<tail>`, `<mkdir>`, `<move>`, `<copy>`, `<delete>`, `<download url="…"/>`, `<fetch url="…"/>`, `<upload path="…"/>`, `<open>`, `<storage/>`, `<memory>`, `<compact/>`, `<websearch>` and `<time/>`. Runs are shown in the transcript and can be switched off in settings. Models are told to write these tags as plain text; if one uses its provider's native function-calling format instead — which some providers reject outright and others answer with a blank reply — the app detects it and asks once more with that spelled out.
+- **Device storage.** Once you grant the storage permission in Settings → AI settings → Device storage, the assistant can read, search, write, move, copy and delete in your shared folders (`/storage/emulated/0/…`) with the same absolute paths, not just copy files into its private workspace.
+- **Tool file history.** Everything the assistant writes in its workspace is listed in its own screen — size, age, a preview, per-file delete and clear-all — and each reply links to the files it touched.
 - **Memory.** Custom instructions, long-term user memory, and AI self-managed memory.
 - **Model parameters.** Temperature, top-P, max tokens, frequency penalty, and presence penalty, with reset-to-defaults.
 - **Conversation history.** Multiple stored conversations, with clear and delete.
 - **Material 3 Expressive.** Dynamic color, a centred top bar, split button, toggle button, morphing loading and wavy progress indicators, the Material shape library and expressive type styles.
 - **Themes.** AMOLED dark, light, and dynamic system theming.
-- **Self-updating.** Checks a mirror for newer builds, downloads the APK in-app with live progress and hands it to the installer — no browser hop. Falls back to the release page if the install is blocked.
+- **Self-updating.** Checks a mirror for newer builds, verifies the downloaded APK against the mirror's published SHA-256, installs in-app with live progress and hands it to the installer — no browser hop. Falls back to the release page if the install is blocked. The mirror format is versioned and additive, so older builds keep reading newer mirrors.
 - **Optional device storage.** Off by default; when granted, the tools can also read and save files in the shared folders (Downloads, Documents, pictures) instead of only their own workspace.
 
 ## Requirements

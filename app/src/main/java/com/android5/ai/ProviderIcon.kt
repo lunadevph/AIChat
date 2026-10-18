@@ -15,6 +15,7 @@ fun providerIconRes(provider: String): Int = when (provider) {
     "Claude" -> R.drawable.ic_provider_claude
     "Mistral" -> R.drawable.ic_provider_mistral
     "Grok" -> R.drawable.ic_provider_grok
+    "NVIDIA" -> R.drawable.ic_provider_nvidia
     else -> R.drawable.ic_provider_openrouter
 }
 

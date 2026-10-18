@@ -2,7 +2,10 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="splash_background">#000000</color>
+    <!-- The launch screen follows the system light/dark setting, like the app
+         itself; the night overrides live in values-night/colors.xml. -->
+    <color name="splash_background">#FFF7F9FC</color>
+    <color name="splash_icon">#FF005FAF</color>
     <color name="icon_gradient_start">#005FAF</color>
     <color name="icon_gradient_end">#00468B</color>
 </resources>

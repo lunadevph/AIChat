@@ -6,9 +6,11 @@ plugins {
 import java.util.Properties
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 import java.text.SimpleDateFormat
 import java.net.URL
 import java.net.HttpURLConnection
+import java.security.MessageDigest
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -32,6 +34,28 @@ fun loadVersionProps(): Properties {
         versionPropsFile.inputStream().use { props.load(it) }
     }
     return props
+}
+
+// Lower-case hex SHA-256 of a file, so the mirror can advertise the exact bytes
+// of the APK it serves and a new client can check the download it just made.
+fun sha256Of(file: File): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    file.inputStream().use { input ->
+        val buffer = ByteArray(64 * 1024)
+        while (true) {
+            val read = input.read(buffer)
+            if (read <= 0) break
+            digest.update(buffer, 0, read)
+        }
+    }
+    return digest.digest().joinToString("") { "%02x".format(it) }
+}
+
+// The moment the mirror was written, in UTC ISO 8601.
+fun nowIso(): String {
+    val format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
+    format.timeZone = TimeZone.getTimeZone("UTC")
+    return format.format(Date())
 }
 
 // Computes the version a release build should use: same calendar-versioning rule
@@ -252,18 +276,30 @@ tasks.register("UpdateMirrors") {
             // 2. Copy APK and update mirror.json
             val apkDir = layout.buildDirectory.dir("outputs/apk/release").get().asFile
             val apkFile = apkDir.listFiles { f -> f.extension == "apk" }?.firstOrNull()
+            var apkSha256 = ""
+            var apkSizeBytes = 0L
             if (apkFile != null && apkFile.exists()) {
                 val destApk = File(mirrorDir, "latest.apk")
                 apkFile.copyTo(destApk, overwrite = true)
-                println("UpdateMirrors: Copied release APK (${apkFile.name}) to ${destApk.absolutePath} (${destApk.length()} bytes)")
+                apkSha256 = sha256Of(destApk)
+                apkSizeBytes = destApk.length()
+                println("UpdateMirrors: Copied release APK (${apkFile.name}) to ${destApk.absolutePath} (${destApk.length()} bytes, sha256 $apkSha256)")
             } else {
                 println("UpdateMirrors: Warning - release APK not found in $apkDir")
             }
 
+            // Mirror format v2.
+            //
+            // Every v1 field keeps its exact name, type and meaning, and the new
+            // ones are purely additive, so a client that only knows v1 (any build
+            // shipped before this one) still parses the file and still sees an
+            // update. Gson ignores fields a client has no property for, and the
+            // added properties all have defaults, so both directions are safe.
             val rawDownloadUrl = "https://raw.githubusercontent.com/lunadevph/update-mirror/main/latest.apk"
             val mirrorFile = File(mirrorDir, "mirror.json")
             val jsonContent = """
 {
+  "schemaVersion": 2,
   "appPackageName": "com.android5.ai",
   "appLatestVersion": "$verName",
   "appLatestCodeVersion": $verCode,
@@ -271,10 +307,15 @@ tasks.register("UpdateMirrors") {
   "openaiIcon": "ic_provider_openai.png",
   "openrouterIcon": "ic_provider_openrouter.png",
   "groqIcon": "ic_provider_groq.png",
+  "nvidiaIcon": "ic_provider_nvidia.png",
   "updateStatus": "Latest release v$verName (Build $verCode)",
   "updateRequired": false,
+  "minVersionCode": 0,
   "updateLinkAvailable": true,
   "downloadUrl": "$rawDownloadUrl",
+  "releasedAt": "${nowIso()}",
+  "apkSizeBytes": $apkSizeBytes,
+  "apkSha256": "$apkSha256",
   "changelog": "$changelogJson"
 }
 """.trimIndent() + "\n"

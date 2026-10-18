@@ -22,7 +22,8 @@ object Providers {
         Info("DeepSeek", "DeepSeek V4 Pro & Flash", "sk-", "https://platform.deepseek.com/api_keys"),
         Info("Claude", "Anthropic Claude Opus 4.1 & Sonnet 4", "sk-ant-", "https://console.anthropic.com/settings/keys"),
         Info("Mistral", "Mistral Large 3, Medium 3.5 & Codestral", "…", "https://console.mistral.ai/api-keys"),
-        Info("Grok", "xAI Grok 4.6 & 4.x family", "xai-", "https://console.x.ai")
+        Info("Grok", "xAI Grok 4.6 & 4.x family", "xai-", "https://console.x.ai"),
+        Info("NVIDIA", "Nemotron, Llama & Qwen on NVIDIA NIM", "nvapi-", "https://build.nvidia.com/settings/api-keys")
     )
 
     fun info(provider: String): Info = ALL.firstOrNull { it.name == provider }
@@ -52,6 +53,7 @@ object Providers {
         "Claude" -> "https://api.anthropic.com/v1/"
         "Mistral" -> "https://api.mistral.ai/v1/"
         "Grok" -> "https://api.x.ai/v1/"
+        "NVIDIA" -> "https://integrate.api.nvidia.com/v1/"
         else -> "https://openrouter.ai/api/v1/"
     }
 
@@ -113,6 +115,7 @@ object Providers {
         "Claude" -> "claude-opus-4-1-20250805"
         "Mistral" -> "mistral-large-latest"
         "Grok" -> "grok-4.6"
+        "NVIDIA" -> "nvidia/llama-3.3-nemotron-super-49b-v1.5"
         else -> "openrouter/free"
     }
 
@@ -202,6 +205,18 @@ object Providers {
             // Previous gen
             ModelInfo(id = "grok-3", name = "Grok 3", description = "Previous-gen capable reasoning model", architecture = Architecture(modality = "text+image->text")),
             ModelInfo(id = "grok-3-mini", name = "Grok 3 Mini", description = "Lightweight fast thinking model", architecture = Architecture(modality = "text+image->text"))
+        )
+        "NVIDIA" -> listOf(
+            // Nemotron family (NVIDIA-tuned)
+            ModelInfo(id = "nvidia/llama-3.3-nemotron-super-49b-v1.5", name = "Nemotron Super 49B", description = "NVIDIA-tuned balanced reasoner, fast on NIM", architecture = Architecture(modality = "text->text")),
+            ModelInfo(id = "nvidia/llama-3.1-nemotron-ultra-253b-v1", name = "Nemotron Ultra 253B", description = "Largest Nemotron — deep reasoning & long context", architecture = Architecture(modality = "text->text")),
+            ModelInfo(id = "nvidia/nemotron-3-ultra", name = "Nemotron 3 Ultra", description = "NVIDIA's current frontier model", architecture = Architecture(modality = "text->text")),
+            ModelInfo(id = "nvidia/nemotron-4-340b-instruct", name = "Nemotron 4 340B", description = "Synthetic-data-tuned instruction model", architecture = Architecture(modality = "text->text")),
+            // Hosted open models
+            ModelInfo(id = "meta/llama-3.3-70b-instruct", name = "Llama 3.3 70B", description = "Meta's versatile open model on NIM", architecture = Architecture(modality = "text->text")),
+            ModelInfo(id = "deepseek-ai/deepseek-r1", name = "DeepSeek R1", description = "Open reasoning model with visible thinking", architecture = Architecture(modality = "text->text")),
+            ModelInfo(id = "qwen/qwen3-coder-480b-a35b-instruct", name = "Qwen 3 Coder 480B", description = "Agentic coding model for large codebases", architecture = Architecture(modality = "text->text")),
+            ModelInfo(id = "mistralai/mistral-nemotron", name = "Mistral Nemotron", description = "Mistral tuned by NVIDIA, tool-use focused", architecture = Architecture(modality = "text->text"))
         )
         else -> listOf(
             // Free models (OpenRouter)

@@ -1,0 +1,22 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- NVIDIA green field: the list clips provider marks to a circle. -->
+    <path
+        android:fillColor="#76B900"
+        android:pathData="M0,0h24v24H0z" />
+
+    <!-- Stylised eye: white almond, green iris, white highlight. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M1.4,12C4.2,8.4 8,6.5 12,6.5s7.8,1.9 10.6,5.5C19.8,15.6 16,17.5 12,17.5S4.2,15.6 1.4,12z" />
+    <path
+        android:fillColor="#76B900"
+        android:pathData="M12,8.6a3.4,3.4 0 1,0 0,6.8a3.4,3.4 0 0,0 0,-6.8z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,10.4a1.6,1.6 0 1,0 0,3.2a1.6,1.6 0 0,0 0,-3.2z" />
+</vector>

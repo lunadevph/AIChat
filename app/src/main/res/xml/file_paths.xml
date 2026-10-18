@@ -9,4 +9,10 @@
     <files-path
         name="workspace"
         path="workspace/" />
+
+    <!-- Shared storage, so a file the user pointed the assistant at can be opened
+         in their own viewer once device storage has been granted. -->
+    <external-path
+        name="device"
+        path="." />
 </paths>

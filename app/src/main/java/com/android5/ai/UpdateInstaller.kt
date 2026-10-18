@@ -12,6 +12,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.IOException
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 /**
@@ -59,11 +60,16 @@ object UpdateInstaller {
      * Streams [url] into [destination], reporting `(bytes, total)` as it goes so
      * the screen can show real progress. Throws with a readable message on
      * failure, and never leaves a half-written file behind.
+     *
+     * When [expectedSha256] is given (a v2 mirror advertises the hash of the APK
+     * it serves) the finished download must match it before it is kept, so a
+     * truncated or substituted file never reaches the installer.
      */
     suspend fun download(
         context: Context,
         url: String,
         destination: File,
+        expectedSha256: String? = null,
         onProgress: (Long, Long) -> Unit
     ): File = withContext(Dispatchers.IO) {
         val client = OkHttpClient.Builder()
@@ -103,6 +109,12 @@ object UpdateInstaller {
                     }
                 }
                 if (partial.length() <= 0) throw IOException("the download was empty")
+                if (!expectedSha256.isNullOrBlank()) {
+                    val actual = sha256(partial)
+                    if (!actual.equals(expectedSha256.trim(), ignoreCase = true)) {
+                        throw IOException("the update failed its integrity check (expected $expectedSha256, got $actual)")
+                    }
+                }
                 if (destination.exists()) destination.delete()
                 if (!partial.renameTo(destination)) {
                     throw IOException("could not finish writing the update file")
@@ -114,6 +126,20 @@ object UpdateInstaller {
 
             destination
         }
+    }
+
+    /** Lower-case hex SHA-256 of [file], for the mirror's integrity check. */
+    private fun sha256(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(64 * 1024)
+            while (true) {
+                val read = input.read(buffer)
+                if (read <= 0) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
     /** The system installer's confirmation screen for a downloaded APK. */

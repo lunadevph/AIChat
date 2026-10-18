@@ -1,13 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.AIChat" parent="Theme.Material3.DayNight.NoActionBar" />
+    <style name="Theme.AIChat" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Day/night aware window background so no mismatched flash behind Compose. -->
+        <item name="android:windowBackground">@color/splash_background</item>
+    </style>
 
     <style name="Theme.App.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/splash_background</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/avd_splash</item>
         <item name="windowSplashScreenAnimationDuration">1500</item>
         <item name="postSplashScreenTheme">@style/Theme.AIChat</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
+        <!-- The light splash needs dark system-bar icons; the night theme
+             overrides these to false. -->
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
     </style>
 </resources>

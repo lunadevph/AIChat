@@ -56,8 +56,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.android5.ai.ui.theme.AIChatTheme
+import com.android5.ai.ui.theme.AmoledBackground
 import com.android5.ai.ui.theme.ExpressiveButtonShapes
 import com.android5.ai.ui.theme.ExpressiveIconButtonShapes
+import com.android5.ai.ui.theme.LightSurface
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -1435,9 +1437,9 @@ fun AboutAppSheet(onDismiss: () -> Unit) {
 @Composable
 fun AppearanceSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
     val options = listOf(
-        Triple("amoled", stringResource(R.string.theme_amoled), Color.Black),
+        Triple("amoled", stringResource(R.string.theme_amoled), AmoledBackground),
         Triple("dynamic", stringResource(R.string.theme_dynamic), MaterialTheme.colorScheme.primary),
-        Triple("light", stringResource(R.string.theme_light), Color.White)
+        Triple("light", stringResource(R.string.theme_light), LightSurface)
     )
     val current = settingsManager.themeMode
 

@@ -206,6 +206,7 @@
     <string name="update_version_badge">v%1$s  ·  Build %2$d</string>
     <string name="update_label_installed">Installed</string>
     <string name="update_label_latest">Latest</string>
+    <string name="update_released">Released %1$s</string>
     <string name="update_status_checking">Checking for updates</string>
     <string name="update_status_contacting">Contacting update server…</string>
     <string name="update_status_failed">Connection Failed</string>

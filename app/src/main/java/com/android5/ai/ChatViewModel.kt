@@ -352,7 +352,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 "IMAGE DISPLAY CAPABILITY: You can display pictures and web images inline in your response by outputting Markdown image tags: `![Description](https://url/to/image.jpg)`. Use this whenever providing photos, pictures, diagrams, or visual examples."
             )
             if (toolsEnabled) {
-                append("\n\n").append(AiTools.describe(ToolFiles.DIR))
+                append("\n\n").append(AiTools.describe(toolScope))
             } else {
                 // With tools switched off the model can still keep memory; it just
                 // does so with the older fenced block instead of the <memory> tool.
@@ -718,11 +718,17 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                     reasoning = turn.reasoning,
                     isStreaming = false,
                     tools = runs.map { run ->
-                        // `label` is the workspace-relative path for the file
-                        // tools, which is exactly what the transcript needs to
-                        // link a run back to the file it touched.
-                        val filePath =
-                            if (run.name in AiTools.fileTools) run.label else null
+                        // `label` is the path for the file tools, which is exactly
+                        // what the transcript needs to link a run back to the file
+                        // it touched. Device paths are absolute and live outside
+                        // the file history screen, so they are shown without a link.
+                        val filePath = if (run.name in AiTools.fileTools &&
+                            !run.label.startsWith("/")
+                        ) {
+                            run.label
+                        } else {
+                            null
+                        }
                         ToolRun(run.name, run.label, run.ok, filePath)
                     }.ifEmpty { null }
                 )

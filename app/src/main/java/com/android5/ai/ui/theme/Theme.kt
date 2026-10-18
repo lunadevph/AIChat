@@ -116,7 +116,12 @@ fun AIChatTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+            // The status and navigation bar icons were only set for the status
+            // bar, so on a light theme the navigation bar showed white glyphs on
+            // a white bar. Both follow the theme now.
+            val controller = WindowCompat.getInsetsController(window, view)
+            controller.isAppearanceLightStatusBars = !darkTheme
+            controller.isAppearanceLightNavigationBars = !darkTheme
         }
     }
 

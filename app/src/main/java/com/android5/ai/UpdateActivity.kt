@@ -44,6 +44,9 @@ import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 import java.util.concurrent.TimeUnit
 
 private const val MIRROR_URL = "https://raw.githubusercontent.com/LunaDevPH/update-mirror/main/"
@@ -60,6 +63,33 @@ sealed class InstallUi {
     data class Downloading(val bytes: Long, val total: Long) : InstallUi()
     data class Ready(val file: File) : InstallUi()
     data class Failed(val message: String) : InstallUi()
+}
+
+/**
+ * Whether this mirror says the running build must update before it can go on. It
+ * has always had the `updateRequired` boolean; a v2 mirror can additionally name
+ * the oldest build it still supports, which forces the update on its own.
+ */
+private fun updateIsRequired(config: AppUpdateConfig): Boolean =
+    config.updateRequired ||
+        (config.minVersionCode > 0 && BuildConfig.VERSION_CODE < config.minVersionCode)
+
+/**
+ * The mirror's release stamp in local time, or null when it is missing or does
+ * not parse — a v1 mirror sends no stamp at all, and one bad value is not worth
+ * failing the screen over.
+ */
+private fun readableReleasedAt(raw: String?): String? {
+    if (raw.isNullOrBlank()) return null
+    return try {
+        val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }
+        val date = parser.parse(raw) ?: return null
+        SimpleDateFormat("d MMM yyyy, HH:mm", Locale.getDefault()).format(date)
+    } catch (_: Exception) {
+        null
+    }
 }
 
 class UpdateActivity : ComponentActivity() {
@@ -200,7 +230,7 @@ class UpdateActivity : ComponentActivity() {
                                 is UpdateUi.Failed -> UpdateErrorCard(s.message)
                                 is UpdateUi.Done -> {
                                     val isNew = s.config.appLatestCodeVersion > BuildConfig.VERSION_CODE
-                                    val required = isNew && s.config.updateRequired
+                                    val required = isNew && updateIsRequired(s.config)
                                     when {
                                         required -> UpdateRequiredCard(s.config)
                                         isNew -> UpdateAvailableCard(s.config)
@@ -230,6 +260,16 @@ class UpdateActivity : ComponentActivity() {
                                 code = (state as? UpdateUi.Done)?.config?.appLatestCodeVersion?.toString() ?: "\u2014",
                                 icon = Icons.Rounded.Cloud,
                                 modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        val released = readableReleasedAt((state as? UpdateUi.Done)?.config?.releasedAt)
+                        if (released != null) {
+                            Spacer(Modifier.height(10.dp))
+                            Text(
+                                stringResource(R.string.update_released, released),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
@@ -272,7 +312,7 @@ class UpdateActivity : ComponentActivity() {
                                             UpdateInstallActions(
                                                 install = install,
                                                 canInstall = canInstall,
-                                                required = s.config.updateRequired,
+                                                required = updateIsRequired(s.config),
                                                 onDownload = {
                                                     val url = s.config.downloadUrl
                                                     if (url.isNullOrBlank()) {
@@ -289,7 +329,9 @@ class UpdateActivity : ComponentActivity() {
                                                                     destination = UpdateInstaller.apkFile(
                                                                         context,
                                                                         s.config.appLatestVersion
-                                                                    )
+                                                                    ),
+                                                                    // A v2 mirror publishes the hash of the APK it serves.
+                                                                    expectedSha256 = s.config.apkSha256
                                                                 ) { written, total ->
                                                                     install = InstallUi.Downloading(written, total)
                                                                 }
