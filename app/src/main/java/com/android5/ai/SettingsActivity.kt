@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.*
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.material3.*
@@ -1339,6 +1340,10 @@ fun AppearanceSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 5.dp)
+                        .semantics {
+                            this.role = Role.RadioButton
+                            this.selected = selected
+                        }
                 ) {
                     Row(
                         modifier = Modifier
@@ -1364,9 +1369,7 @@ fun AppearanceSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.weight(1f)
                         )
-                        if (selected) {
-                            Icon(Icons.Rounded.CheckCircle, null, Modifier.size(24.dp), MaterialTheme.colorScheme.primary)
-                        }
+                        SelectionIndicator(selected)
                     }
                 }
             }

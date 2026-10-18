@@ -337,7 +337,9 @@ fun ChatScreen(
                                 ) {
                                     Icon(
                                         Icons.Rounded.ChatBubbleOutline,
-                                        contentDescription = stringResource(R.string.desc_conversation_icon),
+                                        // Decorative: every row is a chat, and the row
+                                        // itself announces its title and selected state.
+                                        contentDescription = null,
                                         Modifier.size(20.dp),
                                         tint =
                                             if (selected) {
@@ -364,24 +366,24 @@ fun ChatScreen(
                                         style = MaterialTheme.typography.bodyMedium
                                     )
 
-                                    if (
-                                        viewModel.currentConversation?.id != conv.id
+                                    // Every row shows this button. Hiding it for the open
+                                    // conversation made that row 28dp shorter than the
+                                    // rest (the 48dp button is what sets row height) and
+                                    // left the open chat as the one you could not delete.
+                                    IconButton(
+                                        onClick = {
+                                            viewModel.deleteConversation(conv)
+                                        },
+                                        shapes = ExpressiveIconButtonShapes,
+                                        modifier = Modifier.size(48.dp)
                                     ) {
-                                        IconButton(
-                                            onClick = {
-                                                viewModel.deleteConversation(conv)
-                                            },
-                                            shapes = ExpressiveIconButtonShapes,
-                                            modifier = Modifier.size(48.dp)
-                                        ) {
-                                            Icon(
-                                                Icons.Rounded.Close,
-                                                contentDescription = stringResource(R.string.desc_delete_conversation),
-                                                Modifier.size(18.dp),
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    .copy(alpha = 0.7f)
-                                            )
-                                        }
+                                        Icon(
+                                            Icons.Rounded.Close,
+                                            contentDescription = stringResource(R.string.desc_delete_conversation),
+                                            Modifier.size(18.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                .copy(alpha = 0.7f)
+                                        )
                                     }
                                 }
                             }
@@ -1390,7 +1392,12 @@ fun ChatScreen(
                                     },
                                 tonalElevation =
                                     if (selected) 2.dp else 0.dp,
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .semantics {
+                                        this.role = Role.RadioButton
+                                        this.selected = selected
+                                    }
                             ) {
                                 Row(
                                     modifier = Modifier
@@ -1496,16 +1503,9 @@ fun ChatScreen(
                                         }
                                     }
 
-                                    if (selected) {
-                                        Spacer(Modifier.width(12.dp))
+                                    Spacer(Modifier.width(12.dp))
 
-                                        Icon(
-                                            Icons.Rounded.CheckCircle,
-                                            null,
-                                            Modifier.size(24.dp),
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
+                                    SelectionIndicator(selected)
                                 }
                             }
                         }

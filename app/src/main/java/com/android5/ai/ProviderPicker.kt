@@ -9,7 +9,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
-import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -92,14 +91,7 @@ fun ProviderPicker(
                             maxLines = 1
                         )
                     }
-                    if (isSelected) {
-                        Icon(
-                            Icons.Rounded.CheckCircle,
-                            contentDescription = stringResource(R.string.badge_active),
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
+                    SelectionIndicator(isSelected)
                 }
             }
         }

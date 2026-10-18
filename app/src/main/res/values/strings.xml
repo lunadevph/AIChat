@@ -112,7 +112,6 @@
 
     <!-- Additional Accessibility & UI Strings -->
     <string name="desc_delete_conversation">Delete conversation</string>
-    <string name="desc_conversation_icon">Conversation</string>
     <string name="desc_open_menu">Open menu</string>
     <string name="desc_switch_on">On</string>
     <string name="desc_switch_off">Off</string>
