@@ -78,6 +78,12 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
 
     private var currentJob: Job? = null
 
+    /**
+     * Error body read while classifying a failure, kept so the handler that shows
+     * the message can still read it: a Retrofit error body can only be consumed once.
+     */
+    private var lastErrorBody: String? = null
+
     val isLoading: Boolean get() = loadingStatus != LoadingStatus.IDLE
 
     var selectedImageUri by mutableStateOf<Uri?>(null)
@@ -263,11 +269,14 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 for (step in 0 until maxSteps) {
                     val turn = try {
                         requestTurn(apiKey, searchGrounding, toolResults, correction)
-                    } catch (e: HttpException) {
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
                         // Some providers reject a reply that used their own native
                         // tool syntax (Groq's "tool_use_failed") instead of the plain
-                        // tags this app asked for. Say so and ask again, once.
-                        if (correction != null || !isNativeToolCallRejection(e)) throw e
+                        // tags this app asked for; others accept it and leave the
+                        // reply blank. Either way: say so and ask again, once.
+                        if (correction != null || !isNativeToolCallFailure(e)) throw e
                         correction = context.getString(R.string.tool_syntax_correction)
                         loadingStatus = LoadingStatus.THINKING
                         requestTurn(apiKey, searchGrounding, toolResults, correction)
@@ -293,8 +302,14 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                     }
                     updateCurrentConversation()
                 }
+            } catch (e: NativeToolCallException) {
+                // The model answered with its own tool syntax and nothing else, and
+                // the provider took it: there is no text to show, so explain instead.
+                android.util.Log.w("AIChat", "The reply was a native tool call with no text")
+                showReplyError(context.getString(R.string.err_native_tool_call))
             } catch (e: HttpException) {
-                val body = try { e.response()?.errorBody()?.string() } catch (_: Exception) { null }
+                val body = lastErrorBody ?: try { e.response()?.errorBody()?.string() } catch (_: Exception) { null }
+                lastErrorBody = null
                 android.util.Log.e("AIChat", "HTTP ${e.code()}: $body")
                 val errorMsg = if (e.code() == 400 && saysNativeToolCall(body)) {
                     context.getString(R.string.err_native_tool_call)
@@ -307,23 +322,10 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                     500, 502, 503 -> context.getString(R.string.err_server)
                     else -> context.getString(R.string.err_api_code, e.code())
                 }
-                val streamIdx = messages.indexOfLast { it.isStreaming }
-                if (streamIdx != -1) {
-                    messages[streamIdx] = Message(role = "assistant", content = errorMsg, isStreaming = false)
-                } else {
-                    messages.add(Message(role = "assistant", content = errorMsg))
-                }
-                updateCurrentConversation()
+                showReplyError(errorMsg)
             } catch (e: Exception) {
                 android.util.Log.e("AIChat", "Request failed", e)
-                val errorMsg = context.getString(R.string.err_network, e.localizedMessage ?: "Unknown error")
-                val streamIdx = messages.indexOfLast { it.isStreaming }
-                if (streamIdx != -1) {
-                    messages[streamIdx] = Message(role = "assistant", content = errorMsg, isStreaming = false)
-                } else {
-                    messages.add(Message(role = "assistant", content = errorMsg))
-                }
-                updateCurrentConversation()
+                showReplyError(context.getString(R.string.err_network, e.localizedMessage ?: "Unknown error"))
             } finally {
                 loadingStatus = LoadingStatus.IDLE
                 rateLimitRetryIn = 0
@@ -418,6 +420,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         toolResults: String?,
         correction: String?
     ): Turn? {
+        lastErrorBody = null
         val isReasoning = isReasoningModel(settingsManager.selectedModel)
         val isGoogle = settingsManager.selectedProvider == "Google"
         val webSearchOn = settingsManager.webSearchEnabled
@@ -491,6 +494,17 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
     }
 
     /**
+     * True when a failed request looks like the model used its provider's own
+     * function-calling format instead of this app's plain tags: a 400 rejection
+     * (Groq's "tool_use_failed") or a reply that was nothing but a tool call.
+     */
+    private fun isNativeToolCallFailure(e: Exception): Boolean = when (e) {
+        is NativeToolCallException -> true
+        is HttpException -> isNativeToolCallRejection(e)
+        else -> false
+    }
+
+    /**
      * True when a provider answered 400 because the model emitted its *own* native
      * tool call while the request declared no tools. Groq watches gpt-oss and Llama
      * replies for their tool-call syntax and rejects the turn with "tool_use_failed"
@@ -505,6 +519,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         } catch (_: Exception) {
             null
         }
+        lastErrorBody = body
 
         if (!saysNativeToolCall(body)) return false
         android.util.Log.w("AIChat", "Provider rejected a native tool call: $body")
@@ -558,6 +573,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         val contentBuilder = StringBuilder()
         val reasoningBuilder = StringBuilder()
         var lastUiUpdateTime = 0L
+        var nativeToolCallSeen = false
 
         withContext(Dispatchers.IO) {
             responseBody.use { body ->
@@ -587,7 +603,13 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                             break
                         }
 
-                        val delta = chunk.choices?.firstOrNull()?.delta ?: continue
+                        val choice = chunk.choices?.firstOrNull() ?: continue
+                        if (choice.finishReason == "tool_calls") nativeToolCallSeen = true
+                        val delta = choice.delta ?: continue
+
+                        // The model used the provider's own function-calling format
+                        // instead of this app's tags; there will be no text.
+                        if (delta.toolCalls?.isNotEmpty() == true) nativeToolCallSeen = true
 
                         // Accumulate content and reasoning
                         delta.content?.let { contentBuilder.append(it) }
@@ -610,12 +632,22 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                         }
 
                         // Check finish reason
-                        if (chunk.choices?.firstOrNull()?.finishReason != null) break
+                        if (choice.finishReason != null) break
                     } catch (_: Exception) {
                         // Skip malformed chunks
                     }
                 }
             }
+        }
+
+        // A provider that runs its own tool parser can emit a native tool call even
+        // though this request declared no tools — and then the reply has no text at
+        // all. Drop the empty placeholder and let the caller ask the model again.
+        if (contentBuilder.isBlank() && nativeToolCallSeen) {
+            withContext(Dispatchers.Main) {
+                if (msgIndex in messages.indices) messages.removeAt(msgIndex)
+            }
+            throw NativeToolCallException()
         }
 
         // The message stays in its slot; finalizeTurn() decides what the transcript
@@ -644,6 +676,13 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         )
 
         val assistantMsg = response.choices.firstOrNull()?.message ?: return null
+
+        // Some providers accept a native tool call and return no text alongside it;
+        // a blank bubble would be the whole reply, so let the caller ask again.
+        if (assistantMsg.content.isNullOrBlank() && assistantMsg.toolCalls?.isNotEmpty() == true) {
+            throw NativeToolCallException()
+        }
+
         val reasoning = assistantMsg.thinking?.takeIf { it.isNotBlank() }
         messages.add(
             Message(
@@ -830,5 +869,26 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         val display = content.replace(regex, "").trim()
         return display to memory.takeIf { it.isNotBlank() }
     }
+
+    /**
+     * Shows a failure in the transcript: it replaces the reply still arriving, or
+     * starts one when the request failed before anything was shown.
+     */
+    private fun showReplyError(errorMsg: String) {
+        val streamIdx = messages.indexOfLast { it.isStreaming }
+        if (streamIdx != -1) {
+            messages[streamIdx] = Message(role = "assistant", content = errorMsg, isStreaming = false)
+        } else {
+            messages.add(Message(role = "assistant", content = errorMsg))
+        }
+        updateCurrentConversation()
+    }
 }
+
+/**
+ * Thrown when a reply consisted only of a tool call in the provider's own format.
+ * This app asks for tools in plain text tags, so such a reply has no text to show
+ * and is answered by asking the model again with that spelling out.
+ */
+private class NativeToolCallException : Exception("The reply was a native tool call")
 

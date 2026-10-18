@@ -26,10 +26,27 @@ data class StreamDelta(
     val content: String? = null,
     val role: String? = null,
     @SerializedName("reasoning_content") val reasoningContent: String? = null,
-    val reasoning: String? = null
+    val reasoning: String? = null,
+    /**
+     * A provider's own tool call. This app asks for tools in plain text tags, so
+     * this is only ever seen when a model ignores that and uses its native
+     * function-calling format — in which case there is no text to show.
+     */
+    @SerializedName("tool_calls") val toolCalls: List<StreamToolCall>? = null
 ) {
     val thinking: String? get() = reasoningContent ?: reasoning
 }
+
+data class StreamToolCall(
+    val id: String? = null,
+    val type: String? = null,
+    val function: StreamToolFunction? = null
+)
+
+data class StreamToolFunction(
+    val name: String? = null,
+    val arguments: String? = null
+)
 
 data class StreamChoice(
     val delta: StreamDelta? = null,
@@ -109,7 +126,9 @@ data class AssistantMessage(
     val role: String,
     val content: String,
     @SerializedName("reasoning_content") val reasoningContent: String? = null,
-    val reasoning: String? = null
+    val reasoning: String? = null,
+    /** Present only when a model used its own tool syntax instead of the tags. */
+    @SerializedName("tool_calls") val toolCalls: List<StreamToolCall>? = null
 ) {
     val thinking: String? get() = reasoningContent ?: reasoning
 }

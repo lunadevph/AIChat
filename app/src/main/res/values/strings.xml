@@ -140,7 +140,7 @@
     <string name="err_rate_limit">Rate limit hit. The provider is still busy after several retries — wait a little and try again.</string>
     <string name="err_native_tool_call">The model tried to call a tool in its own format and the provider rejected it. Turn off Tool calls in Settings → AI settings, or choose a different model.</string>
     <!-- Appended to the system prompt for one retry after a provider rejects a native tool call. -->
-    <string name="tool_syntax_correction" translatable="false">IMPORTANT — the provider rejected your previous reply because it contained a native tool call. This endpoint declares no tools at all, so a JSON tool_calls object, &lt;function=…&gt; markers and tool-call channels cannot be used here. When you need a tool, write the plain tags from the TOOLS section as ordinary text (for example &lt;read path=\"notes.md\"/&gt;); otherwise just answer in words.</string>
+    <string name="tool_syntax_correction" translatable="false">IMPORTANT — do not use native function calling for this reply. A JSON tool_calls object, &lt;function=…&gt; markers and tool-call channels are not accepted here; the provider rejects them and the reply arrives empty. If you need to act on the device, write the plain tags from the TOOLS section as ordinary text (for example &lt;read path=\"notes.md\"/&gt;); otherwise answer in words.</string>
     <string name="err_server">Server error. The provider is having issues.</string>
     <string name="err_api_code">API Error: %1$d</string>
     <string name="err_network">Network Error: %1$s</string>
