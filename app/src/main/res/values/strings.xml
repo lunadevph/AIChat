@@ -59,6 +59,16 @@
     <string name="setting_show_thinking_sub">Display the AI\'s step-by-step reasoning.</string>
     <string name="setting_web_search">Web search</string>
     <string name="setting_web_search_sub">Let the AI search the web for up-to-date info.</string>
+    <string name="setting_tools">Tool calls</string>
+    <string name="setting_tools_sub">Let the assistant read and write files, save memory and search the web on its own.</string>
+    <string name="desc_tool_ran">Tool %1$s completed</string>
+    <string name="desc_tool_failed">Tool %1$s failed</string>
+    <string name="label_tools_used">Tools used</string>
+    <string name="desc_more_actions">More actions</string>
+    <string name="setting_tools_workspace">Tool workspace</string>
+    <string name="setting_tools_workspace_empty">The assistant has not written any files yet.</string>
+    <string name="setting_tools_workspace_count">%1$d file(s) · %2$s</string>
+    <string name="desc_clear_workspace">Delete every file the assistant wrote</string>
     <string name="label_custom_instructions">Custom Instructions</string>
     <string name="label_user_memory">User Memory (Long-term)</string>
     <string name="hint_custom_instructions">e.g. You are a professional coder...</string>
@@ -115,7 +125,6 @@
     <string name="desc_scroll_to_bottom">Scroll to bottom</string>
     <string name="desc_show_thoughts">Show thoughts</string>
     <string name="desc_hide_thoughts">Hide thoughts</string>
-    <string name="label_web_badge">Web</string>
     <string name="empty_suggestions_hint">Choose a starter prompt or type your own question.</string>
     <string name="btn_clear_text">Clear</string>
     <string name="btn_get_api_key">Get an API key</string>

@@ -1,3 +1,11 @@
+- The assistant can now use tools. It can read and write files in a private workspace, list and search them, delete them, save or read its own memory, compact that memory, search the web and look up the date and time — all by writing simple tags such as <read path="notes.md"/> in its reply.
+- Every tool the assistant runs is shown as a small pill above its reply, so you can see what it did.
+- AI settings has a new "Tool calls" switch to turn the assistant's tools off, and a "Tool workspace" row showing the files it has written, with a button to clear them.
+- Saving memory now uses a <memory> tag, and <compact/> shrinks memory when it has grown repetitive.
+- The chat header is now a Material 3 Expressive flexible app bar that shows the current model as its subtitle and folds away as you scroll.
+- The composer now uses an expressive split button: one half sends (or stops), the other opens the attach menu, and web search is a toggle button beside the input.
+- Loading states use the Material 3 Expressive morphing loading indicator, and update checks use the wavy progress indicator.
+- The empty chat screen uses shapes from the Material shape library, and headings use the expressive type styles.
 - Removed the OpenCode Zen provider; it is no longer offered in setup, settings or the model picker.
 - If you had OpenCode Zen selected, the app now falls back to the default provider instead of staying on the retired one.
 - All user-facing text now comes from translatable string resources, including the update, setup, settings and about screens.

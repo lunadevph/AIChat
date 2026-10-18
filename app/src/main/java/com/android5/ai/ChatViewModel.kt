@@ -27,10 +27,19 @@ enum class LoadingStatus {
     IDLE, THINKING, SEARCHING, CREATING_IMAGE, STREAMING
 }
 
+/** Folder inside the app's private storage that the file tools may work in. */
+private const val WORKSPACE_DIR = "workspace"
+
+/** How many tool rounds a single reply may trigger before the app stops looping. */
+private const val MAX_TOOL_STEPS = 3
+
 class ChatViewModel(application: Application, private val settingsManager: SettingsManager) : AndroidViewModel(application) {
     private val context = application.applicationContext
     private val gson = Gson()
     private val conversationStore = ConversationStore(context)
+    /** Sandbox the file tools may read and write; see [AiTools]. */
+    private val toolScope: AiTools.Scope
+        get() = AiTools.Scope(File(context.filesDir, WORKSPACE_DIR), settingsManager)
     /** Title shown for a conversation that has not been auto-titled yet. */
     private val defaultChatTitle = context.getString(R.string.chat_default_title)
 
@@ -225,35 +234,45 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                     loadingStatus = LoadingStatus.THINKING
                 }
 
-                val apiMessages = buildApiMessages(searchGrounding)
+                // A reply can ask for tools; when it does, the results are fed back
+                // and the request runs again, up to MAX_TOOL_STEPS rounds.
+                var toolResults: String? = null
+                val maxSteps = if (settingsManager.toolsEnabled) MAX_TOOL_STEPS else 1
 
-                val useStreaming = settingsManager.streamingEnabled
-                val isReasoning = isReasoningModel(settingsManager.selectedModel)
-                val isGoogle = settingsManager.selectedProvider == "Google"
-                val request = ChatRequest(
-                    model = settingsManager.selectedModel,
-                    messages = apiMessages,
-                    tools = if (webSearchOn && (settingsManager.selectedProvider == "OpenAI" || settingsManager.selectedProvider == "Claude")) {
-                        buildWebSearchTools(settingsManager.selectedProvider)
-                    } else null,
-                    stream = if (useStreaming) true else null,
-                    temperature = if (isReasoning) null else settingsManager.temperature.toDouble(),
-                    topP = if (isReasoning) null else settingsManager.topP.toDouble(),
-                    maxTokens = if (isReasoning) null else settingsManager.maxTokens,
-                    maxCompletionTokens = if (isReasoning) settingsManager.maxTokens else null,
-                    frequencyPenalty = if (isReasoning || isGoogle) null else settingsManager.frequencyPenalty.toDouble(),
-                    presencePenalty = if (isReasoning || isGoogle) null else settingsManager.presencePenalty.toDouble()
-                )
+                for (step in 0 until maxSteps) {
+                    val isReasoning = isReasoningModel(settingsManager.selectedModel)
+                    val isGoogle = settingsManager.selectedProvider == "Google"
+                    val request = ChatRequest(
+                        model = settingsManager.selectedModel,
+                        messages = buildApiMessages(searchGrounding, toolResults),
+                        tools = if (webSearchOn && (settingsManager.selectedProvider == "OpenAI" || settingsManager.selectedProvider == "Claude")) {
+                            buildWebSearchTools(settingsManager.selectedProvider)
+                        } else null,
+                        stream = if (settingsManager.streamingEnabled) true else null,
+                        temperature = if (isReasoning) null else settingsManager.temperature.toDouble(),
+                        topP = if (isReasoning) null else settingsManager.topP.toDouble(),
+                        maxTokens = if (isReasoning) null else settingsManager.maxTokens,
+                        maxCompletionTokens = if (isReasoning) settingsManager.maxTokens else null,
+                        frequencyPenalty = if (isReasoning || isGoogle) null else settingsManager.frequencyPenalty.toDouble(),
+                        presencePenalty = if (isReasoning || isGoogle) null else settingsManager.presencePenalty.toDouble()
+                    )
 
-                val isAnthropic = Providers.isAnthropic(settingsManager.selectedProvider)
-                val authHeader = if (isAnthropic) null else "Bearer $apiKey"
-                val xApiKeyHeader = if (isAnthropic) apiKey else null
-                val anthropicHeader = if (isAnthropic) Providers.ANTHROPIC_VERSION else null
+                    val isAnthropic = Providers.isAnthropic(settingsManager.selectedProvider)
+                    val authHeader = if (isAnthropic) null else "Bearer $apiKey"
+                    val xApiKeyHeader = if (isAnthropic) apiKey else null
+                    val anthropicHeader = if (isAnthropic) Providers.ANTHROPIC_VERSION else null
 
-                if (useStreaming) {
-                    streamResponse(authHeader, xApiKeyHeader, anthropicHeader, request)
-                } else {
-                    nonStreamResponse(authHeader, xApiKeyHeader, anthropicHeader, request)
+                    val turn = if (settingsManager.streamingEnabled) {
+                        streamResponse(authHeader, xApiKeyHeader, anthropicHeader, request)
+                    } else {
+                        nonStreamResponse(authHeader, xApiKeyHeader, anthropicHeader, request)
+                    } ?: break
+
+                    val runs = finalizeTurn(turn)
+                    if (runs.isEmpty() || step == maxSteps - 1) break
+
+                    toolResults = AiTools.formatResults(runs)
+                    loadingStatus = LoadingStatus.THINKING
                 }
 
                 if (currentConversation?.title == defaultChatTitle && messages.size >= 2) {
@@ -305,25 +324,38 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         }
     }
 
-    private fun buildApiMessages(searchGrounding: String?): List<ApiMessage> {
+    private fun buildApiMessages(searchGrounding: String?, toolResults: String? = null): List<ApiMessage> {
         val apiMessages = mutableListOf<ApiMessage>()
         val instructions = settingsManager.customInstructions
         val userMemory = settingsManager.aiMemory
         val agentMemory = settingsManager.agentMemory
+        val toolsEnabled = settingsManager.toolsEnabled
         val systemContent = buildString {
             if (instructions.isNotBlank()) append(instructions).append("\n\n")
             if (userMemory.isNotBlank()) append("User-provided long-term memory:\n").append(userMemory).append("\n\n")
             if (agentMemory.isNotBlank()) append("Your self-managed memory of this user:\n").append(agentMemory).append("\n\n")
             append(
-                "You have a persistent memory that carries across all conversations with this user. " +
-                "When you learn something worth remembering (facts, preferences, context, plans), " +
-                "update your memory by responding with a fenced code block whose language is `memory` " +
-                "containing your COMPLETE updated memory (not just the new line). Only include that block " +
-                "when you actually want to save or update memory; otherwise do not use it.\n\n" +
                 "IMAGE DISPLAY CAPABILITY: You can display pictures and web images inline in your response by outputting Markdown image tags: `![Description](https://url/to/image.jpg)`. Use this whenever providing photos, pictures, diagrams, or visual examples."
             )
+            if (toolsEnabled) {
+                append("\n\n").append(AiTools.describe(WORKSPACE_DIR))
+            } else {
+                // With tools switched off the model can still keep memory; it just
+                // does so with the older fenced block instead of the <memory> tool.
+                append("\n\n")
+                append(
+                    "You have a persistent memory that carries across all conversations with this user. " +
+                    "When you learn something worth remembering (facts, preferences, context, plans), " +
+                    "update your memory by responding with a fenced code block whose language is `memory` " +
+                    "containing your COMPLETE updated memory (not just the new line). Only include that block " +
+                    "when you actually want to save or update memory; otherwise do not use it."
+                )
+            }
             if (searchGrounding != null) {
                 append("\n\n").append(searchGrounding)
+            }
+            if (toolResults != null) {
+                append("\n\n").append(toolResults)
             }
         }
         if (systemContent.isNotBlank()) {
@@ -364,7 +396,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                lower.contains("/o1") || lower.contains("/o3") || lower.contains("/o4")
     }
 
-    private suspend fun streamResponse(authHeader: String?, xApiKey: String?, anthropicHeader: String?, request: ChatRequest) {
+    private suspend fun streamResponse(authHeader: String?, xApiKey: String?, anthropicHeader: String?, request: ChatRequest): Turn? {
         val responseBody = getApi().getCompletionStream(
             authorization = authHeader,
             xApiKey = xApiKey,
@@ -424,7 +456,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                             withContext(Dispatchers.Main) {
                                 if (msgIndex in messages.indices) {
                                     messages[msgIndex] = messages[msgIndex].copy(
-                                        content = currentContent,
+                                        content = visibleText(currentContent, streaming = true),
                                         reasoning = currentReasoning,
                                         isStreaming = true
                                     )
@@ -441,25 +473,23 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             }
         }
 
-        // Finalize: extract memory and mark as done
-        val finalContent = contentBuilder.toString()
-        val finalReasoning = reasoningBuilder.toString().takeIf { it.isNotBlank() }
-        val (displayContent, newMemory) = extractMemory(finalContent)
-        if (newMemory != null) settingsManager.agentMemory = newMemory
-
+        // The message stays in its slot; finalizeTurn() decides what the transcript
+        // shows and which tool calls to run.
+        val raw = contentBuilder.toString()
+        val reasoning = reasoningBuilder.toString().takeIf { it.isNotBlank() }
         withContext(Dispatchers.Main) {
             if (msgIndex in messages.indices) {
                 messages[msgIndex] = messages[msgIndex].copy(
-                    content = displayContent,
-                    reasoning = finalReasoning,
+                    content = visibleText(raw, streaming = false),
+                    reasoning = reasoning,
                     isStreaming = false
                 )
             }
         }
-        updateCurrentConversation()
+        return Turn(raw, msgIndex, reasoning)
     }
 
-    private suspend fun nonStreamResponse(authHeader: String?, xApiKey: String?, anthropicHeader: String?, request: ChatRequest) {
+    private suspend fun nonStreamResponse(authHeader: String?, xApiKey: String?, anthropicHeader: String?, request: ChatRequest): Turn? {
         val nonStreamRequest = request.copy(stream = null)
         val response = getApi().getCompletion(
             authorization = authHeader,
@@ -468,15 +498,66 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             request = nonStreamRequest
         )
 
-        response.choices.firstOrNull()?.message?.let { assistantMsg ->
-            val (displayContent, newMemory) = extractMemory(assistantMsg.content)
-            if (newMemory != null) settingsManager.agentMemory = newMemory
+        val assistantMsg = response.choices.firstOrNull()?.message ?: return null
+        val reasoning = assistantMsg.thinking?.takeIf { it.isNotBlank() }
+        messages.add(
+            Message(
+                role = "assistant",
+                content = visibleText(assistantMsg.content, streaming = false),
+                reasoning = reasoning,
+                isStreaming = false
+            )
+        )
+        updateCurrentConversation()
+        return Turn(assistantMsg.content, messages.lastIndex, reasoning)
+    }
 
-            val reasoning = assistantMsg.thinking?.takeIf { it.isNotBlank() }
-            val assistantMessage = Message(role = "assistant", content = displayContent, reasoning = reasoning, isStreaming = false)
-            messages.add(assistantMessage)
-            updateCurrentConversation()
+    /** A completed assistant reply, before its tool tags have been acted on. */
+    private data class Turn(val raw: String, val index: Int, val reasoning: String?)
+
+    /**
+     * Applies a finished reply: saves any memory it asked for, runs the tool calls
+     * it made, and rewrites the message with the tags hidden. Returns the tool runs
+     * so the caller can feed their results back to the model.
+     */
+    private suspend fun finalizeTurn(turn: Turn): List<AiTools.Run> {
+        val (withoutMemory, newMemory) = extractMemory(turn.raw)
+        if (newMemory != null) settingsManager.agentMemory = newMemory
+
+        val calls = if (settingsManager.toolsEnabled) AiTools.parse(withoutMemory) else emptyList()
+        val runs = calls.map { AiTools.execute(it, toolScope) }
+
+        withContext(Dispatchers.Main) {
+            if (turn.index in messages.indices) {
+                messages[turn.index] = messages[turn.index].copy(
+                    content = AiTools.strip(withoutMemory).trim(),
+                    reasoning = turn.reasoning,
+                    isStreaming = false,
+                    tools = runs.map { ToolRun(it.name, it.label, it.ok) }.ifEmpty { null }
+                )
+            }
         }
+        updateCurrentConversation()
+        return runs
+    }
+
+    /**
+     * What the transcript shows for a reply. Tool tags and the memory block are
+     * implementation detail, so they stay hidden even while the reply streams.
+     */
+    private fun visibleText(raw: String, streaming: Boolean): String {
+        var text = raw
+        if (streaming) {
+            // An unterminated memory block would otherwise show up verbatim while
+            // the model is still writing it.
+            val fence = text.indexOf("```memory")
+            if (fence != -1 && text.indexOf("```", fence + 3) == -1) text = text.substring(0, fence)
+        }
+        if (text.contains('<')) {
+            text = if (streaming) AiTools.stripPartial(text) else AiTools.strip(text)
+        }
+        val display = extractMemory(text).first
+        return if (streaming) display else display.trim()
     }
 
     fun stopGeneration() {

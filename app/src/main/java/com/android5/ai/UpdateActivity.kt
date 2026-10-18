@@ -410,8 +410,8 @@ private fun UpdateLoadingCard() {
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
-            LinearProgressIndicator(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
+            LinearWavyProgressIndicator(
+                modifier = Modifier.fillMaxWidth()
             )
             Text(
                 stringResource(R.string.update_status_contacting),

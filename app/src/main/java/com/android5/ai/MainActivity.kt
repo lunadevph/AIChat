@@ -17,6 +17,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -29,6 +30,7 @@ import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.automirrored.rounded.FormatListBulleted
 import androidx.compose.material.icons.automirrored.rounded.NoteAdd
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.*
@@ -54,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -144,7 +147,9 @@ fun ChatScreen(
 
     var inputText by remember { mutableStateOf("") }
 
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    // The expressive ("flexible") app bar grows while the reader is at the top of
+    // the conversation and folds away as they scroll, instead of staying pinned.
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val listState = rememberLazyListState()
 
     var showMenu by remember { mutableStateOf(false) }
@@ -156,6 +161,7 @@ fun ChatScreen(
     var menuExpanded by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
+    val webSearchDescription = stringResource(R.string.desc_web_search)
 
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -439,7 +445,7 @@ fun ChatScreen(
                 scrollBehavior.nestedScrollConnection
             ),
             topBar = {
-                TopAppBar(
+                MediumFlexibleTopAppBar(
                     navigationIcon = {
                         IconButton(
                             onClick = {
@@ -484,91 +490,94 @@ fun ChatScreen(
 
                             Text(
                                 text = stringResource(R.string.app_name),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMediumEmphasized,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1,
                                 softWrap = false
                             )
-
-                            Surface(
-                                onClick = {
-                                    showModelSheet = true
-                                },
-                                shape = RoundedCornerShape(50),
-                                color = MaterialTheme.colorScheme.surfaceContainerHighest
-                                    .copy(alpha = 0.8f),
-                                border = BorderStroke(
-                                    1.2.dp,
-                                    MaterialTheme.colorScheme.outlineVariant
-                                        .copy(alpha = 0.6f)
-                                ),
-                                tonalElevation = 2.dp
+                        }
+                    },
+                    // The flexible app bar carries the current model as its subtitle
+                    // while it is expanded. Once it collapses, "Change model" is
+                    // still one tap away in the overflow menu.
+                    subtitle = {
+                        Surface(
+                            onClick = {
+                                showModelSheet = true
+                            },
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest
+                                .copy(alpha = 0.8f),
+                            border = BorderStroke(
+                                1.2.dp,
+                                MaterialTheme.colorScheme.outlineVariant
+                                    .copy(alpha = 0.6f)
+                            ),
+                            tonalElevation = 2.dp
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(
+                                    start = 6.dp,
+                                    end = 8.dp,
+                                    top = 4.dp,
+                                    bottom = 4.dp
+                                )
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(
-                                        start = 6.dp,
-                                        end = 8.dp,
-                                        top = 4.dp,
-                                        bottom = 4.dp
-                                    )
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.surface,
+                                    border = BorderStroke(
+                                        0.8.dp,
+                                        MaterialTheme.colorScheme.primary
+                                            .copy(alpha = 0.3f)
+                                    ),
+                                    tonalElevation = 1.dp,
+                                    modifier = Modifier.size(22.dp)
                                 ) {
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = MaterialTheme.colorScheme.surface,
-                                        border = BorderStroke(
-                                            0.8.dp,
-                                            MaterialTheme.colorScheme.primary
-                                                .copy(alpha = 0.3f)
-                                        ),
-                                        tonalElevation = 1.dp,
-                                        modifier = Modifier.size(22.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Image(
-                                                painter = painterResource(
-                                                    providerIconRes(
-                                                        settingsManager.selectedProvider
-                                                    )
-                                                ),
-                                                contentDescription = null,
-                                                modifier = Modifier
-                                                    .size(15.dp)
-                                                    .clip(CircleShape)
-                                            )
-                                        }
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Image(
+                                            painter = painterResource(
+                                                providerIconRes(
+                                                    settingsManager.selectedProvider
+                                                )
+                                            ),
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .size(15.dp)
+                                                .clip(CircleShape)
+                                        )
                                     }
-
-                                    Spacer(Modifier.width(6.dp))
-
-                                    val modelName =
-                                        viewModel.availableModels.find {
-                                            it.id == settingsManager.selectedModel
-                                        }?.displayName
-                                            ?: stringResource(
-                                                R.string.label_select_model
-                                            )
-
-                                    Text(
-                                        text = modelName,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.widthIn(max = 125.dp)
-                                    )
-
-                                    Spacer(Modifier.width(2.dp))
-
-                                    Icon(
-                                        Icons.Rounded.KeyboardArrowDown,
-                                        null,
-                                        Modifier.size(17.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
                                 }
+
+                                Spacer(Modifier.width(6.dp))
+
+                                val modelName =
+                                    viewModel.availableModels.find {
+                                        it.id == settingsManager.selectedModel
+                                    }?.displayName
+                                        ?: stringResource(
+                                            R.string.label_select_model
+                                        )
+
+                                Text(
+                                    text = modelName,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.widthIn(max = 125.dp)
+                                )
+
+                                Spacer(Modifier.width(2.dp))
+
+                                Icon(
+                                    Icons.Rounded.KeyboardArrowDown,
+                                    null,
+                                    Modifier.size(17.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
                     },
@@ -765,120 +774,26 @@ fun ChatScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Box {
-                                    IconButton(
-                                        onClick = {
-                                            menuExpanded = true
-                                        },
-                                        shapes = ExpressiveIconButtonShapes
-                                    ) {
-                                        Icon(
-                                            Icons.Rounded.AddCircleOutline,
-                                            stringResource(R.string.menu_more),
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-
-                                    DropdownMenu(
-                                        expanded = menuExpanded,
-                                        onDismissRequest = {
-                                            menuExpanded = false
-                                        },
-                                        shape = RoundedCornerShape(20.dp),
-                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                                    ) {
-                                        DropdownMenuItem(
-                                            leadingIcon = {
-                                                Icon(
-                                                    Icons.Rounded.AddPhotoAlternate,
-                                                    null,
-                                                    tint = MaterialTheme.colorScheme.primary
-                                                )
-                                            },
-                                            text = {
-                                                Text(
-                                                    stringResource(R.string.desc_add_image),
-                                                    fontWeight = FontWeight.Medium
-                                                )
-                                            },
-                                            onClick = {
-                                                menuExpanded = false
-                                                imagePicker.launch("image/*")
-                                            }
-                                        )
-
-                                        DropdownMenuItem(
-                                            leadingIcon = {
-                                                Icon(
-                                                    Icons.Rounded.Public,
-                                                    null,
-                                                    tint = MaterialTheme.colorScheme.primary
-                                                )
-                                            },
-                                            text = {
-                                                Text(
-                                                    stringResource(R.string.desc_web_search),
-                                                    fontWeight = FontWeight.Medium
-                                                )
-                                            },
-                                            trailingIcon = {
-                                                if (webSearchOn) {
-                                                    Icon(
-                                                        Icons.Rounded.Check,
-                                                        null,
-                                                        tint = MaterialTheme.colorScheme.primary
-                                                    )
-                                                }
-                                            },
-                                            onClick = {
-                                                settingsManager.webSearchEnabled =
-                                                    !settingsManager.webSearchEnabled
-                                                menuExpanded = false
-                                            }
-                                        )
-                                    }
-                                }
-
-                                if (webSearchOn) {
-                                    Surface(
-                                        onClick = {
-                                            settingsManager.webSearchEnabled = false
-                                        },
-                                        shape = RoundedCornerShape(50),
-                                        color = MaterialTheme.colorScheme.primaryContainer
-                                            .copy(alpha = 0.7f),
-                                        border = BorderStroke(
-                                            1.dp,
-                                            MaterialTheme.colorScheme.primary
-                                                .copy(alpha = 0.5f)
-                                        )
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.padding(
-                                                horizontal = 8.dp,
-                                                vertical = 4.dp
-                                            )
-                                        ) {
-                                            Icon(
-                                                Icons.Rounded.Public,
-                                                contentDescription = null,
-                                                Modifier.size(14.dp),
-                                                tint = MaterialTheme.colorScheme.primary
-                                            )
-
-                                            Spacer(Modifier.width(4.dp))
-
-                                            Text(
-                                                stringResource(R.string.label_web_badge),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
-                                        }
-                                    }
-
-                                    Spacer(Modifier.width(4.dp))
+                                // Expressive toggle button: web search is a filter on
+                                // the request, so it belongs next to the input.
+                                ToggleButton(
+                                    checked = webSearchOn,
+                                    onCheckedChange = {
+                                        settingsManager.webSearchEnabled = it
+                                    },
+                                    modifier = Modifier
+                                        .padding(end = 6.dp)
+                                        .semantics { contentDescription = webSearchDescription },
+                                    contentPadding = PaddingValues(
+                                        horizontal = 12.dp,
+                                        vertical = 10.dp
+                                    )
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.Public,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
                                 }
 
                                 OutlinedTextField(
@@ -911,56 +826,127 @@ fun ChatScreen(
 
                                 Spacer(Modifier.width(6.dp))
 
-                                if (viewModel.isLoading) {
-                                    FilledIconButton(
-                                        onClick = {
-                                            viewModel.stopGeneration()
-                                        },
-                                        modifier = Modifier.size(48.dp),
-                                        shapes = ExpressiveIconButtonShapes,
-                                        colors = IconButtonDefaults.filledIconButtonColors(
-                                            containerColor = MaterialTheme.colorScheme.error,
-                                            contentColor = MaterialTheme.colorScheme.onError
-                                        )
-                                    ) {
-                                        Icon(
-                                            Icons.Rounded.Stop,
-                                            stringResource(R.string.desc_stop)
-                                        )
-                                    }
-                                } else {
-                                    val canSend =
-                                        inputText.isNotBlank() ||
-                                            viewModel.selectedImageUri != null
-
-                                    FilledIconButton(
-                                        onClick = {
-                                            if (canSend) {
-                                                viewModel.sendMessage(
-                                                    inputText,
-                                                    context
+                                // Expressive split button: the leading half sends (or
+                                // stops), the trailing half opens the attach menu.
+                                SplitButtonLayout(
+                                    leadingButton = {
+                                        if (viewModel.isLoading) {
+                                            SplitButtonDefaults.LeadingButton(
+                                                onClick = {
+                                                    viewModel.stopGeneration()
+                                                },
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = MaterialTheme.colorScheme.error,
+                                                    contentColor = MaterialTheme.colorScheme.onError
                                                 )
-                                                inputText = ""
+                                            ) {
+                                                Icon(
+                                                    Icons.Rounded.Stop,
+                                                    stringResource(R.string.desc_stop),
+                                                    Modifier.size(20.dp)
+                                                )
                                             }
-                                        },
-                                        enabled = canSend,
-                                        modifier = Modifier.size(48.dp),
-                                        shapes = ExpressiveIconButtonShapes,
-                                        colors = IconButtonDefaults.filledIconButtonColors(
-                                            containerColor = MaterialTheme.colorScheme.primary,
-                                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                                            disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                                            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                                .copy(alpha = 0.5f)
-                                        )
-                                    ) {
-                                        Icon(
-                                            Icons.AutoMirrored.Rounded.Send,
-                                            stringResource(R.string.desc_send),
-                                            Modifier.size(20.dp)
-                                        )
+                                        } else {
+                                            val canSend =
+                                                inputText.isNotBlank() ||
+                                                    viewModel.selectedImageUri != null
+
+                                            SplitButtonDefaults.LeadingButton(
+                                                onClick = {
+                                                    if (canSend) {
+                                                        viewModel.sendMessage(
+                                                            inputText,
+                                                            context
+                                                        )
+                                                        inputText = ""
+                                                    }
+                                                },
+                                                enabled = canSend
+                                            ) {
+                                                Icon(
+                                                    Icons.AutoMirrored.Rounded.Send,
+                                                    stringResource(R.string.desc_send),
+                                                    Modifier.size(20.dp)
+                                                )
+                                            }
+                                        }
+                                    },
+                                    trailingButton = {
+                                        Box {
+                                            SplitButtonDefaults.TonalTrailingButton(
+                                                checked = menuExpanded,
+                                                onCheckedChange = {
+                                                    menuExpanded = it
+                                                }
+                                            ) {
+                                                Icon(
+                                                    Icons.Rounded.KeyboardArrowDown,
+                                                    stringResource(R.string.desc_more_actions),
+                                                    Modifier.size(20.dp)
+                                                )
+                                            }
+
+                                            DropdownMenu(
+                                                expanded = menuExpanded,
+                                                onDismissRequest = {
+                                                    menuExpanded = false
+                                                },
+                                                shape = RoundedCornerShape(20.dp),
+                                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                            ) {
+                                                DropdownMenuItem(
+                                                    leadingIcon = {
+                                                        Icon(
+                                                            Icons.Rounded.AddPhotoAlternate,
+                                                            null,
+                                                            tint = MaterialTheme.colorScheme.primary
+                                                        )
+                                                    },
+                                                    text = {
+                                                        Text(
+                                                            stringResource(R.string.desc_add_image),
+                                                            fontWeight = FontWeight.Medium
+                                                        )
+                                                    },
+                                                    onClick = {
+                                                        menuExpanded = false
+                                                        imagePicker.launch("image/*")
+                                                    }
+                                                )
+
+                                                DropdownMenuItem(
+                                                    leadingIcon = {
+                                                        Icon(
+                                                            Icons.Rounded.Public,
+                                                            null,
+                                                            tint = MaterialTheme.colorScheme.primary
+                                                        )
+                                                    },
+                                                    text = {
+                                                        Text(
+                                                            stringResource(R.string.desc_web_search),
+                                                            fontWeight = FontWeight.Medium
+                                                        )
+                                                    },
+                                                    trailingIcon = {
+                                                        if (webSearchOn) {
+                                                            Icon(
+                                                                Icons.Rounded.Check,
+                                                                null,
+                                                                tint = MaterialTheme.colorScheme.primary
+                                                            )
+                                                        }
+                                                    },
+                                                    onClick = {
+                                                        settingsManager.webSearchEnabled =
+                                                            !settingsManager.webSearchEnabled
+                                                        menuExpanded = false
+                                                    }
+                                                )
+                                            }
+                                        }
                                     }
-                                }
+                                )
                             }
                         }
                     }
@@ -981,18 +967,37 @@ fun ChatScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Surface(
-                            shape = RoundedCornerShape(32.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer
-                                .copy(alpha = 0.7f),
-                            modifier = Modifier.size(88.dp),
-                            tonalElevation = 2.dp
+                        // Expressive decoration: the app's mark sits on one of the
+                        // Material shape library's "cookie" polygons, with a softer
+                        // clover peeking out from behind it.
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.size(116.dp)
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
+                            Box(
+                                modifier = Modifier
+                                    .size(78.dp)
+                                    .offset(x = 20.dp, y = (-16).dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.tertiaryContainer
+                                            .copy(alpha = 0.85f),
+                                        MaterialShapes.Clover4Leaf.toShape()
+                                    )
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .size(92.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.primaryContainer,
+                                        MaterialShapes.Cookie9Sided.toShape()
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
                                 Icon(
                                     Icons.Rounded.AutoAwesome,
                                     null,
-                                    Modifier.size(44.dp),
+                                    Modifier.size(42.dp),
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
@@ -1002,8 +1007,7 @@ fun ChatScreen(
 
                         Text(
                             stringResource(R.string.empty_greeting),
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.headlineMediumEmphasized,
                             color = MaterialTheme.colorScheme.onSurface,
                             textAlign = TextAlign.Center
                         )
@@ -1514,22 +1518,6 @@ fun ChatScreen(
 
 @Composable
 fun ThinkingIndicator(status: LoadingStatus) {
-    val infiniteTransition =
-        rememberInfiniteTransition(label = "thinking")
-
-    val alpha by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                900,
-                easing = LinearEasing
-            ),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "alpha"
-    )
-
     val statusText =
         when (status) {
             LoadingStatus.SEARCHING ->
@@ -1552,29 +1540,27 @@ fun ThinkingIndicator(status: LoadingStatus) {
         border = BorderStroke(
             1.dp,
             MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-        ),
-        modifier = Modifier.alpha(alpha)
+        )
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(
                 horizontal = 14.dp,
-                vertical = 6.dp
+                vertical = 8.dp
             )
         ) {
-            Icon(
-                Icons.Rounded.AutoAwesome,
-                null,
-                Modifier.size(16.dp),
-                MaterialTheme.colorScheme.primary
+            // The expressive loading indicator morphs between shapes, which reads
+            // as "working" without a spinner or a pulsing container.
+            LoadingIndicator(
+                modifier = Modifier.size(18.dp),
+                color = MaterialTheme.colorScheme.primary
             )
 
             Spacer(Modifier.width(8.dp))
 
             Text(
                 text = statusText,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.labelLargeEmphasized,
                 color = MaterialTheme.colorScheme.primary
             )
         }
@@ -1617,19 +1603,19 @@ fun BlinkingCursorBar(
 
 @Composable
 fun TypingIndicatorRow() {
-    Column(
+    Box(
         modifier = Modifier
             .widthIn(max = 340.dp)
             .padding(
                 horizontal = 16.dp,
-                vertical = 12.dp
-            )
+                vertical = 10.dp
+            ),
+        contentAlignment = Alignment.Center
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            BlinkingCursorBar()
-        }
+        LoadingIndicator(
+            modifier = Modifier.size(20.dp),
+            color = MaterialTheme.colorScheme.primary
+        )
     }
 }
 
@@ -1867,6 +1853,10 @@ fun MessageBubble(
                     ) {
                         TypingIndicatorRow()
                     }
+                }
+
+                if (!isUser && !message.tools.isNullOrEmpty()) {
+                    ToolRunRow(tools = message.tools, alignment = alignment)
                 }
 
                 if (message.content.isNotBlank()) {
@@ -2114,6 +2104,91 @@ fun MessageBubble(
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Icon shown on the pill for each tool the assistant can run. */
+private fun toolIcon(name: String) = when (name) {
+    "read" -> Icons.Rounded.Description
+    "write" -> Icons.Rounded.Save
+    "list" -> Icons.AutoMirrored.Rounded.FormatListBulleted
+    "delete" -> Icons.Rounded.DeleteOutline
+    "search" -> Icons.Rounded.Search
+    "memory" -> Icons.Rounded.Psychology
+    "compact" -> Icons.Rounded.Compress
+    "websearch" -> Icons.Rounded.Public
+    "time" -> Icons.Rounded.Schedule
+    else -> Icons.Rounded.Build
+}
+
+/**
+ * The tools a reply used, as pills above its bubble. Tool activity is shown
+ * rather than hidden: running on the device is the whole point of it.
+ */
+@Composable
+fun ToolRunRow(tools: List<ToolRun>, alignment: Alignment.Horizontal) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 6.dp),
+        horizontalAlignment = alignment
+    ) {
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                stringResource(R.string.label_tools_used),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            tools.forEach { tool ->
+                val description = stringResource(
+                    if (tool.ok) R.string.desc_tool_ran else R.string.desc_tool_failed,
+                    tool.name
+                )
+
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = if (tool.ok) {
+                        MaterialTheme.colorScheme.secondaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.errorContainer
+                    },
+                    contentColor = if (tool.ok) {
+                        MaterialTheme.colorScheme.onSecondaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onErrorContainer
+                    },
+                    tonalElevation = 1.dp,
+                    modifier = Modifier.semantics { contentDescription = description }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            toolIcon(tool.name),
+                            contentDescription = null,
+                            modifier = Modifier.size(13.dp)
+                        )
+
+                        Spacer(Modifier.width(5.dp))
+
+                        Text(
+                            text = if (tool.label.isBlank()) tool.name else "${tool.name} · ${tool.label}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 200.dp)
+                        )
                     }
                 }
             }

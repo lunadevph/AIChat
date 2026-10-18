@@ -17,7 +17,7 @@ val GoogleSansRounded = FontFamily(
     Font(R.font.google_sans_rounded_bold, FontWeight.Bold)
 )
 
-val Typography = Typography(
+private val BaseTypography = Typography(
     displayLarge = TextStyle(
         fontFamily = GoogleSansRounded,
         fontWeight = FontWeight.Bold,
@@ -123,4 +123,30 @@ val Typography = Typography(
         lineHeight = 16.sp,
         letterSpacing = 0.5.sp
     )
+)
+
+/** A step heavier, which is the visible difference in the expressive type scale. */
+private fun TextStyle.emphasized(): TextStyle = copy(fontWeight = FontWeight.Bold)
+
+/**
+ * The app's type on the Material 3 Expressive scale. The baseline styles above are
+ * hand-tuned for the rounded typeface, so the "emphasized" variants they leave out
+ * are derived from them instead of falling back to the stock Roboto tokens.
+ */
+val Typography = BaseTypography.copy(
+    displayLargeEmphasized = BaseTypography.displayLarge.emphasized(),
+    displayMediumEmphasized = BaseTypography.displayMedium.emphasized(),
+    displaySmallEmphasized = BaseTypography.displaySmall.emphasized(),
+    headlineLargeEmphasized = BaseTypography.headlineLarge.emphasized(),
+    headlineMediumEmphasized = BaseTypography.headlineMedium.emphasized(),
+    headlineSmallEmphasized = BaseTypography.headlineSmall.emphasized(),
+    titleLargeEmphasized = BaseTypography.titleLarge.emphasized(),
+    titleMediumEmphasized = BaseTypography.titleMedium.emphasized(),
+    titleSmallEmphasized = BaseTypography.titleSmall.emphasized(),
+    bodyLargeEmphasized = BaseTypography.bodyLarge.emphasized(),
+    bodyMediumEmphasized = BaseTypography.bodyMedium.emphasized(),
+    bodySmallEmphasized = BaseTypography.bodySmall.emphasized(),
+    labelLargeEmphasized = BaseTypography.labelLarge.emphasized(),
+    labelMediumEmphasized = BaseTypography.labelMedium.emphasized(),
+    labelSmallEmphasized = BaseTypography.labelSmall.emphasized()
 )

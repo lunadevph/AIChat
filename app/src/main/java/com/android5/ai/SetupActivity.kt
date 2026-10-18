@@ -219,7 +219,10 @@ fun SetupScreen(
             },
             trailingIcon = {
                 when {
-                    isValidating -> CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                    isValidating -> LoadingIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = MaterialTheme.colorScheme.primary
+                    )
                     else -> IconButton(
                         onClick = { apiKeyVisible = !apiKeyVisible },
                         shapes = ExpressiveIconButtonShapes

@@ -53,6 +53,7 @@ import com.android5.ai.ui.theme.AIChatTheme
 import com.android5.ai.ui.theme.ExpressiveButtonShapes
 import com.android5.ai.ui.theme.ExpressiveIconButtonShapes
 import kotlinx.coroutines.launch
+import java.io.File
 
 class SettingsActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -561,7 +562,7 @@ fun ApiKeyManagerSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) 
                                     modifier = Modifier.weight(1f).height(44.dp)
                                 ) {
                                     if (isValidating) {
-                                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                                        LoadingIndicator(Modifier.size(18.dp), color = MaterialTheme.colorScheme.onPrimary)
                                     } else {
                                         Icon(Icons.Rounded.Check, null, Modifier.size(16.dp))
                                         Spacer(Modifier.width(6.dp))
@@ -721,6 +722,93 @@ fun ParameterSliderRow(
     }
 }
 
+@Composable
+private fun ToolWorkspaceRow() {
+    val context = LocalContext.current
+    val dir = remember { File(context.filesDir, "workspace") }
+    var files by remember { mutableStateOf(emptyList<File>()) }
+
+    fun refresh() {
+        files = if (dir.exists()) {
+            dir.walkTopDown().filter { it.isFile }.toList()
+        } else {
+            emptyList()
+        }
+    }
+
+    LaunchedEffect(dir) { refresh() }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+        ),
+        tonalElevation = 1.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Rounded.Folder,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+
+            Spacer(Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.setting_tools_workspace),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = if (files.isEmpty()) {
+                        stringResource(R.string.setting_tools_workspace_empty)
+                    } else {
+                        stringResource(
+                            R.string.setting_tools_workspace_count,
+                            files.size,
+                            android.text.format.Formatter.formatFileSize(
+                                context,
+                                files.sumOf { it.length() }
+                            )
+                        )
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (files.isNotEmpty()) {
+                IconButton(
+                    onClick = {
+                        dir.deleteRecursively()
+                        refresh()
+                    },
+                    modifier = Modifier.size(48.dp),
+                    shapes = ExpressiveIconButtonShapes
+                ) {
+                    Icon(
+                        Icons.Rounded.DeleteOutline,
+                        contentDescription = stringResource(R.string.desc_clear_workspace),
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun AISettingsSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
@@ -729,6 +817,7 @@ fun AISettingsSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
     var agentMemory by remember { mutableStateOf(settingsManager.agentMemory) }
     var showThinking by remember { mutableStateOf(settingsManager.showThinking) }
     var webSearch by remember { mutableStateOf(settingsManager.webSearchEnabled) }
+    var toolsEnabled by remember { mutableStateOf(settingsManager.toolsEnabled) }
     var streamingEnabled by remember { mutableStateOf(settingsManager.streamingEnabled) }
     var temperature by remember { mutableStateOf(settingsManager.temperature) }
     var topP by remember { mutableStateOf(settingsManager.topP) }
@@ -744,6 +833,7 @@ fun AISettingsSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
         settingsManager.agentMemory = agentMemory
         settingsManager.showThinking = showThinking
         settingsManager.webSearchEnabled = webSearch
+        settingsManager.toolsEnabled = toolsEnabled
         settingsManager.streamingEnabled = streamingEnabled
         settingsManager.temperature = temperature
         settingsManager.topP = topP
@@ -818,6 +908,16 @@ fun AISettingsSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
                 checked = webSearch,
                 onCheckedChange = { webSearch = it }
             )
+
+            SettingsSwitchRow(
+                title = stringResource(R.string.setting_tools),
+                subtitle = stringResource(R.string.setting_tools_sub),
+                icon = Icons.Rounded.Build,
+                checked = toolsEnabled,
+                onCheckedChange = { toolsEnabled = it }
+            )
+
+            ToolWorkspaceRow()
 
             OutlinedTextField(
                 value = customInstructions,
@@ -1111,6 +1211,7 @@ fun AISettingsSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
                     settingsManager.agentMemory = agentMemory
                     settingsManager.showThinking = showThinking
                     settingsManager.webSearchEnabled = webSearch
+                    settingsManager.toolsEnabled = toolsEnabled
                     settingsManager.streamingEnabled = streamingEnabled
                     settingsManager.temperature = temperature
                     settingsManager.topP = topP

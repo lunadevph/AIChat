@@ -63,6 +63,13 @@ data class ApiImageUrl(
     val url: String
 )
 
+/** One tool the assistant asked for, kept short so it can be shown in the transcript. */
+data class ToolRun(
+    val name: String,
+    val label: String = "",
+    val ok: Boolean = true
+)
+
 data class Message(
     val id: String = UUID.randomUUID().toString(),
     val role: String,
@@ -70,6 +77,11 @@ data class Message(
     val reasoning: String? = null,
     val localImageUrl: String? = null,
     val isStreaming: Boolean = false,
+    /**
+     * Tools this message's reply invoked. Nullable so replies saved by older
+     * versions (which have no such field) still deserialize cleanly.
+     */
+    val tools: List<ToolRun>? = null,
     val timestamp: Long = System.currentTimeMillis()
 )
 

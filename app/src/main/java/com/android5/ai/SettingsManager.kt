@@ -180,6 +180,11 @@ class SettingsManager(context: Context) {
             _prefs!!.edit().putBoolean("web_search_enabled", value).apply()
         }
 
+    /** Whether the assistant may run in-band tool calls (`<read>`, `<memory>`, …). */
+    var toolsEnabled: Boolean
+        get() = _prefs!!.getBoolean("tools_enabled", true)
+        set(value) = _prefs!!.edit().putBoolean("tools_enabled", value).apply()
+
     var themeMode: String
         get() = _themeModeState!!.value
         set(value) {
