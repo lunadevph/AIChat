@@ -73,12 +73,14 @@ object AiTools {
     private val fenceRegex = Regex("```[\\s\\S]*?```")
     private val inlineCodeRegex = Regex("`[^`\n]*`")
 
-    /** [text] with code blocks and inline code blanked out, offsets preserved. */
-    private fun withoutCode(text: String): String {
-        var out = fenceRegex.replace(text) { " ".repeat(it.value.length) }
-        out = inlineCodeRegex.replace(out) { " ".repeat(it.value.length) }
-        return out
-    }
+    /**
+     * Ranges in [text] that are code the reader is being shown rather than a
+     * request: fenced blocks and inline code spans. A tag that falls entirely
+     * inside one of these is documentation, not a tool call.
+     */
+    private fun codeRanges(text: String): List<IntRange> =
+        fenceRegex.findAll(text).map { it.range }.toList() +
+            inlineCodeRegex.findAll(text).map { it.range }.toList()
 
     // ---------------------------------------------------------------- parsing
 
@@ -91,22 +93,27 @@ object AiTools {
         data class Hit(val start: Int, val end: Int, val call: Call)
 
         // A tag the model is *showing* the reader inside a code block or inline
-        // code span is documentation, not a request, so it must not run.
-        val masked = withoutCode(text)
+        // code span is documentation, not a request, so it must not run. The
+        // test is containment rather than masking, so a tag whose body itself
+        // contains a fenced block (`<write>` of a markdown file) survives whole.
+        val code = codeRanges(text)
+        fun inCode(range: IntRange) =
+            code.any { range.first >= it.first && range.last <= it.last }
+
         val hits = mutableListOf<Hit>()
 
-        blockRegex.findAll(masked).forEach { m ->
+        blockRegex.findAll(text).forEach { m ->
             val name = m.groupValues[1].lowercase()
-            if (name !in names) return@forEach
+            if (name !in names || inCode(m.range)) return@forEach
             hits += Hit(
                 m.range.first,
                 m.range.last,
                 Call(name, parseAttrs(m.groupValues[2]), m.groupValues[3], m.value)
             )
         }
-        selfRegex.findAll(masked).forEach { m ->
+        selfRegex.findAll(text).forEach { m ->
             val name = m.groupValues[1].lowercase()
-            if (name !in names) return@forEach
+            if (name !in names || inCode(m.range)) return@forEach
             hits += Hit(
                 m.range.first,
                 m.range.last,

@@ -1,3 +1,4 @@
+- When the assistant saves a file whose contents include a code block, the code is now saved with the file instead of being dropped, and a tool tag that it is only showing you inside a code block is no longer run.
 - The assistant can now use tools. It can read and write files in a private workspace, list and search them, delete them, save or read its own memory, compact that memory, search the web and look up the date and time — all by writing simple tags such as <read path="notes.md"/> in its reply.
 - Every tool the assistant runs is shown as a small pill above its reply, so you can see what it did.
 - AI settings has a new "Tool calls" switch to turn the assistant's tools off, and a "Tool workspace" row showing the files it has written, with a button to clear them.
