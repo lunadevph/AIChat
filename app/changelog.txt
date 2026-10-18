@@ -1,13 +1,7 @@
-- The model picker has been redesigned: your provider's logo sits at the top, the model you are using is shown in a pill beneath it, and the list below is much denser, so far more models fit on screen at once.
-- The model picker now shows how many models match what you are searching for.
-- The app's logo is the same mark everywhere — drawer, chat header, empty chat screen, setup and about — on a soft gradient blob instead of the old flat square.
-- The whole interface is more compact: tighter chat rows, message spacing, settings rows, model and provider lists, and a slimmer composer, so more fits on screen without shrinking anything you tap.
-- The assistant can now do a lot more with your files: <cat> reads one, <edit> changes part of one, <append> adds to the end, and <mkdir>, <move> and <copy> manage folders and duplicate files.
-- The assistant can also work with the internet and your device: <download> saves a file from a link into its workspace, <fetch> reads a web page as text, <upload> copies a file from your device in, and <open> opens a file it made in your own viewer.
-- There is a new "Tool files" screen listing every file the assistant has written — with its size, when it was last changed, a preview you can select and copy, a delete button, and one button to clear them all.
-- In the chat, tapping a tool pill now opens a small panel showing the file that reply touched, with a button to view it.
-- AI settings has a new "Device storage" switch. Off by default, it lets the assistant read and save files in your shared folders (Downloads, Documents, pictures) instead of only its own workspace.
-- The app now updates itself: it downloads the new version inside the app with live progress and hands it to the installer, instead of opening a download page in your browser. There is still a button to open the download page if you prefer.
-- If Android needs your permission before it will install the update, the update screen explains it and takes you straight to the setting.
-- Setup is now a clear three-step flow with a progress row, a note that your key never leaves the device, a proper "checking your key" and "you're connected" state, and a way to save your key and continue anyway when your provider cannot be reached.
-- The app now names itself properly in the task switcher and recents screen instead of showing hard-coded text on those screens.
+- The top bar is back to a plain centred bar: the app's mark, the name and the current model sit together in the middle, with the menu button on the left and the overflow menu on the right. The tall flexible bar is gone.
+- The app's mark is back to the flat rounded tile it used before, on every screen, instead of the gradient blob — and the empty chat screen no longer has a second shape peeking out behind it.
+- Rate limits are no longer an error. When a provider answers "too many requests", the app waits and tries again by itself — 2 seconds, then 4, 8 and 16, or however long the provider asks for — and shows the countdown where "AI is thinking" normally appears. Stopping the reply still cancels it.
+- The rate-limit message now only appears after several retries have failed, and says the provider is still busy rather than asking you to wait a moment.
+- When a provider rejects a reply for using its own tool-call format — Groq's "Tool choice is none, but model called a tool" — the app now asks once more, telling the model to use the plain tags this app understands, instead of failing your message.
+- The tool instructions now tell the model outright never to use a provider's native function-call syntax, which is what triggers that rejection.
+- If it still fails, the error now says what to do: turn off Tool calls in Settings → AI settings, or choose a different model.

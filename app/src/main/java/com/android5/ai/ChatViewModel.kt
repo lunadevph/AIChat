@@ -12,6 +12,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -21,14 +22,26 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStreamReader
+import java.text.SimpleDateFormat
+import java.util.Locale
 import java.util.UUID
 
 enum class LoadingStatus {
-    IDLE, THINKING, SEARCHING, CREATING_IMAGE, STREAMING
+    IDLE, THINKING, SEARCHING, CREATING_IMAGE, STREAMING, RATE_LIMITED
 }
 
 /** How many tool rounds a single reply may trigger before the app stops looping. */
 private const val MAX_TOOL_STEPS = 3
+
+/**
+ * Rate limits are retried rather than reported: providers answer 429 for a busy key
+ * or a throttled free tier, and the wait is usually seconds.
+ */
+private const val MAX_RATE_LIMIT_RETRIES = 4
+/** First retry wait; it doubles each attempt (2s, 4s, 8s, 16s). */
+private const val RATE_LIMIT_BASE_DELAY_MS = 2_000L
+/** Upper bound on a provider's Retry-After, so a bad header cannot stall a reply. */
+private const val RATE_LIMIT_MAX_DELAY_MS = 60_000L
 
 class ChatViewModel(application: Application, private val settingsManager: SettingsManager) : AndroidViewModel(application) {
     private val context = application.applicationContext
@@ -57,6 +70,10 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
     var availableModels = mutableStateListOf<ModelInfo>()
     
     var loadingStatus by mutableStateOf(LoadingStatus.IDLE)
+        private set
+
+    /** Seconds until the next rate-limit retry, while that wait is on screen. */
+    var rateLimitRetryIn by mutableStateOf(0)
         private set
 
     private var currentJob: Job? = null
@@ -241,34 +258,19 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 // and the request runs again, up to MAX_TOOL_STEPS rounds.
                 var toolResults: String? = null
                 val maxSteps = if (settingsManager.toolsEnabled) MAX_TOOL_STEPS else 1
+                var correction: String? = null
 
                 for (step in 0 until maxSteps) {
-                    val isReasoning = isReasoningModel(settingsManager.selectedModel)
-                    val isGoogle = settingsManager.selectedProvider == "Google"
-                    val request = ChatRequest(
-                        model = settingsManager.selectedModel,
-                        messages = buildApiMessages(searchGrounding, toolResults),
-                        tools = if (webSearchOn && (settingsManager.selectedProvider == "OpenAI" || settingsManager.selectedProvider == "Claude")) {
-                            buildWebSearchTools(settingsManager.selectedProvider)
-                        } else null,
-                        stream = if (settingsManager.streamingEnabled) true else null,
-                        temperature = if (isReasoning) null else settingsManager.temperature.toDouble(),
-                        topP = if (isReasoning) null else settingsManager.topP.toDouble(),
-                        maxTokens = if (isReasoning) null else settingsManager.maxTokens,
-                        maxCompletionTokens = if (isReasoning) settingsManager.maxTokens else null,
-                        frequencyPenalty = if (isReasoning || isGoogle) null else settingsManager.frequencyPenalty.toDouble(),
-                        presencePenalty = if (isReasoning || isGoogle) null else settingsManager.presencePenalty.toDouble()
-                    )
-
-                    val isAnthropic = Providers.isAnthropic(settingsManager.selectedProvider)
-                    val authHeader = if (isAnthropic) null else "Bearer $apiKey"
-                    val xApiKeyHeader = if (isAnthropic) apiKey else null
-                    val anthropicHeader = if (isAnthropic) Providers.ANTHROPIC_VERSION else null
-
-                    val turn = if (settingsManager.streamingEnabled) {
-                        streamResponse(authHeader, xApiKeyHeader, anthropicHeader, request)
-                    } else {
-                        nonStreamResponse(authHeader, xApiKeyHeader, anthropicHeader, request)
+                    val turn = try {
+                        requestTurn(apiKey, searchGrounding, toolResults, correction)
+                    } catch (e: HttpException) {
+                        // Some providers reject a reply that used their own native
+                        // tool syntax (Groq's "tool_use_failed") instead of the plain
+                        // tags this app asked for. Say so and ask again, once.
+                        if (correction != null || !isNativeToolCallRejection(e)) throw e
+                        correction = context.getString(R.string.tool_syntax_correction)
+                        loadingStatus = LoadingStatus.THINKING
+                        requestTurn(apiKey, searchGrounding, toolResults, correction)
                     } ?: break
 
                     val runs = finalizeTurn(turn)
@@ -294,7 +296,9 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             } catch (e: HttpException) {
                 val body = try { e.response()?.errorBody()?.string() } catch (_: Exception) { null }
                 android.util.Log.e("AIChat", "HTTP ${e.code()}: $body")
-                val errorMsg = when (e.code()) {
+                val errorMsg = if (e.code() == 400 && saysNativeToolCall(body)) {
+                    context.getString(R.string.err_native_tool_call)
+                } else when (e.code()) {
                     401 -> context.getString(R.string.err_unauthorized)
                     402 -> context.getString(R.string.err_insufficient_credits)
                     403 -> context.getString(R.string.err_forbidden)
@@ -322,12 +326,17 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 updateCurrentConversation()
             } finally {
                 loadingStatus = LoadingStatus.IDLE
+                rateLimitRetryIn = 0
                 currentJob = null
             }
         }
     }
 
-    private fun buildApiMessages(searchGrounding: String?, toolResults: String? = null): List<ApiMessage> {
+    private fun buildApiMessages(
+        searchGrounding: String?,
+        toolResults: String? = null,
+        correction: String? = null
+    ): List<ApiMessage> {
         val apiMessages = mutableListOf<ApiMessage>()
         val instructions = settingsManager.customInstructions
         val userMemory = settingsManager.aiMemory
@@ -359,6 +368,9 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             }
             if (toolResults != null) {
                 append("\n\n").append(toolResults)
+            }
+            if (!correction.isNullOrBlank()) {
+                append("\n\n").append(correction)
             }
         }
         if (systemContent.isNotBlank()) {
@@ -397,6 +409,136 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         val lower = modelId.lowercase()
         return lower.startsWith("o1") || lower.startsWith("o3") || lower.startsWith("o4") ||
                lower.contains("/o1") || lower.contains("/o3") || lower.contains("/o4")
+    }
+
+    /** One request round — streaming or not — with the current model's parameters. */
+    private suspend fun requestTurn(
+        apiKey: String,
+        searchGrounding: String?,
+        toolResults: String?,
+        correction: String?
+    ): Turn? {
+        val isReasoning = isReasoningModel(settingsManager.selectedModel)
+        val isGoogle = settingsManager.selectedProvider == "Google"
+        val webSearchOn = settingsManager.webSearchEnabled
+
+        val request = ChatRequest(
+            model = settingsManager.selectedModel,
+            messages = buildApiMessages(searchGrounding, toolResults, correction),
+            tools = if (webSearchOn && (settingsManager.selectedProvider == "OpenAI" || settingsManager.selectedProvider == "Claude")) {
+                buildWebSearchTools(settingsManager.selectedProvider)
+            } else null,
+            stream = if (settingsManager.streamingEnabled) true else null,
+            temperature = if (isReasoning) null else settingsManager.temperature.toDouble(),
+            topP = if (isReasoning) null else settingsManager.topP.toDouble(),
+            maxTokens = if (isReasoning) null else settingsManager.maxTokens,
+            maxCompletionTokens = if (isReasoning) settingsManager.maxTokens else null,
+            frequencyPenalty = if (isReasoning || isGoogle) null else settingsManager.frequencyPenalty.toDouble(),
+            presencePenalty = if (isReasoning || isGoogle) null else settingsManager.presencePenalty.toDouble()
+        )
+
+        val isAnthropic = Providers.isAnthropic(settingsManager.selectedProvider)
+        val authHeader = if (isAnthropic) null else "Bearer $apiKey"
+        val xApiKeyHeader = if (isAnthropic) apiKey else null
+        val anthropicHeader = if (isAnthropic) Providers.ANTHROPIC_VERSION else null
+
+        return retryingOnRateLimit {
+            if (settingsManager.streamingEnabled) {
+                streamResponse(authHeader, xApiKeyHeader, anthropicHeader, request)
+            } else {
+                nonStreamResponse(authHeader, xApiKeyHeader, anthropicHeader, request)
+            }
+        }
+    }
+
+    /**
+     * Runs [block], and when the provider answers 429 waits and tries again instead
+     * of handing the user an error: a rate limit is usually a busy key or a
+     * throttled free tier, and it clears on its own within seconds. The wait doubles
+     * each attempt, a provider-supplied Retry-After wins, and the countdown is on
+     * screen while it runs. Stop still cancels the retry.
+     */
+    private suspend fun <T> retryingOnRateLimit(block: suspend () -> T): T {
+        var attempt = 0
+
+        while (true) {
+            try {
+                return block()
+            } catch (e: HttpException) {
+                if (e.code() != 429 || attempt >= MAX_RATE_LIMIT_RETRIES) throw e
+                attempt++
+
+                val waitMs = retryAfterMs(e) ?: (RATE_LIMIT_BASE_DELAY_MS shl (attempt - 1))
+                var secondsLeft = ((waitMs + 999) / 1000).toInt().coerceAtLeast(1)
+
+                withContext(Dispatchers.Main) {
+                    rateLimitRetryIn = secondsLeft
+                    loadingStatus = LoadingStatus.RATE_LIMITED
+                }
+
+                while (secondsLeft > 0) {
+                    delay(1_000)
+                    secondsLeft--
+                    withContext(Dispatchers.Main) { rateLimitRetryIn = secondsLeft }
+                }
+
+                withContext(Dispatchers.Main) {
+                    rateLimitRetryIn = 0
+                    loadingStatus = LoadingStatus.THINKING
+                }
+            }
+        }
+    }
+
+    /**
+     * True when a provider answered 400 because the model emitted its *own* native
+     * tool call while the request declared no tools. Groq watches gpt-oss and Llama
+     * replies for their tool-call syntax and rejects the turn with "tool_use_failed"
+     * — which a system prompt full of tool tags can provoke, even though this app
+     * never asks for a native call.
+     */
+    private fun isNativeToolCallRejection(e: HttpException): Boolean {
+        if (e.code() != 400) return false
+
+        val body = try {
+            e.response()?.errorBody()?.string()
+        } catch (_: Exception) {
+            null
+        }
+
+        if (!saysNativeToolCall(body)) return false
+        android.util.Log.w("AIChat", "Provider rejected a native tool call: $body")
+        return true
+    }
+
+    /** Recognises the wordings providers use for a rejected native tool call. */
+    private fun saysNativeToolCall(body: String?): Boolean {
+        if (body.isNullOrBlank()) return false
+        val lower = body.lowercase()
+        return lower.contains("tool_use_failed") ||
+            lower.contains("called a tool") ||
+            lower.contains("tool_choice")
+    }
+
+    /** A 429's Retry-After in milliseconds, whether it is seconds or an HTTP date. */
+    private fun retryAfterMs(e: HttpException): Long? {
+        val raw = try {
+            e.response()?.headers()?.get("Retry-After")?.trim()
+        } catch (_: Exception) {
+            null
+        } ?: return null
+
+        raw.toLongOrNull()?.let { seconds ->
+            return (seconds * 1_000L).coerceIn(0L, RATE_LIMIT_MAX_DELAY_MS)
+        }
+
+        return try {
+            SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US)
+                .parse(raw)
+                ?.let { (it.time - System.currentTimeMillis()).coerceIn(0L, RATE_LIMIT_MAX_DELAY_MS) }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private suspend fun streamResponse(authHeader: String?, xApiKey: String?, anthropicHeader: String?, request: ChatRequest): Turn? {

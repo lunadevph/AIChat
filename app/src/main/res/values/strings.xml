@@ -35,6 +35,8 @@
     <string name="desc_web_search">Toggle web search</string>
     <string name="status_typing">AI is typing...</string>
     <string name="status_thinking">AI is thinking...</string>
+    <string name="status_rate_limited">Rate limited — retrying…</string>
+    <string name="status_rate_limited_in">Rate limited — retrying in %1$ds</string>
     <string name="status_searching">AI is searching the web...</string>
     <string name="status_creating_image">AI is creating an image...</string>
     <string name="empty_greeting">How can I help you today?</string>
@@ -135,7 +137,10 @@
     <string name="err_insufficient_credits">Insufficient credits. Please top up your account.</string>
     <string name="err_forbidden">Access denied. You might not have permission to use this model.</string>
     <string name="err_not_found">Model not found. The selected model is currently unavailable.</string>
-    <string name="err_rate_limit">Rate limit exceeded. Please wait a moment before trying again.</string>
+    <string name="err_rate_limit">Rate limit hit. The provider is still busy after several retries — wait a little and try again.</string>
+    <string name="err_native_tool_call">The model tried to call a tool in its own format and the provider rejected it. Turn off Tool calls in Settings → AI settings, or choose a different model.</string>
+    <!-- Appended to the system prompt for one retry after a provider rejects a native tool call. -->
+    <string name="tool_syntax_correction" translatable="false">IMPORTANT — the provider rejected your previous reply because it contained a native tool call. This endpoint declares no tools at all, so a JSON tool_calls object, &lt;function=…&gt; markers and tool-call channels cannot be used here. When you need a tool, write the plain tags from the TOOLS section as ordinary text (for example &lt;read path=\"notes.md\"/&gt;); otherwise just answer in words.</string>
     <string name="err_server">Server error. The provider is having issues.</string>
     <string name="err_api_code">API Error: %1$d</string>
     <string name="err_network">Network Error: %1$s</string>

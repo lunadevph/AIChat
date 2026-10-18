@@ -10,14 +10,15 @@ A native Android client for chatting with large language models. Bring your own 
 - **Bring your own key.** Keys are encrypted on-device with AES-256-GCM via Android Keystore, and validated against the provider's API before being saved.
 - **Multiple saved keys.** Keep one key per provider and switch the active one without re-entering credentials.
 - **Vision input.** Attach images to messages on models that support multimodal input.
-- **Streaming responses.** Tokens render as they arrive, and generation can be stopped mid-flight.
+- **Streaming responses.** Tokens render as they arrive, and generation can be stopped mid-flight, including while a retry is counting down.
+- **Retries instead of errors.** A rate-limited request (HTTP 429) is held and retried with a doubling backoff, honouring the provider's Retry-After, with the countdown shown in the transcript.
 - **Web search.** Optional per-request toggle for up-to-date answers.
 - **Tool calls.** The assistant works on the device with tags such as `<read path="notes.md"/>`, `<write>`, `<edit>`, `<append>`, `<list>`, `<search>`, `<mkdir>`, `<move>`, `<copy>`, `<delete>`, `<download url="…"/>`, `<fetch url="…"/>`, `<upload path="…"/>` and `<open>`, plus memory, web search and the clock. Runs are shown in the transcript and can be switched off in settings.
 - **Tool file history.** Everything the assistant writes is listed in its own screen — size, age, a preview, per-file delete and clear-all — and each reply links to the files it touched.
 - **Memory.** Custom instructions, long-term user memory, and AI self-managed memory.
 - **Model parameters.** Temperature, top-P, max tokens, frequency penalty, and presence penalty, with reset-to-defaults.
 - **Conversation history.** Multiple stored conversations, with clear and delete.
-- **Material 3 Expressive.** Dynamic color, a flexible app bar, split button, toggle button, morphing loading and wavy progress indicators, the Material shape library and expressive type styles.
+- **Material 3 Expressive.** Dynamic color, a centred top bar, split button, toggle button, morphing loading and wavy progress indicators, the Material shape library and expressive type styles.
 - **Themes.** AMOLED dark, light, and dynamic system theming.
 - **Self-updating.** Checks a mirror for newer builds, downloads the APK in-app with live progress and hands it to the installer — no browser hop. Falls back to the release page if the install is blocked.
 - **Optional device storage.** Off by default; when granted, the tools can also read and save files in the shared folders (Downloads, Documents, pictures) instead of only their own workspace.

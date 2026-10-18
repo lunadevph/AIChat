@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 
 package com.android5.ai
 
@@ -437,7 +437,7 @@ fun ChatScreen(
                 scrollBehavior.nestedScrollConnection
             ),
             topBar = {
-                MediumFlexibleTopAppBar(
+                CenterAlignedTopAppBar(
                     navigationIcon = {
                         IconButton(
                             onClick = {
@@ -453,103 +453,106 @@ fun ChatScreen(
                             )
                         }
                     },
+                    // The mark, the name and the current model in one centred row,
+                    // the way the bar carried them before the flexible app bar.
                     title = {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            AppLogo(size = 32.dp)
+                            AppLogo(size = 30.dp)
 
                             Text(
                                 text = stringResource(R.string.app_name),
-                                style = MaterialTheme.typography.titleMediumEmphasized,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1,
-                                softWrap = false
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis,
+                                // Bounded so the model pill keeps its room on the
+                                // narrowest screens; the row is centred by the bar.
+                                modifier = Modifier.widthIn(max = 96.dp)
                             )
-                        }
-                    },
-                    // The flexible app bar carries the current model as its subtitle
-                    // while it is expanded. Once it collapses, "Change model" is
-                    // still one tap away in the overflow menu.
-                    subtitle = {
-                        Surface(
-                            onClick = {
-                                showModelSheet = true
-                            },
-                            shape = RoundedCornerShape(50),
-                            color = MaterialTheme.colorScheme.surfaceContainerHighest
-                                .copy(alpha = 0.8f),
-                            border = BorderStroke(
-                                1.2.dp,
-                                MaterialTheme.colorScheme.outlineVariant
-                                    .copy(alpha = 0.6f)
-                            ),
-                            tonalElevation = 2.dp
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(
-                                    start = 6.dp,
-                                    end = 8.dp,
-                                    top = 4.dp,
-                                    bottom = 4.dp
-                                )
+
+                            Surface(
+                                onClick = {
+                                    showModelSheet = true
+                                },
+                                shape = RoundedCornerShape(50),
+                                color = MaterialTheme.colorScheme.surfaceContainerHighest
+                                    .copy(alpha = 0.8f),
+                                border = BorderStroke(
+                                    1.2.dp,
+                                    MaterialTheme.colorScheme.outlineVariant
+                                        .copy(alpha = 0.6f)
+                                ),
+                                tonalElevation = 2.dp
                             ) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = MaterialTheme.colorScheme.surface,
-                                    border = BorderStroke(
-                                        0.8.dp,
-                                        MaterialTheme.colorScheme.primary
-                                            .copy(alpha = 0.3f)
-                                    ),
-                                    tonalElevation = 1.dp,
-                                    modifier = Modifier.size(22.dp)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(
+                                        start = 6.dp,
+                                        end = 8.dp,
+                                        top = 4.dp,
+                                        bottom = 4.dp
+                                    )
                                 ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Image(
-                                            painter = painterResource(
-                                                providerIconRes(
-                                                    settingsManager.selectedProvider
-                                                )
-                                            ),
-                                            contentDescription = null,
-                                            modifier = Modifier
-                                                .size(15.dp)
-                                                .clip(CircleShape)
-                                        )
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.surface,
+                                        border = BorderStroke(
+                                            0.8.dp,
+                                            MaterialTheme.colorScheme.primary
+                                                .copy(alpha = 0.3f)
+                                        ),
+                                        tonalElevation = 1.dp,
+                                        modifier = Modifier.size(22.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Image(
+                                                painter = painterResource(
+                                                    providerIconRes(
+                                                        settingsManager.selectedProvider
+                                                    )
+                                                ),
+                                                contentDescription = null,
+                                                modifier = Modifier
+                                                    .size(15.dp)
+                                                    .clip(CircleShape)
+                                            )
+                                        }
                                     }
+
+                                    Spacer(Modifier.width(6.dp))
+
+                                    val modelName =
+                                        viewModel.availableModels.find {
+                                            it.id == settingsManager.selectedModel
+                                        }?.displayName
+                                            ?: stringResource(
+                                                R.string.label_select_model
+                                            )
+
+                                    Text(
+                                        text = modelName,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.widthIn(max = 88.dp)
+                                    )
+
+                                    Spacer(Modifier.width(2.dp))
+
+                                    Icon(
+                                        Icons.Rounded.KeyboardArrowDown,
+                                        null,
+                                        Modifier.size(17.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
-
-                                Spacer(Modifier.width(6.dp))
-
-                                val modelName =
-                                    viewModel.availableModels.find {
-                                        it.id == settingsManager.selectedModel
-                                    }?.displayName
-                                        ?: stringResource(
-                                            R.string.label_select_model
-                                        )
-
-                                Text(
-                                    text = modelName,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.widthIn(max = 125.dp)
-                                )
-
-                                Spacer(Modifier.width(2.dp))
-
-                                Icon(
-                                    Icons.Rounded.KeyboardArrowDown,
-                                    null,
-                                    Modifier.size(17.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
                             }
                         }
                     },
@@ -643,8 +646,7 @@ fun ChatScreen(
                                 )
                             }
                         }
-                    },
-                    scrollBehavior = scrollBehavior
+                    }
                 )
             },
             bottomBar = {
@@ -667,7 +669,10 @@ fun ChatScreen(
                             bottom = 6.dp
                         )
                     ) {
-                        ThinkingIndicator(viewModel.loadingStatus)
+                        ThinkingIndicator(
+                            viewModel.loadingStatus,
+                            viewModel.rateLimitRetryIn
+                        )
                     }
 
                     Surface(
@@ -939,25 +944,7 @@ fun ChatScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        // Expressive decoration: the app's mark, with a softer clover
-                        // peeking out from behind it.
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier.size(108.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(72.dp)
-                                    .offset(x = 20.dp, y = (-16).dp)
-                                    .background(
-                                        MaterialTheme.colorScheme.tertiaryContainer
-                                            .copy(alpha = 0.7f),
-                                        MaterialShapes.Clover4Leaf.toShape()
-                                    )
-                            )
-
-                            AppLogo(size = 88.dp)
-                        }
+                        AppLogo(size = 88.dp)
 
                         Spacer(Modifier.height(16.dp))
 
@@ -1108,7 +1095,7 @@ fun ChatScreen(
 }
 
 @Composable
-fun ThinkingIndicator(status: LoadingStatus) {
+fun ThinkingIndicator(status: LoadingStatus, rateLimitRetryIn: Int = 0) {
     val statusText =
         when (status) {
             LoadingStatus.SEARCHING ->
@@ -1117,6 +1104,13 @@ fun ThinkingIndicator(status: LoadingStatus) {
             LoadingStatus.CREATING_IMAGE ->
                 stringResource(R.string.status_creating_image)
 
+            LoadingStatus.RATE_LIMITED ->
+                if (rateLimitRetryIn > 0) {
+                    stringResource(R.string.status_rate_limited_in, rateLimitRetryIn)
+                } else {
+                    stringResource(R.string.status_rate_limited)
+                }
+
             LoadingStatus.THINKING ->
                 stringResource(R.string.status_thinking)
 
@@ -1124,14 +1118,28 @@ fun ThinkingIndicator(status: LoadingStatus) {
                 stringResource(R.string.status_typing)
         }
 
+    // A rate limit is a wait rather than progress, so it gets its own tint.
+    val throttled = status == LoadingStatus.RATE_LIMITED
+    val containerColor = if (throttled) {
+        MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.7f)
+    } else {
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+    }
+    val contentColor = if (throttled) {
+        MaterialTheme.colorScheme.onTertiaryContainer
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
+    val outlineColor = if (throttled) {
+        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.4f)
+    } else {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+    }
+
     Surface(
         shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.primaryContainer
-            .copy(alpha = 0.6f),
-        border = BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-        )
+        color = containerColor,
+        border = BorderStroke(1.dp, outlineColor)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -1144,7 +1152,7 @@ fun ThinkingIndicator(status: LoadingStatus) {
             // as "working" without a spinner or a pulsing container.
             LoadingIndicator(
                 modifier = Modifier.size(18.dp),
-                color = MaterialTheme.colorScheme.primary
+                color = contentColor
             )
 
             Spacer(Modifier.width(8.dp))
@@ -1152,7 +1160,7 @@ fun ThinkingIndicator(status: LoadingStatus) {
             Text(
                 text = statusText,
                 style = MaterialTheme.typography.labelLargeEmphasized,
-                color = MaterialTheme.colorScheme.primary
+                color = contentColor
             )
         }
     }
