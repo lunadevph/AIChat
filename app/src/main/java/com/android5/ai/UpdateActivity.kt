@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -354,7 +355,7 @@ class UpdateActivity : ComponentActivity() {
                                                 shapes = ExpressiveButtonShapes
                                             ) {
                                                 Icon(
-                                                    Icons.Rounded.OpenInNew,
+                                                    Icons.AutoMirrored.Rounded.OpenInNew,
                                                     contentDescription = null,
                                                     Modifier.size(16.dp)
                                                 )
