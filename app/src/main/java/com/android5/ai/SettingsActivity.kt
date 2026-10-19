@@ -122,6 +122,7 @@ class SettingsActivity : ComponentActivity() {
                             .verticalScroll(rememberScrollState())
                             .padding(horizontal = 20.dp, vertical = 12.dp)
                     ) {
+                        val context = LocalContext.current
                         SettingsSectionHeader(stringResource(R.string.settings_section_provider))
                         
                         Surface(
@@ -196,6 +197,19 @@ class SettingsActivity : ComponentActivity() {
                                     icon = Icons.Rounded.Info,
                                     badgeColor = MaterialTheme.colorScheme.secondary,
                                     onClick = { showAboutApp = true }
+                                )
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+                                )
+                                SettingsGroupItem(
+                                    title = "Diagnostics",
+                                    subtitle = "Build status, release notes, backup and debug info",
+                                    icon = Icons.Rounded.BugReport,
+                                    badgeColor = MaterialTheme.colorScheme.tertiary,
+                                    onClick = {
+                                        context.startActivity(Intent(context, DebugActivity::class.java))
+                                    }
                                 )
                             }
                         }
@@ -1491,7 +1505,15 @@ fun AboutAppSheet(onDismiss: () -> Unit) {
                     style = MaterialTheme.typography.labelMedium
                 )
             }
+            val ctx = LocalContext.current
             Text(stringResource(R.string.about_build_date, BuildConfig.BUILD_DATE), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                if (AppSigning.isOfficial(ctx)) "Official build" else "Unofficial build",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = if (AppSigning.isOfficial(ctx)) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+            )
             
             Spacer(Modifier.height(8.dp))
             

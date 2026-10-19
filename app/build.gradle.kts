@@ -378,6 +378,15 @@ tasks.register("UpdateMirrors") {
     }
 }
 
+// Bundle the release notes as an asset so the app can show them offline.
+// app/changelog.txt stays the single source of truth (see AGENTS.md).
+tasks.register<Copy>("copyChangelogToAssets") {
+    from(file("changelog.txt"))
+    into(layout.projectDirectory.dir("src/main/assets"))
+    rename { "changelog.txt" }
+}
+tasks.named("preBuild") { dependsOn("copyChangelogToAssets") }
+
 // Automatically trigger UpdateMirrors when assembleRelease finishes
 tasks.matching { it.name == "assembleRelease" }.configureEach {
     finalizedBy("UpdateMirrors")

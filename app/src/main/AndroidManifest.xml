@@ -72,6 +72,12 @@
             android:label="@string/title_tool_files"
             android:theme="@style/Theme.AIChat" />
 
+        <activity
+            android:name=".DebugActivity"
+            android:exported="false"
+            android:label="Diagnostics"
+            android:theme="@style/Theme.AIChat" />
+
         <!-- Shares the downloaded update APK with the package installer. -->
         <provider
             android:name="androidx.core.content.FileProvider"
