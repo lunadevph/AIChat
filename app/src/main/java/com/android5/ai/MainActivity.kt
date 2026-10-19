@@ -1097,7 +1097,8 @@ fun ChatScreen(
                 settingsManager.selectedModel = modelId
                 showModelSheet = false
                 viewModel.fetchModels()
-            }
+            },
+            onProviderChange = { viewModel.fetchModels() }
         )
     }
 }

@@ -199,19 +199,21 @@ class SettingsActivity : ComponentActivity() {
                                     badgeColor = MaterialTheme.colorScheme.secondary,
                                     onClick = { showAboutApp = true }
                                 )
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(horizontal = 16.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
-                                )
-                                SettingsGroupItem(
-                                    title = "Diagnostics",
-                                    subtitle = "Build status, release notes, backup and debug info",
-                                    icon = Icons.Rounded.BugReport,
-                                    badgeColor = MaterialTheme.colorScheme.tertiary,
-                                    onClick = {
-                                        context.startActivity(Intent(context, DebugActivity::class.java))
-                                    }
-                                )
+                                if (BuildConfig.DEBUG) {
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(horizontal = 16.dp),
+                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+                                    )
+                                    SettingsGroupItem(
+                                        title = "Diagnostics",
+                                        subtitle = "Build status, release notes, backup and debug info",
+                                        icon = Icons.Rounded.BugReport,
+                                        badgeColor = MaterialTheme.colorScheme.tertiary,
+                                        onClick = {
+                                            context.startActivity(Intent(context, DebugActivity::class.java))
+                                        }
+                                    )
+                                }
                             }
                         }
 

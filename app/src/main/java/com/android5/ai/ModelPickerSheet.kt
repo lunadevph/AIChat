@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -70,13 +71,16 @@ fun ModelPickerSheet(
     settingsManager: SettingsManager,
     models: List<ModelInfo>,
     onSelect: (String) -> Unit,
+    onProviderChange: (String) -> Unit = {},
     onDismiss: () -> Unit
 ) {
     var visionOnly by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var providerExpanded by remember { mutableStateOf(false) }
 
     val currentModelId = settingsManager.selectedModel
     val currentModel = models.find { it.id == currentModelId }
+    val customProviders = settingsManager.customProviders
 
     val filteredModels = models.filter { model ->
         val matchesSearch =
@@ -160,6 +164,44 @@ fun ModelPickerSheet(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                }
+
+                Spacer(Modifier.height(14.dp))
+
+                // Provider selector, so switching providers does not require a trip
+                // to Settings. Changing it re-fetches the catalog.
+                Text(
+                    stringResource(R.string.label_provider),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 6.dp)
+                )
+                androidx.compose.foundation.lazy.LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(Providers.all(customProviders)) { info ->
+                        FilterChip(
+                            selected = info.name == settingsManager.selectedProvider,
+                            onClick = {
+                                if (info.name != settingsManager.selectedProvider) {
+                                    settingsManager.selectedProvider = info.name
+                                    onProviderChange(info.name)
+                                }
+                            },
+                            label = { Text(info.name) },
+                            leadingIcon = {
+                                Image(
+                                    painter = painterResource(providerIconRes(info.name)),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp).clip(CircleShape)
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(14.dp))
