@@ -51,6 +51,7 @@ class SetupActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val settingsManager = SettingsManager(this)
+        setTheme(settingsManager.activityThemeStyle())
 
         if (settingsManager.isSetupComplete) {
             startMainActivity()

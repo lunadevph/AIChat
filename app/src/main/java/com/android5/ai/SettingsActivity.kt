@@ -59,7 +59,9 @@ import com.android5.ai.ui.theme.AIChatTheme
 import com.android5.ai.ui.theme.AmoledBackground
 import com.android5.ai.ui.theme.ExpressiveButtonShapes
 import com.android5.ai.ui.theme.ExpressiveIconButtonShapes
+import com.android5.ai.ui.theme.HoloPrimary
 import com.android5.ai.ui.theme.LightSurface
+import com.android5.ai.ui.theme.OldAndroidPrimary
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -69,6 +71,7 @@ class SettingsActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val settingsManager = SettingsManager(this)
+        setTheme(settingsManager.activityThemeStyle())
 
         setContent {
             AIChatTheme(themeMode = settingsManager.themeMode) {
@@ -1500,9 +1503,12 @@ fun AboutAppSheet(onDismiss: () -> Unit) {
 @Composable
 fun AppearanceSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
     val options = listOf(
-        Triple("amoled", stringResource(R.string.theme_amoled), AmoledBackground),
         Triple("dynamic", stringResource(R.string.theme_dynamic), MaterialTheme.colorScheme.primary),
-        Triple("light", stringResource(R.string.theme_light), LightSurface)
+        Triple("amoled", stringResource(R.string.theme_amoled), AmoledBackground),
+        Triple("light", stringResource(R.string.theme_light), LightSurface),
+        Triple("old_android", stringResource(R.string.theme_old_android), OldAndroidPrimary),
+        Triple("holo", stringResource(R.string.theme_holo), HoloPrimary),
+        Triple("compact", stringResource(R.string.theme_compact), MaterialTheme.colorScheme.primary)
     )
     val current = settingsManager.themeMode
 
@@ -1557,7 +1563,9 @@ fun AppearanceSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
                                 .background(swatchColor, CircleShape)
                                 .clip(CircleShape)
                                 .then(
-                                    if (key == "light" || key == "amoled") Modifier.background(MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), CircleShape)
+                                    // Dark swatches need a ring to stay visible on the sheet.
+                                    if (key == "light" || key == "amoled" || key == "old_android" || key == "holo")
+                                        Modifier.background(MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), CircleShape)
                                     else Modifier
                                 )
                         )

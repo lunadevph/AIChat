@@ -2,4 +2,6 @@
 <resources>
     <color name="splash_background">#FF000000</color>
     <color name="splash_icon">#FFFFFFFF</color>
+    <color name="compact_window">#FF000000</color>
+    <color name="compact_primary">#FFD0BCFF</color>
 </resources>

@@ -8,4 +8,11 @@
     <color name="splash_icon">#FF005FAF</color>
     <color name="icon_gradient_start">#005FAF</color>
     <color name="icon_gradient_end">#00468B</color>
+    <!-- AppCompat (pre-Material 3) theme window backgrounds and accents. -->
+    <color name="old_android_window">#FF000000</color>
+    <color name="old_android_primary">#FFA4C639</color>
+    <color name="holo_window">#FF000000</color>
+    <color name="holo_primary">#FF33B5E5</color>
+    <color name="compact_window">#FFF7F9FC</color>
+    <color name="compact_primary">#FF6750A4</color>
 </resources>

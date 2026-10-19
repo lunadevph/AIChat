@@ -502,6 +502,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
     implementation(libs.google.android.material)
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)

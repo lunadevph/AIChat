@@ -150,3 +150,22 @@ val Typography = BaseTypography.copy(
     labelMediumEmphasized = BaseTypography.labelMedium.emphasized(),
     labelSmallEmphasized = BaseTypography.labelSmall.emphasized()
 )
+
+/**
+ * A denser type scale for the compact appearance: the same styles, set smaller,
+ * so more fits on a screen without changing the hierarchy.
+ */
+val CompactTypography = Typography.copy(
+    headlineLarge = Typography.headlineLarge.copy(fontSize = 26.sp, lineHeight = 34.sp),
+    headlineMedium = Typography.headlineMedium.copy(fontSize = 24.sp, lineHeight = 32.sp),
+    headlineSmall = Typography.headlineSmall.copy(fontSize = 20.sp, lineHeight = 28.sp),
+    titleLarge = Typography.titleLarge.copy(fontSize = 19.sp, lineHeight = 26.sp),
+    titleMedium = Typography.titleMedium.copy(fontSize = 14.sp, lineHeight = 20.sp),
+    titleSmall = Typography.titleSmall.copy(fontSize = 12.sp, lineHeight = 18.sp),
+    bodyLarge = Typography.bodyLarge.copy(fontSize = 14.sp, lineHeight = 20.sp),
+    bodyMedium = Typography.bodyMedium.copy(fontSize = 12.sp, lineHeight = 18.sp),
+    bodySmall = Typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 14.sp),
+    labelLarge = Typography.labelLarge.copy(fontSize = 12.sp, lineHeight = 18.sp),
+    labelMedium = Typography.labelMedium.copy(fontSize = 11.sp, lineHeight = 14.sp),
+    labelSmall = Typography.labelSmall.copy(fontSize = 10.sp, lineHeight = 14.sp)
+)

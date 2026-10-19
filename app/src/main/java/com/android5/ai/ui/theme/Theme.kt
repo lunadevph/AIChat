@@ -25,6 +25,30 @@ private val ExpressiveShapes = Shapes(
     extraExtraLarge = RoundedCornerShape(64.dp)
 )
 
+/** Sharp corners, for the pre-Material appearances. */
+private val SharpShapes = Shapes(
+    extraSmall = RoundedCornerShape(2.dp),
+    small = RoundedCornerShape(4.dp),
+    medium = RoundedCornerShape(6.dp),
+    large = RoundedCornerShape(8.dp),
+    extraLarge = RoundedCornerShape(10.dp),
+    largeIncreased = RoundedCornerShape(12.dp),
+    extraLargeIncreased = RoundedCornerShape(14.dp),
+    extraExtraLarge = RoundedCornerShape(16.dp)
+)
+
+/** Tighter corners, for the compact appearance. */
+private val CompactShapes = Shapes(
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(10.dp),
+    medium = RoundedCornerShape(12.dp),
+    large = RoundedCornerShape(14.dp),
+    extraLarge = RoundedCornerShape(16.dp),
+    largeIncreased = RoundedCornerShape(18.dp),
+    extraLargeIncreased = RoundedCornerShape(20.dp),
+    extraExtraLarge = RoundedCornerShape(24.dp)
+)
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 val ExpressiveButtonShapes = ButtonShapes(
     shape = RoundedCornerShape(20.dp),
@@ -46,13 +70,17 @@ fun AIChatTheme(
     // "light" is always light, "amoled" is always dark; "dynamic" follows the
     // system light/dark setting (previously it was hard-coded to dark, so the
     // "Dynamic (System)" option never respected a light system theme).
+    // The retro appearances — Old Android and Holo — are dark by nature.
     val darkTheme = when (themeMode) {
         "light" -> false
-        "amoled" -> true
+        "amoled", "old_android", "holo" -> true
         else -> isSystemInDarkTheme()
     }
-    val useDynamic = themeMode == "dynamic"
+    val useDynamic = themeMode == "dynamic" || themeMode == "compact"
     val isAmoled = themeMode == "amoled"
+    val isOldAndroid = themeMode == "old_android"
+    val isHolo = themeMode == "holo"
+    val isCompact = themeMode == "compact"
 
     val colorScheme = when {
         isAmoled -> darkColorScheme(
@@ -81,6 +109,50 @@ fun AIChatTheme(
             surfaceContainerHighest = AmoledSurfaceContainerHighest,
             outline = AmoledOutline,
             outlineVariant = AmoledOutlineVariant
+        )
+        isOldAndroid -> darkColorScheme(
+            primary = OldAndroidPrimary,
+            onPrimary = OldAndroidOnPrimary,
+            primaryContainer = OldAndroidPrimaryContainer,
+            onPrimaryContainer = OldAndroidOnPrimaryContainer,
+            secondary = OldAndroidSecondary,
+            onSecondary = OldAndroidOnSecondary,
+            secondaryContainer = OldAndroidSecondaryContainer,
+            onSecondaryContainer = OldAndroidOnSecondaryContainer,
+            tertiary = OldAndroidTertiary,
+            onTertiary = OldAndroidOnTertiary,
+            background = OldAndroidBackground,
+            onBackground = Color.White,
+            surface = OldAndroidSurface,
+            onSurface = Color.White,
+            surfaceVariant = OldAndroidSurfaceVariant,
+            onSurfaceVariant = Color(0xFFC4C7D4),
+            error = OldAndroidError,
+            onError = OldAndroidOnError,
+            outline = OldAndroidOutline,
+            outlineVariant = OldAndroidOutlineVariant
+        )
+        isHolo -> darkColorScheme(
+            primary = HoloPrimary,
+            onPrimary = HoloOnPrimary,
+            primaryContainer = HoloPrimaryContainer,
+            onPrimaryContainer = HoloOnPrimaryContainer,
+            secondary = HoloSecondary,
+            onSecondary = HoloOnSecondary,
+            secondaryContainer = HoloSecondaryContainer,
+            onSecondaryContainer = HoloOnSecondaryContainer,
+            tertiary = HoloTertiary,
+            onTertiary = HoloOnTertiary,
+            background = HoloBackground,
+            onBackground = Color.White,
+            surface = HoloSurface,
+            onSurface = Color.White,
+            surfaceVariant = HoloSurfaceVariant,
+            onSurfaceVariant = Color(0xFFC4C7D4),
+            error = HoloError,
+            onError = HoloOnError,
+            outline = HoloOutline,
+            outlineVariant = HoloOutlineVariant
         )
         useDynamic && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
@@ -125,11 +197,19 @@ fun AIChatTheme(
         }
     }
 
+    // The retro appearances are pre-Material, so they carry sharp corners; the
+    // compact one tightens everything instead.
+    val shapes = when {
+        isCompact -> CompactShapes
+        isOldAndroid || isHolo -> SharpShapes
+        else -> ExpressiveShapes
+    }
+
     MaterialExpressiveTheme(
         colorScheme = colorScheme,
         motionScheme = MotionScheme.expressive(),
-        shapes = ExpressiveShapes,
-        typography = Typography,
+        shapes = shapes,
+        typography = if (isCompact) CompactTypography else Typography,
         content = content
     )
 }

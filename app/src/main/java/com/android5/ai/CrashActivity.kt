@@ -42,6 +42,8 @@ class CrashActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        setTheme(SettingsManager(this).activityThemeStyle())
+
         val stackTrace = intent.getStringExtra(EXTRA_STACK_TRACE) ?: "Unknown error"
         val message = intent.getStringExtra(EXTRA_MESSAGE)
 

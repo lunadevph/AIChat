@@ -89,6 +89,7 @@ class ToolFilesActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val settingsManager = SettingsManager(this)
+        setTheme(settingsManager.activityThemeStyle())
         val initialFile = intent.getStringExtra(EXTRA_FILE)
 
         setContent {

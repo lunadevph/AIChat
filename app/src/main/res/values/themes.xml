@@ -15,4 +15,29 @@
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>
     </style>
+
+    <!-- AppCompat (pre-Material 3) themes for the retro appearances. These style
+         the window and the system bars; the Compose theme styles the content. -->
+    <style name="Theme.AIChat.OldAndroid" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/old_android_window</item>
+        <item name="android:statusBarColor">@color/old_android_window</item>
+        <item name="colorPrimary">@color/old_android_primary</item>
+        <item name="colorPrimaryDark">@color/old_android_window</item>
+        <item name="colorAccent">@color/old_android_primary</item>
+    </style>
+
+    <style name="Theme.AIChat.Holo" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/holo_window</item>
+        <item name="android:statusBarColor">@color/holo_window</item>
+        <item name="colorPrimary">@color/holo_primary</item>
+        <item name="colorPrimaryDark">@color/holo_window</item>
+        <item name="colorAccent">@color/holo_primary</item>
+    </style>
+
+    <style name="Theme.AIChat.Compact" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/compact_window</item>
+        <item name="colorPrimary">@color/compact_primary</item>
+        <item name="colorPrimaryDark">@color/compact_window</item>
+        <item name="colorAccent">@color/compact_primary</item>
+    </style>
 </resources>

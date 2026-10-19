@@ -217,6 +217,18 @@ class SettingsManager(context: Context) {
             _prefs!!.edit().putString("theme_mode", value).apply()
         }
 
+    /**
+     * The AppCompat theme for the selected appearance. The retro appearances have
+     * their own pre-Material window and system bars; the rest keep the default.
+     * Applied with setTheme() before the content is set.
+     */
+    fun activityThemeStyle(): Int = when (themeMode) {
+        "old_android" -> R.style.Theme_AIChat_OldAndroid
+        "holo" -> R.style.Theme_AIChat_Holo
+        "compact" -> R.style.Theme_AIChat_Compact
+        else -> R.style.Theme_AIChat
+    }
+
     var currentConversationId: String?
         get() = _prefs!!.getString("current_conv_id", null)
         set(value) = _prefs!!.edit().putString("current_conv_id", value).apply()

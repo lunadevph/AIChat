@@ -82,6 +82,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val settingsManager = SettingsManager(this)
+        setTheme(settingsManager.activityThemeStyle())
 
         if (!settingsManager.isSetupComplete) {
             startActivity(Intent(this, SetupActivity::class.java))

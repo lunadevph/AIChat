@@ -20,7 +20,7 @@ A native Android client for chatting with large language models. Bring your own 
 - **Model parameters.** Temperature, top-P, max tokens, frequency penalty, and presence penalty, with reset-to-defaults.
 - **Conversation history.** Multiple stored conversations, with clear and delete.
 - **Material 3 Expressive.** Dynamic color, a centred top bar, split button, toggle button, morphing loading and wavy progress indicators, the Material shape library and expressive type styles.
-- **Themes.** AMOLED dark, light, and dynamic system theming.
+- **Themes.** AMOLED dark, light, dynamic system theming, plus three AppCompat-based appearances: Old Android (gingerbread green on black, sharp corners), Holo (holo blue on black, sharp corners) and Compact (a denser Material 3 with tighter corners and type).
 - **Self-updating.** Checks a mirror for newer builds, verifies the downloaded APK against the mirror's published SHA-256, installs in-app with live progress and hands it to the installer — no browser hop. Falls back to the release page if the install is blocked. The mirror format is versioned and additive, so older builds keep reading newer mirrors.
 - **Optional device storage.** Off by default; when granted, the tools can also read and save files in the shared folders (Downloads, Documents, pictures) instead of only their own workspace.
 

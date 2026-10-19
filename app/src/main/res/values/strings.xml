@@ -67,6 +67,9 @@
     <string name="settings_appearance_title">Appearance</string>
     <string name="settings_appearance_subtitle">Theme and colors</string>
     <string name="theme_amoled">AMOLED Dark</string>
+    <string name="theme_old_android">Old Android</string>
+    <string name="theme_holo">Holo</string>
+    <string name="theme_compact">Compact</string>
     <string name="theme_dynamic">Dynamic (System)</string>
     <string name="theme_light">Light</string>
 

@@ -98,6 +98,7 @@ class UpdateActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val settingsManager = SettingsManager(this)
+        setTheme(settingsManager.activityThemeStyle())
 
         setContent {
             AIChatTheme(themeMode = settingsManager.themeMode) {
