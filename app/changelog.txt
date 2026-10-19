@@ -1,3 +1,5 @@
-- The assistant can now run shell commands on the device via the `<shell>` tool, and is explicitly instructed to use it instead of refusing — list directories, check versions, search code, run scripts, inspect the system.
-- The About sheet now shows the creator (LunaDevPH) and build date alongside the version.
+- Tool runs (which tools a reply used and the files it touched) now render inside the message bubble instead of as a separate row beneath it.
+- While a reply streams in, the view only auto-scrolls to the bottom when you are already there; scrolling up to read earlier messages no longer fights every token. A new message always jumps to the latest.
+- The assistant can run shell commands on the device via the `<shell>` tool, and is explicitly instructed to use it instead of refusing.
+- The About sheet shows the creator (LunaDevPH) and build date alongside the version.
 - A mechanical guard fails the release build if `app/changelog.txt` is empty or has no bullets, so stale release notes can no longer ship.
