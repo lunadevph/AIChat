@@ -93,6 +93,14 @@ object Providers {
 
     fun isAnthropic(provider: String): Boolean = provider == "Claude"
 
+    fun anthropicApi(forValidation: Boolean = false): AnthropicApi =
+        Retrofit.Builder()
+            .baseUrl("https://api.anthropic.com/v1/")
+            .client(if (forValidation) validationClient else chatClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(AnthropicApi::class.java)
+
     fun api(
         provider: String,
         custom: List<Custom> = emptyList(),
@@ -160,7 +168,7 @@ object Providers {
         "NVIDIA" -> "nvidia/llama-3.3-nemotron-super-49b-v1.5"
         else -> custom(custom, provider)?.defaultModel
             ?: custom(custom, provider)?.models?.firstOrNull()
-            ?: "openrouter/free"
+            ?: ""
     }
 
     fun defaultModels(provider: String, custom: List<Custom> = emptyList()): List<ModelInfo> = when (provider) {
@@ -265,28 +273,12 @@ object Providers {
         else -> {
             // A custom provider: the catalog the user wrote down, or a single
             // placeholder when they left it for the app to fetch from /models.
-            val customModels = custom(custom, provider)?.models
+            // A custom provider: the catalog the user wrote down, or nothing at all
+            // when they left it for the app to fetch from /models (an OpenRouter
+            // fallback list would only 404 against their own endpoint).
+            custom(custom, provider)?.models
                 ?.map { modelId -> ModelInfo(id = modelId, name = modelId) }
-            if (!customModels.isNullOrEmpty()) {
-                customModels
-            } else {
-                listOf(
-                    // Free models (OpenRouter)
-                    ModelInfo(id = "openrouter/free", name = "Auto (Free Router)", description = "Auto-selects best free model for your request", architecture = Architecture(modality = "text+image->text")),
-                    ModelInfo(id = "google/gemini-3.5-flash:free", name = "Gemini 3.5 Flash (Free)", description = "Free Google agentic workhorse model", architecture = Architecture(modality = "text+image->text")),
-                    ModelInfo(id = "meta-llama/llama-4-scout:free", name = "Llama 4 Scout (Free)", description = "Free Meta MoE model with vision", architecture = Architecture(modality = "text+image->text")),
-                    ModelInfo(id = "nvidia/nemotron-3-ultra:free", name = "Nemotron 3 Ultra (Free)", description = "Free NVIDIA frontier model", architecture = Architecture(modality = "text->text")),
-                    ModelInfo(id = "qwen/qwen-3.8-32b:free", name = "Qwen 3.8 32B (Free)", description = "Free Alibaba latest reasoning model", architecture = Architecture(modality = "text->text")),
-                    ModelInfo(id = "deepseek/deepseek-r1:free", name = "DeepSeek R1 (Free)", description = "Free open reasoning model", architecture = Architecture(modality = "text->text")),
-                    ModelInfo(id = "openai/gpt-oss-120b:free", name = "GPT-OSS 120B (Free)", description = "Free OpenAI open-weight reasoning model", architecture = Architecture(modality = "text->text")),
-                    ModelInfo(id = "mistralai/mistral-small-4:free", name = "Mistral Small 4 (Free)", description = "Free efficient Mistral hybrid model", architecture = Architecture(modality = "text->text")),
-                    // Paid popular models
-                    ModelInfo(id = "openai/gpt-5.6-sol", name = "GPT-5.6 Sol", description = "OpenAI's premier flagship via OpenRouter", architecture = Architecture(modality = "text+image->text")),
-                    ModelInfo(id = "anthropic/claude-opus-4.1", name = "Claude Opus 4.1", description = "Most powerful Claude via OpenRouter", architecture = Architecture(modality = "text+image->text")),
-                    ModelInfo(id = "x-ai/grok-4.6", name = "Grok 4.6", description = "xAI flagship via OpenRouter", architecture = Architecture(modality = "text+image->text")),
-                    ModelInfo(id = "google/gemini-3.7-flash", name = "Gemini 3.7 Flash", description = "Google workhorse via OpenRouter", architecture = Architecture(modality = "text+image->text"))
-                )
-            }
+                ?: emptyList()
         }
     }
 

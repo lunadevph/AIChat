@@ -194,7 +194,14 @@ fun SetupScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        SetupSteps(current = if (isConnected) 3 else 2)
+        // Step 1 (provider) is done once the user has typed or validated a key,
+        // otherwise it is the active step.
+        val currentStep = when {
+            isConnected -> 3
+            apiKey.isNotBlank() -> 2
+            else -> 1
+        }
+        SetupSteps(current = currentStep)
 
         Spacer(modifier = Modifier.height(22.dp))
 
@@ -280,7 +287,7 @@ fun SetupScreen(
                     if (errorText != null) {
                         Text(errorText!!, color = MaterialTheme.colorScheme.error)
                     } else {
-                        GetKeyLink(selectedProvider)
+                        GetKeyLink(selectedProvider, customProviders)
                     }
                 }
             }
@@ -386,6 +393,18 @@ fun SetupScreen(
                 shapes = ExpressiveButtonShapes
             ) {
                 Text(stringResource(R.string.btn_continue_anyway))
+            }
+        }
+
+        // Let them into the app even if validation failed, so a bad key never
+        // traps them on this screen. The chat screen reports the problem.
+        if (errorText != null && !networkTrouble) {
+            Spacer(modifier = Modifier.height(6.dp))
+            TextButton(
+                onClick = { finish(apiKey) },
+                shapes = ExpressiveButtonShapes
+            ) {
+                Text(stringResource(R.string.btn_skip_setup))
             }
         }
 

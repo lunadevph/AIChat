@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.android5.ai.ui.theme.AIChatTheme
@@ -226,13 +227,15 @@ fun CrashScreen(
                         )
                     }
                     Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = stackTrace,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurface
+                    SelectionContainer {
+                        Text(
+                            text = stackTrace,
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
                         )
-                    )
+                    }
                 }
             }
 

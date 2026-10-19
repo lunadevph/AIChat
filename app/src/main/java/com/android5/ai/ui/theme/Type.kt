@@ -167,5 +167,17 @@ val CompactTypography = Typography.copy(
     bodySmall = Typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 14.sp),
     labelLarge = Typography.labelLarge.copy(fontSize = 12.sp, lineHeight = 18.sp),
     labelMedium = Typography.labelMedium.copy(fontSize = 11.sp, lineHeight = 14.sp),
-    labelSmall = Typography.labelSmall.copy(fontSize = 10.sp, lineHeight = 14.sp)
+    labelSmall = Typography.labelSmall.copy(fontSize = 10.sp, lineHeight = 14.sp),
+    headlineLargeEmphasized = Typography.headlineLargeEmphasized.copy(fontSize = 26.sp, lineHeight = 34.sp),
+    headlineMediumEmphasized = Typography.headlineMediumEmphasized.copy(fontSize = 24.sp, lineHeight = 32.sp),
+    headlineSmallEmphasized = Typography.headlineSmallEmphasized.copy(fontSize = 20.sp, lineHeight = 28.sp),
+    titleLargeEmphasized = Typography.titleLargeEmphasized.copy(fontSize = 19.sp, lineHeight = 26.sp),
+    titleMediumEmphasized = Typography.titleMediumEmphasized.copy(fontSize = 14.sp, lineHeight = 20.sp),
+    titleSmallEmphasized = Typography.titleSmallEmphasized.copy(fontSize = 12.sp, lineHeight = 18.sp),
+    bodyLargeEmphasized = Typography.bodyLargeEmphasized.copy(fontSize = 14.sp, lineHeight = 20.sp),
+    bodyMediumEmphasized = Typography.bodyMediumEmphasized.copy(fontSize = 12.sp, lineHeight = 18.sp),
+    bodySmallEmphasized = Typography.bodySmallEmphasized.copy(fontSize = 11.sp, lineHeight = 14.sp),
+    labelLargeEmphasized = Typography.labelLargeEmphasized.copy(fontSize = 12.sp, lineHeight = 18.sp),
+    labelMediumEmphasized = Typography.labelMediumEmphasized.copy(fontSize = 11.sp, lineHeight = 14.sp),
+    labelSmallEmphasized = Typography.labelSmallEmphasized.copy(fontSize = 10.sp, lineHeight = 14.sp)
 )

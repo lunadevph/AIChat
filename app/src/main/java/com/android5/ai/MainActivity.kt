@@ -238,7 +238,11 @@ fun ChatScreen(
 
                     FilledTonalButton(
                         onClick = {
-                            viewModel.createNewConversation()
+                            // Only start a new chat when the current one actually has
+                            // content, so repeated taps do not pile up empties.
+                            if (viewModel.messages.isNotEmpty()) {
+                                viewModel.createNewConversation()
+                            }
                             scope.launch {
                                 drawerState.close()
                             }
@@ -312,8 +316,7 @@ fun ChatScreen(
                                 tonalElevation = if (selected) 2.dp else 0.dp,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .semantics {
-                                        this.role = Role.Tab
+                                    .semantics(mergeDescendants = true) {
                                         this.selected = selected
                                     }
                             ) {
@@ -464,7 +467,9 @@ fun ChatScreen(
                             AppLogo(size = 30.dp)
 
                             Text(
-                                text = stringResource(R.string.app_name),
+                                text = viewModel.currentConversation?.title?.takeIf {
+                                    it.isNotBlank() && it != context.getString(R.string.chat_default_title)
+                                } ?: stringResource(R.string.app_name),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface,
@@ -1102,9 +1107,6 @@ fun ThinkingIndicator(status: LoadingStatus, rateLimitRetryIn: Int = 0) {
             LoadingStatus.SEARCHING ->
                 stringResource(R.string.status_searching)
 
-            LoadingStatus.CREATING_IMAGE ->
-                stringResource(R.string.status_creating_image)
-
             LoadingStatus.RATE_LIMITED ->
                 if (rateLimitRetryIn > 0) {
                     stringResource(R.string.status_rate_limited_in, rateLimitRetryIn)
@@ -1277,7 +1279,9 @@ fun MessageBubble(
         if (isUser) Alignment.End else Alignment.Start
 
     val bubbleColor =
-        if (isUser) {
+        if (message.isError) {
+            MaterialTheme.colorScheme.errorContainer
+        } else if (isUser) {
             MaterialTheme.colorScheme.primaryContainer
                 .copy(alpha = 0.9f)
         } else {
@@ -1285,7 +1289,9 @@ fun MessageBubble(
         }
 
     val contentColor =
-        if (isUser) {
+        if (message.isError) {
+            MaterialTheme.colorScheme.onErrorContainer
+        } else if (isUser) {
             MaterialTheme.colorScheme.onPrimaryContainer
         } else {
             MaterialTheme.colorScheme.onSurface
@@ -1310,6 +1316,7 @@ fun MessageBubble(
 
     val clipboardManager =
         LocalClipboardManager.current
+    val context = LocalContext.current
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -1556,6 +1563,11 @@ fun MessageBubble(
                                                                     code
                                                                 )
                                                             )
+                                                            android.widget.Toast.makeText(
+                                                                context,
+                                                                context.getString(R.string.action_copied),
+                                                                android.widget.Toast.LENGTH_SHORT
+                                                            ).show()
                                                         },
                                                         modifier = Modifier.size(48.dp),
                                                         shapes = ExpressiveIconButtonShapes
@@ -1640,6 +1652,11 @@ fun MessageBubble(
                                         clipboardManager.setText(
                                             AnnotatedString(message.content)
                                         )
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            context.getString(R.string.action_copied),
+                                            android.widget.Toast.LENGTH_SHORT
+                                        ).show()
                                     },
                                     modifier = Modifier.size(48.dp),
                                     shapes = ExpressiveIconButtonShapes

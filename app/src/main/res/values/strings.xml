@@ -14,6 +14,7 @@
     <string name="setup_connected">You’re connected</string>
     <string name="setup_key_privacy">Your key stays on this device and goes only to the provider you pick.</string>
     <string name="btn_continue_anyway">Save it and continue anyway</string>
+    <string name="btn_skip_setup">Skip setup</string>
     <string name="label_provider">Provider</string>
     <string name="label_api_key">API Key</string>
     <string name="btn_get_started">Get Started</string>
@@ -149,10 +150,10 @@
     <string name="btn_set_active">Set Active</string>
     <string name="btn_clear_key">Clear Key</string>
     <string name="msg_key_saved">API Key saved successfully!</string>
+    <string name="err_key_storage">Could not store the key on this device (keystore error). Try again.</string>
     <string name="msg_provider_activated">%1$s is now the active provider.</string>
     <string name="msg_key_cleared">API Key removed.</string>
 
-    <string name="sheet_about_title">About AI Chat</string>
     <string name="about_description">Experience high-performance AI with vision, memory, and multi-provider support.</string>
     <string name="about_build_date">Build Date: %1$s</string>
 
@@ -162,6 +163,7 @@
     <string name="err_forbidden">Access denied. You might not have permission to use this model.</string>
     <string name="err_not_found">Model not found. The selected model is currently unavailable.</string>
     <string name="err_rate_limit">Rate limit hit. The provider is still busy after several retries — wait a little and try again.</string>
+    <string name="err_image_attach">Could not read the attached image. Try a different picture, or send the message without it.</string>
     <string name="err_native_tool_call">The model tried to call a tool in its own format and the provider rejected it. Turn off Tool calls in Settings → AI settings, or choose a different model.</string>
     <!-- Appended to the system prompt for one retry after a provider rejects a native tool call. -->
     <string name="tool_syntax_correction" translatable="false">IMPORTANT — do not use native function calling for this reply. A JSON tool_calls object, &lt;function=…&gt; markers and tool-call channels are not accepted here; the provider rejects them and the reply arrives empty. If you need to act on the device, write the plain tags from the TOOLS section as ordinary text (for example &lt;read path=\"notes.md\"/&gt;); otherwise answer in words.</string>
@@ -180,7 +182,6 @@
     <string name="desc_attached_image">Attached image</string>
     <string name="desc_user_image">User image</string>
     <string name="desc_copy_code">Copy code</string>
-    <string name="desc_copy_message">Copy message</string>
     <string name="desc_scroll_to_bottom">Scroll to bottom</string>
     <string name="desc_show_thoughts">Show thoughts</string>
     <string name="desc_hide_thoughts">Hide thoughts</string>
@@ -211,15 +212,11 @@
     <string name="crash_stack_trace">Stack trace</string>
 
     <!-- Chat Actions & A11y Strings -->
-    <string name="action_copy">Copy</string>
-    <string name="action_share">Share</string>
-    <string name="action_retry">Regenerate</string>
-    <string name="action_edit">Edit</string>
     <string name="action_copied">Copied to clipboard</string>
     <string name="desc_action_copy">Copy message to clipboard</string>
     <string name="desc_action_share">Share message</string>
     <string name="desc_action_retry">Regenerate response</string>
-    <string name="desc_action_edit">Edit message and resend</string>
+    <string name="desc_action_edit">Edit message</string>
     <string name="desc_status_icon">Update status indicator</string>
     <string name="desc_download_update">Download update package</string>
     <string name="desc_check_again">Check for updates again</string>
@@ -235,6 +232,9 @@
     <string name="update_status_contacting">Contacting update server…</string>
     <string name="update_status_failed">Connection Failed</string>
     <string name="update_error_unreachable">Could not reach the update server.</string>
+    <string name="update_error_no_link">No download link was provided for this release.</string>
+    <string name="update_error_wrong_package">This update is for a different app.</string>
+    <string name="update_error_low_storage">Not enough free space to download this update.</string>
     <string name="update_uptodate_title">You’re up to date!</string>
     <string name="update_uptodate_sub">AI Chat is running the latest version.</string>
     <string name="update_available_title">Update Available</string>
@@ -244,7 +244,6 @@
     <string name="update_whats_new">What’s New</string>
     <string name="btn_download_update">Download Update</string>
     <string name="btn_download_required_update">Download Required Update</string>
-    <string name="btn_download_install">Update Now</string>
     <string name="btn_install_update">Install Update</string>
     <string name="btn_open_browser">Open download page</string>
     <string name="update_status_downloading">Downloading update…</string>
@@ -254,7 +253,6 @@
     <string name="update_install_blocked">Android needs your permission before it will install the update. Open the setting below, turn on “Allow from this source”, then come back.</string>
     <string name="btn_open_install_settings">Allow installs</string>
     <string name="update_download_failed">Download failed — %1$s</string>
-    <string name="desc_update_progress">Update download progress</string>
     <string name="desc_back">Back</string>
     <string name="desc_close">Close</string>
     <string name="desc_hide_api_key">Hide API key</string>

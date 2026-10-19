@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -148,13 +149,8 @@ class UpdateActivity : ComponentActivity() {
                             .create(UpdateApi::class.java)
 
                         val config = api.getUpdateConfig("mirror.json")
-                        try {
-                            settingsManager.googleIcon = config.googleIcon ?: settingsManager.googleIcon
-                            settingsManager.openaiIcon = config.openaiIcon ?: settingsManager.openaiIcon
-                            settingsManager.openrouterIcon = config.openrouterIcon ?: settingsManager.openrouterIcon
-                            settingsManager.groqIcon = config.groqIcon ?: settingsManager.groqIcon
-                            settingsManager.iconBaseUrl = MIRROR_URL
-                        } catch (_: Exception) {}
+                        // (Remote provider icons are advertised by the mirror but the
+                        // app renders the bundled marks; nothing to do here.)
 
                         state = UpdateUi.Done(config)
                     } catch (e: Exception) {
@@ -165,7 +161,7 @@ class UpdateActivity : ComponentActivity() {
                 Scaffold(
                     topBar = {
                         TopAppBar(
-                            title = {},
+                            title = { Text(stringResource(R.string.settings_update_title)) },
                             navigationIcon = {
                                 IconButton(onClick = { finish() }, shapes = ExpressiveIconButtonShapes) {
                                     Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.desc_back))
@@ -318,30 +314,44 @@ class UpdateActivity : ComponentActivity() {
                                                     val url = s.config.downloadUrl
                                                     if (url.isNullOrBlank()) {
                                                         install = InstallUi.Failed(
-                                                            context.getString(R.string.update_error_unreachable)
+                                                            context.getString(R.string.update_error_no_link)
+                                                        )
+                                                    } else if (s.config.appPackageName != null &&
+                                                        s.config.appPackageName.isNotBlank() &&
+                                                        s.config.appPackageName != context.packageName
+                                                    ) {
+                                                        install = InstallUi.Failed(
+                                                            context.getString(R.string.update_error_wrong_package)
                                                         )
                                                     } else {
-                                                        install = InstallUi.Downloading(0L, -1L)
-                                                        scope.launch {
-                                                            try {
-                                                                val file = UpdateInstaller.download(
-                                                                    context = context,
-                                                                    url = url,
-                                                                    destination = UpdateInstaller.apkFile(
-                                                                        context,
-                                                                        s.config.appLatestVersion
-                                                                    ),
-                                                                    // A v2 mirror publishes the hash of the APK it serves.
-                                                                    expectedSha256 = s.config.apkSha256
-                                                                ) { written, total ->
-                                                                    install = InstallUi.Downloading(written, total)
+                                                        UpdateInstaller.clear(context)
+                                                        val needed = s.config.apkSizeBytes
+                                                        if (needed > 0 && context.cacheDir.usableSpace < needed + 8 * 1024 * 1024) {
+                                                            install = InstallUi.Failed(
+                                                                context.getString(R.string.update_error_low_storage)
+                                                            )
+                                                        } else {
+                                                            install = InstallUi.Downloading(0L, -1L)
+                                                            scope.launch {
+                                                                try {
+                                                                    val file = UpdateInstaller.download(
+                                                                        context = context,
+                                                                        url = url,
+                                                                        destination = UpdateInstaller.apkFile(
+                                                                            context,
+                                                                            s.config.appLatestVersion
+                                                                        ),
+                                                                        expectedSha256 = s.config.apkSha256
+                                                                    ) { written, total ->
+                                                                        install = InstallUi.Downloading(written, total)
+                                                                    }
+                                                                    install = InstallUi.Ready(file)
+                                                                } catch (e: Exception) {
+                                                                    install = InstallUi.Failed(
+                                                                        e.message
+                                                                            ?: e.javaClass.simpleName
+                                                                    )
                                                                 }
-                                                                install = InstallUi.Ready(file)
-                                                            } catch (e: Exception) {
-                                                                install = InstallUi.Failed(
-                                                                    e.message
-                                                                        ?: e.javaClass.simpleName
-                                                                )
                                                             }
                                                         }
                                                     }
@@ -1019,7 +1029,8 @@ fun VersionInfoCard(
                 version,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                maxLines = 1
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Text(
                 stringResource(R.string.update_label_code, code),

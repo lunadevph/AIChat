@@ -51,7 +51,7 @@ object KeyStoreHelper {
             ENCRYPTED_PREFIX + Base64.encodeToString(combined, Base64.NO_WRAP)
         } catch (e: Exception) {
             android.util.Log.e("KeyStoreHelper", "Encryption error", e)
-            plainText
+            null
         }
     }
 

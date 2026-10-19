@@ -27,7 +27,7 @@ import java.util.Locale
 import java.util.UUID
 
 enum class LoadingStatus {
-    IDLE, THINKING, SEARCHING, CREATING_IMAGE, STREAMING, RATE_LIMITED
+    IDLE, THINKING, SEARCHING, STREAMING, RATE_LIMITED
 }
 
 /** How many tool rounds a single reply may trigger before the app stops looping. */
@@ -116,6 +116,8 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         settingsManager.currentConversationId = full.id
         messages.clear()
         messages.addAll(full.messages)
+        // An image picked for one chat must not leak into another.
+        selectedImageUri = null
     }
 
     fun createNewConversation() {
@@ -126,6 +128,10 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
     }
 
     fun deleteConversation(conversation: Conversation) {
+        val full = conversationStore.loadConversation(conversation.id)
+        full?.messages?.forEach { msg ->
+            msg.localImageUrl?.let { path -> File(path).takeIf { it.exists() }?.delete() }
+        }
         conversations.remove(conversation)
         conversationStore.deleteConversation(conversation.id)
         if (currentConversation?.id == conversation.id) {
@@ -146,9 +152,8 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             val fetched = try {
                 val response = if (!apiKey.isNullOrBlank()) {
                     if (Providers.isAnthropic(provider)) {
-                        getApi().getModels(
+                        getAnthropicApi().getModels(
                             url = Providers.modelsUrl(provider, custom),
-                            authorization = null,
                             xApiKey = apiKey,
                             anthropicVersion = Providers.ANTHROPIC_VERSION
                         )
@@ -185,9 +190,11 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             // provider's, so keep it instead of downgrading to the built-in list.
 
             if (modelsProvider == provider &&
+                availableModels.isNotEmpty() &&
                 availableModels.none { it.id == settingsManager.selectedModel }
             ) {
-                settingsManager.selectedModel = Providers.defaultModel(provider, custom)
+                val dm = Providers.defaultModel(provider, custom)
+                if (dm.isNotBlank()) settingsManager.selectedModel = dm
             }
         }
     }
@@ -198,6 +205,20 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
 
         val imageUri = selectedImageUri
         val localPath = imageUri?.let { saveImageLocally(activityContext, it) }
+        // If the user attached an image but it could not be read, say so instead
+        // of silently dropping it — otherwise the reply answers a different question.
+        if (imageUri != null && localPath == null) {
+            messages.add(
+                Message(
+                    role = "assistant",
+                    content = context.getString(R.string.err_image_attach),
+                    isError = true
+                )
+            )
+            updateCurrentConversation()
+            selectedImageUri = null
+            return
+        }
 
         val userMessage = Message(
             role = "user",
@@ -233,23 +254,22 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         if (apiKey.isNullOrBlank()) {
             // Surface the problem instead of silently doing nothing when the
             // selected provider has no usable key.
-            messages.add(Message(role = "assistant", content = context.getString(R.string.err_unauthorized)))
+            messages.add(Message(role = "assistant", content = context.getString(R.string.err_unauthorized), isError = true))
             updateCurrentConversation()
             return
         }
 
         currentJob = viewModelScope.launch {
             val webSearchOn = settingsManager.webSearchEnabled
-            val isImageQuery = prompt.contains("image", ignoreCase = true) ||
-                    prompt.contains("photo", ignoreCase = true) ||
-                    prompt.contains("picture", ignoreCase = true) ||
-                    prompt.contains("show me", ignoreCase = true) ||
-                    prompt.contains("wallpaper", ignoreCase = true) ||
-                    prompt.contains("pic", ignoreCase = true)
+            // Only fire the automatic image search for a prompt that clearly asks
+            // for a picture, so ordinary text questions do not pay for it.
+            val isImageQuery = Regex(
+                """\b(image|picture|photo|wallpaper)s?\b""",
+                RegexOption.IGNORE_CASE
+            ).containsMatchIn(prompt)
 
             loadingStatus = when {
                 webSearchOn || isImageQuery -> LoadingStatus.SEARCHING
-                prompt.contains("create", ignoreCase = true) && prompt.contains("image", ignoreCase = true) -> LoadingStatus.CREATING_IMAGE
                 else -> LoadingStatus.THINKING
             }
 
@@ -271,7 +291,11 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
 
                 for (step in 0 until maxSteps) {
                     val turn = try {
-                        requestTurn(apiKey, searchGrounding, toolResults, correction)
+                        if (Providers.isAnthropic(settingsManager.selectedProvider)) {
+                            requestAnthropicTurn(apiKey, searchGrounding, toolResults, correction)
+                        } else {
+                            requestTurn(apiKey, searchGrounding, toolResults, correction)
+                        }
                     } catch (e: kotlinx.coroutines.CancellationException) {
                         throw e
                     } catch (e: Exception) {
@@ -431,7 +455,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         val request = ChatRequest(
             model = settingsManager.selectedModel,
             messages = buildApiMessages(searchGrounding, toolResults, correction),
-            tools = if (webSearchOn && (settingsManager.selectedProvider == "OpenAI" || settingsManager.selectedProvider == "Claude")) {
+            tools = if (webSearchOn && settingsManager.selectedProvider == "OpenAI") {
                 buildWebSearchTools(settingsManager.selectedProvider)
             } else null,
             stream = if (settingsManager.streamingEnabled) true else null,
@@ -456,6 +480,189 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             }
         }
     }
+
+    // ---------------------------------------------------------------------
+    // Anthropic (Claude) path. Claude is the one provider that is not
+    // OpenAI-shaped: it speaks the Messages API at /v1/messages, with a
+    // separate `system` field and content blocks instead of a `content` string.
+    // The app's in-band tool tags still work, so no native tool support is
+    // needed here — only text and images in, text out.
+    // ---------------------------------------------------------------------
+
+    private suspend fun requestAnthropicTurn(
+        apiKey: String,
+        searchGrounding: String?,
+        toolResults: String?,
+        correction: String?
+    ): Turn? {
+        lastErrorBody = null
+        val isReasoning = isReasoningModel(settingsManager.selectedModel)
+        val apiMessages = buildApiMessages(searchGrounding, toolResults, correction)
+        val (system, messages) = buildAnthropicMessages(apiMessages)
+
+        val request = AnthropicRequest(
+            model = settingsManager.selectedModel,
+            messages = messages,
+            system = system,
+            maxTokens = settingsManager.maxTokens.coerceAtLeast(1),
+            stream = if (settingsManager.streamingEnabled) true else null,
+            temperature = if (isReasoning) null else settingsManager.temperature.toDouble(),
+            topP = if (isReasoning) null else settingsManager.topP.toDouble()
+        )
+
+        return retryingOnRateLimit {
+            val api = getAnthropicApi()
+            if (settingsManager.streamingEnabled) {
+                anthropicStreamResponse(api, apiKey, request)
+            } else {
+                anthropicNonStreamResponse(api, apiKey, request)
+            }
+        }
+    }
+
+    private fun buildAnthropicMessages(apiMessages: List<ApiMessage>): Pair<String?, List<AnthropicMessage>> {
+        val systemParts = mutableListOf<String>()
+        val messages = mutableListOf<AnthropicMessage>()
+        for (am in apiMessages) {
+            if (am.role == "system") {
+                val text = when (val c = am.content) {
+                    is String -> c
+                    is List<*> -> c.filterIsInstance<ContentPart>().joinToString("\n") { it.text.orEmpty() }
+                    else -> c.toString()
+                }
+                if (text.isNotBlank()) systemParts.add(text)
+                continue
+            }
+            val blocks = when (val c = am.content) {
+                is String -> listOf(AnthropicContentBlock(type = "text", text = c))
+                is List<*> -> c.filterIsInstance<ContentPart>().mapNotNull { part ->
+                    when (part.type) {
+                        "text" -> AnthropicContentBlock(type = "text", text = part.text)
+                        "image_url" -> {
+                            val url = part.imageUrl?.url ?: return@mapNotNull null
+                            val m = Regex("^data:([^;]+);base64,(.+)$", RegexOption.DOT_MATCHES_ALL).find(url)
+                            val mediaType = m?.groupValues?.get(1) ?: "image/jpeg"
+                            val data = m?.groupValues?.get(2) ?: url
+                            AnthropicContentBlock(
+                                type = "image",
+                                source = AnthropicImageSource(mediaType = mediaType, data = data)
+                            )
+                        }
+                        else -> null
+                    }
+                }
+                else -> listOf(AnthropicContentBlock(type = "text", text = c.toString()))
+            }
+            if (blocks.isNotEmpty()) {
+                messages.add(AnthropicMessage(role = am.role, content = blocks))
+            }
+        }
+        return systemParts.joinToString("\n\n").takeIf { it.isNotBlank() } to messages
+    }
+
+    private suspend fun anthropicNonStreamResponse(
+        api: AnthropicApi,
+        apiKey: String,
+        request: AnthropicRequest
+    ): Turn? {
+        val response = api.getMessages(
+            xApiKey = apiKey,
+            anthropicVersion = Providers.ANTHROPIC_VERSION,
+            request = request
+        )
+        val raw = response.text
+        val reasoning = response.thinking
+        messages.add(
+            Message(
+                role = "assistant",
+                content = visibleText(raw, streaming = false),
+                reasoning = reasoning,
+                isStreaming = false
+            )
+        )
+        updateCurrentConversation()
+        return Turn(raw, messages.lastIndex, reasoning)
+    }
+
+    private suspend fun anthropicStreamResponse(
+        api: AnthropicApi,
+        apiKey: String,
+        request: AnthropicRequest
+    ): Turn? {
+        val body = api.getMessagesStream(
+            xApiKey = apiKey,
+            anthropicVersion = Providers.ANTHROPIC_VERSION,
+            request = request
+        )
+        val streamingMessage = Message(role = "assistant", content = "", isStreaming = true)
+        messages.add(streamingMessage)
+        val msgIndex = messages.lastIndex
+        loadingStatus = LoadingStatus.STREAMING
+
+        val contentBuilder = StringBuilder()
+        val thinkingBuilder = StringBuilder()
+        var lastUiUpdateTime = 0L
+
+        withContext(Dispatchers.IO) {
+            body.use { responseBody ->
+                val reader = BufferedReader(InputStreamReader(responseBody.byteStream(), Charsets.UTF_8))
+                var line: String?
+                while (reader.readLine().also { line = it } != null) {
+                    ensureActive()
+                    val trimmed = line!!.trim()
+                    if (trimmed.isEmpty() || trimmed.startsWith(":")) continue
+                    if (!trimmed.startsWith("data:")) continue
+                    val data = trimmed.removePrefix("data:").trim()
+                    if (data == "[DONE]") break
+                    try {
+                        val event = gson.fromJson(data, AnthropicStreamEvent::class.java) ?: continue
+                        when (event.type) {
+                            "content_block_delta" -> {
+                                val delta = event.delta
+                                when (delta?.type) {
+                                    "text_delta" -> delta.text?.let { contentBuilder.append(it) }
+                                    "thinking_delta" -> delta.thinking?.let { thinkingBuilder.append(it) }
+                                    else -> {}
+                                }
+                            }
+                        }
+                        val now = System.currentTimeMillis()
+                        if (now - lastUiUpdateTime >= 35) {
+                            lastUiUpdateTime = now
+                            val currentContent = contentBuilder.toString()
+                            val currentReasoning = thinkingBuilder.toString().takeIf { it.isNotBlank() }
+                            withContext(Dispatchers.Main) {
+                                if (msgIndex in messages.indices) {
+                                    messages[msgIndex] = messages[msgIndex].copy(
+                                        content = visibleText(currentContent, streaming = true),
+                                        reasoning = currentReasoning,
+                                        isStreaming = true
+                                    )
+                                }
+                            }
+                        }
+                    } catch (_: Exception) {
+                        // Skip malformed chunks.
+                    }
+                }
+            }
+        }
+
+        val raw = contentBuilder.toString()
+        val reasoning = thinkingBuilder.toString().takeIf { it.isNotBlank() }
+        withContext(Dispatchers.Main) {
+            if (msgIndex in messages.indices) {
+                messages[msgIndex] = messages[msgIndex].copy(
+                    content = visibleText(raw, streaming = false),
+                    reasoning = reasoning,
+                    isStreaming = false
+                )
+            }
+        }
+        return Turn(raw, msgIndex, reasoning)
+    }
+
+    private fun getAnthropicApi(): AnthropicApi = Providers.anthropicApi()
 
     /**
      * Runs [block], and when the provider answers 429 waits and tries again instead
@@ -867,6 +1074,9 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
     }
 
     fun clearHistory() {
+        messages.forEach { msg ->
+            msg.localImageUrl?.let { path -> File(path).takeIf { it.exists() }?.delete() }
+        }
         messages.clear()
         updateCurrentConversation()
     }
@@ -886,9 +1096,9 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
     private fun showReplyError(errorMsg: String) {
         val streamIdx = messages.indexOfLast { it.isStreaming }
         if (streamIdx != -1) {
-            messages[streamIdx] = Message(role = "assistant", content = errorMsg, isStreaming = false)
+            messages[streamIdx] = Message(role = "assistant", content = errorMsg, isStreaming = false, isError = true)
         } else {
-            messages.add(Message(role = "assistant", content = errorMsg))
+            messages.add(Message(role = "assistant", content = errorMsg, isError = true))
         }
         updateCurrentConversation()
     }

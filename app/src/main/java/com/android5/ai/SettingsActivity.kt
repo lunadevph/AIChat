@@ -557,9 +557,13 @@ fun ApiKeyManagerSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) 
                                             when (val result = Providers.validateKey(info.name, providerKey.trim(), customProviders)) {
                                                 is Providers.KeyValidation.Valid -> {
                                                     isValidating = false
-                                                    settingsManager.setApiKey(info.name, providerKey.trim())
-                                                    statusMessage = context.getString(R.string.msg_key_saved)
-                                                    isError = false
+                                                    if (!settingsManager.setApiKey(info.name, providerKey.trim())) {
+                                                        statusMessage = context.getString(R.string.err_key_storage)
+                                                        isError = true
+                                                    } else {
+                                                        statusMessage = context.getString(R.string.msg_key_saved)
+                                                        isError = false
+                                                    }
                                                 }
                                                 is Providers.KeyValidation.InvalidKey -> {
                                                     isValidating = false
@@ -615,7 +619,7 @@ fun ApiKeyManagerSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) 
                                             isError = false
                                         },
                                         shapes = ExpressiveIconButtonShapes,
-                                        modifier = Modifier.size(44.dp)
+                                        modifier = Modifier.size(48.dp)
                                     ) {
                                         Icon(Icons.Rounded.DeleteOutline, stringResource(R.string.btn_clear_key), Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
                                     }
@@ -637,9 +641,14 @@ fun ApiKeyManagerSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) 
                                             if (expandedProvider == info.name) expandedProvider = null
                                             customVersion++
                                             statusMessage = null
+                                            android.widget.Toast.makeText(
+                                                context,
+                                                context.getString(R.string.custom_provider_deleted, info.name),
+                                                android.widget.Toast.LENGTH_SHORT
+                                            ).show()
                                         },
                                         shapes = ExpressiveIconButtonShapes,
-                                        modifier = Modifier.size(44.dp)
+                                        modifier = Modifier.size(48.dp)
                                     ) {
                                         Icon(
                                             Icons.Rounded.DeleteForever,
@@ -679,6 +688,11 @@ fun ApiKeyManagerSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) 
                     onSaved = { name ->
                         customVersion++
                         expandedProvider = name
+                        android.widget.Toast.makeText(
+                            context,
+                            context.getString(R.string.custom_provider_saved, name),
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
                     }
                 )
             }
@@ -705,7 +719,7 @@ fun SettingsSwitchRow(
         tonalElevation = 1.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .semantics {
+            .semantics(mergeDescendants = true) {
                 this.role = Role.Switch
                 this.stateDescription = if (checked) onLabel else offLabel
             }
@@ -846,7 +860,7 @@ private fun StorageAccessRow() {
         tonalElevation = 1.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .semantics {
+            .semantics(mergeDescendants = true) {
                 this.role = Role.Switch
                 this.stateDescription = if (granted) onLabel else offLabel
             }

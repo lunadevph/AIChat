@@ -14,7 +14,7 @@ A native Android client for chatting with large language models. Bring your own 
 - **Retries instead of errors.** A rate-limited request (HTTP 429) is held and retried with a doubling backoff, honouring the provider's Retry-After, with the countdown shown in the transcript.
 - **Web search.** Optional per-request toggle for up-to-date answers.
 - **Tool calls.** The assistant works on the device with tags such as `<read path="notes.md"/>`, `<write>`, `<edit>`, `<replace>` (regex), `<append>`, `<list>`, `<search>`, `<find>`, `<stat>`, `<tail>`, `<mkdir>`, `<move>`, `<copy>`, `<delete>`, `<download url="…"/>`, `<fetch url="…"/>`, `<upload path="…"/>`, `<open>`, `<storage/>`, `<memory>`, `<compact/>`, `<websearch>` and `<time/>`. Runs are shown in the transcript and can be switched off in settings. Models are told to write these tags as plain text; if one uses its provider's native function-calling format instead — which some providers reject outright and others answer with a blank reply — the app detects it and asks once more with that spelled out.
-- **Device storage.** Once you grant the storage permission in Settings → AI settings → Device storage, the assistant can read, search, write, move, copy and delete in your shared folders (`/storage/emulated/0/…`) with the same absolute paths, not just copy files into its private workspace.
+- **Device storage.** Once you grant "All files access" in Settings → AI settings → Device storage, the assistant can read, search, write, move, copy and delete anywhere under `/storage/emulated/0/…` with absolute paths — the entire shared storage, not just Downloads, Documents and pictures. The app works fully without it; the tools stay in their private workspace.
 - **Tool file history.** Everything the assistant writes in its workspace is listed in its own screen — size, age, a preview, per-file delete and clear-all — and each reply links to the files it touched.
 - **Memory.** Custom instructions, long-term user memory, and AI self-managed memory.
 - **Model parameters.** Temperature, top-P, max tokens, frequency penalty, and presence penalty, with reset-to-defaults.
@@ -87,6 +87,7 @@ Publishing tasks read a token from `github_token.txt` in the project root, or fr
 | Claude | `claude-opus-4-1-20250805` | Anthropic direct, uses `x-api-key` |
 | Mistral | `mistral-large-latest` | Large, Medium, Small, Codestral, Devstral |
 | Grok | `grok-4.6` | xAI 4.x family |
+| NVIDIA | `nvidia/llama-3.3-nemotron-super-49b-v1.5` | NIM-hosted Nemotron and open models |
 
 Model IDs and default selections are defined in `app/src/main/java/com/android5/ai/Providers.kt`. Provider-specific quirks — Claude's separate auth header and version header, the different timeout profile for key validation versus chat — are handled there too.
 

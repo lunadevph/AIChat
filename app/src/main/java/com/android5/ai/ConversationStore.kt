@@ -87,10 +87,10 @@ class ConversationStore(context: Context) {
                 "CREATE TABLE IF NOT EXISTS messages (" +
                     "id TEXT PRIMARY KEY, role TEXT NOT NULL, content TEXT NOT NULL, " +
                     "reasoning TEXT, local_image_url TEXT, is_streaming INTEGER NOT NULL DEFAULT 0, " +
-                    "timestamp INTEGER NOT NULL)"
+                    "is_error INTEGER NOT NULL DEFAULT 0, tools TEXT, timestamp INTEGER NOT NULL)"
             )
             val cursor = db.rawQuery(
-                "SELECT id, role, content, reasoning, local_image_url, is_streaming, timestamp " +
+                "SELECT id, role, content, reasoning, local_image_url, is_streaming, is_error, tools, timestamp " +
                     "FROM messages ORDER BY timestamp ASC",
                 null
             )
@@ -101,8 +101,19 @@ class ConversationStore(context: Context) {
                 val reasoningIdx = it.getColumnIndexOrThrow("reasoning")
                 val imageIdx = it.getColumnIndexOrThrow("local_image_url")
                 val streamingIdx = it.getColumnIndexOrThrow("is_streaming")
+                val errorIdx = it.getColumnIndexOrThrow("is_error")
+                val toolsIdx = it.getColumnIndexOrThrow("tools")
                 val tsIdx = it.getColumnIndexOrThrow("timestamp")
                 while (it.moveToNext()) {
+                    val toolsJson = it.getString(toolsIdx)?.takeIf { v -> !v.isBlank() && v != "null" }
+                    val tools = if (toolsJson != null) {
+                        try {
+                            val type = object : com.google.gson.reflect.TypeToken<List<ToolRun>>() {}.type
+                            gson.fromJson<List<ToolRun>>(toolsJson, type)
+                        } catch (_: Exception) {
+                            null
+                        }
+                    } else null
                     messages.add(
                         Message(
                             id = it.getString(idIdx),
@@ -110,7 +121,10 @@ class ConversationStore(context: Context) {
                             content = it.getString(contentIdx),
                             reasoning = it.getString(reasoningIdx)?.takeIf { r -> !r.isBlank() && r != "null" },
                             localImageUrl = it.getString(imageIdx)?.takeIf { v -> !v.isBlank() && v != "null" },
-                            isStreaming = it.getInt(streamingIdx) == 1,
+                            // A saved conversation never has a reply still arriving.
+                            isStreaming = false,
+                            isError = it.getInt(errorIdx) == 1,
+                            tools = tools,
                             timestamp = it.getLong(tsIdx)
                         )
                     )
@@ -147,15 +161,15 @@ class ConversationStore(context: Context) {
                 "CREATE TABLE IF NOT EXISTS messages (" +
                     "id TEXT PRIMARY KEY, role TEXT NOT NULL, content TEXT NOT NULL, " +
                     "reasoning TEXT, local_image_url TEXT, is_streaming INTEGER NOT NULL DEFAULT 0, " +
-                    "timestamp INTEGER NOT NULL)"
+                    "is_error INTEGER NOT NULL DEFAULT 0, tools TEXT, timestamp INTEGER NOT NULL)"
             )
             db.execSQL("DELETE FROM messages")
             db.beginTransaction()
             try {
                 conversation.messages.forEach { msg ->
                     db.execSQL(
-                        "INSERT INTO messages (id, role, content, reasoning, local_image_url, is_streaming, timestamp) " +
-                            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        "INSERT INTO messages (id, role, content, reasoning, local_image_url, is_streaming, is_error, tools, timestamp) " +
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         arrayOf<Any?>(
                             msg.id,
                             msg.role,
@@ -163,6 +177,8 @@ class ConversationStore(context: Context) {
                             msg.reasoning,
                             msg.localImageUrl,
                             if (msg.isStreaming) 1 else 0,
+                            if (msg.isError) 1 else 0,
+                            if (msg.tools != null) gson.toJson(msg.tools) else null,
                             msg.timestamp
                         )
                     )

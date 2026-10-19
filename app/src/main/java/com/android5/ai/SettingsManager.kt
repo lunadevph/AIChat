@@ -55,13 +55,17 @@ class SettingsManager(context: Context) {
         return null
     }
 
-    fun setApiKey(provider: String, key: String?) {
+    fun setApiKey(provider: String, key: String?): Boolean {
         val edit = _prefs!!.edit()
         val keyName = "api_key_${provider.lowercase()}"
         if (key.isNullOrBlank()) {
             edit.remove(keyName)
         } else {
             val encrypted = KeyStoreHelper.encrypt(key.trim())
+            if (encrypted.isNullOrBlank()) {
+                // Encryption failed: do not store the key in plaintext.
+                return false
+            }
             edit.putString(keyName, encrypted)
         }
         if (provider.equals(selectedProvider, ignoreCase = true)) {
@@ -69,10 +73,14 @@ class SettingsManager(context: Context) {
                 edit.remove("api_key")
             } else {
                 val encrypted = KeyStoreHelper.encrypt(key.trim())
+                if (encrypted.isNullOrBlank()) {
+                    return false
+                }
                 edit.putString("api_key", encrypted)
             }
         }
         edit.apply()
+        return true
     }
 
     fun hasApiKey(provider: String): Boolean = !getApiKey(provider).isNullOrBlank()
@@ -102,7 +110,7 @@ class SettingsManager(context: Context) {
 
     var apiKey: String?
         get() = getApiKey(selectedProvider)
-        set(value) = setApiKey(selectedProvider, value)
+        set(value) { setApiKey(selectedProvider, value) }
 
     var selectedModel: String
         get() = _prefs!!.getString("selected_model", "google/gemini-2.0-flash-lite-preview-02-05:free") ?: "google/gemini-2.0-flash-lite-preview-02-05:free"
@@ -233,20 +241,6 @@ class SettingsManager(context: Context) {
         get() = _prefs!!.getString("current_conv_id", null)
         set(value) = _prefs!!.edit().putString("current_conv_id", value).apply()
 
-    var conversations: List<Conversation>
-        get() {
-            val json = _prefs!!.getString("conversations_list", null) ?: return emptyList()
-            val type = object : TypeToken<List<Conversation>>() {}.type
-            return try {
-                _gson!!.fromJson<List<Conversation>>(json, type) ?: emptyList()
-            } catch (e: Exception) {
-                emptyList()
-            }
-        }
-        set(value) {
-            val json = _gson!!.toJson(value)
-            _prefs!!.edit().putString("conversations_list", json).apply()
-        }
 
     val isSetupComplete: Boolean
         get() = !apiKey.isNullOrBlank() ||

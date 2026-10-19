@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -234,13 +235,15 @@ fun ModelPickerSheet(
                                 fontWeight = FontWeight.SemiBold
                             )
                         },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Rounded.Visibility,
-                                contentDescription = null,
-                                Modifier.size(16.dp)
-                            )
-                        },
+                        leadingIcon = if (visionOnly) {
+                            {
+                                Icon(
+                                    Icons.Rounded.Visibility,
+                                    contentDescription = null,
+                                    Modifier.size(16.dp)
+                                )
+                            }
+                        } else null,
                         shape = RoundedCornerShape(12.dp)
                     )
 
@@ -261,16 +264,25 @@ fun ModelPickerSheet(
             Spacer(Modifier.height(8.dp))
 
             if (filteredModels.isEmpty()) {
-                Box(
+                Column(
                     Modifier
                         .fillMaxWidth()
-                        .height(120.dp),
-                    contentAlignment = Alignment.Center
+                        .height(160.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
+                    Icon(
+                        Icons.Rounded.SearchOff,
+                        contentDescription = null,
+                        modifier = Modifier.size(40.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                    Spacer(Modifier.height(10.dp))
                     Text(
                         stringResource(R.string.empty_models_found),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center
                     )
                 }
             } else {

@@ -104,7 +104,12 @@ data class Message(
      * versions (which have no such field) still deserialize cleanly.
      */
     val tools: List<ToolRun>? = null,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    /**
+     * True when this message is an error reported by the app rather than a
+     * reply from the model. Errors are styled differently in the transcript.
+     */
+    val isError: Boolean = false
 )
 
 data class Conversation(
@@ -135,6 +140,73 @@ data class AssistantMessage(
 
 data class ModelResponse(
     val data: List<ModelInfo>
+)
+
+// ---------------------------------------------------------------------
+// Anthropic Messages API. Claude is the one provider that is not
+// OpenAI-shaped, so it has its own request/response models and its own
+// endpoint (/v1/messages) rather than /v1/chat/completions.
+// ---------------------------------------------------------------------
+
+data class AnthropicRequest(
+    val model: String,
+    val messages: List<AnthropicMessage>,
+    val system: String? = null,
+    @SerializedName("max_tokens") val maxTokens: Int = 4096,
+    val stream: Boolean? = null,
+    val temperature: Double? = null,
+    @SerializedName("top_p") val topP: Double? = null
+)
+
+data class AnthropicMessage(
+    val role: String,
+    val content: List<AnthropicContentBlock>
+)
+
+data class AnthropicContentBlock(
+    val type: String = "text",
+    val text: String? = null,
+    val thinking: String? = null,
+    val source: AnthropicImageSource? = null
+)
+
+data class AnthropicImageSource(
+    val type: String = "base64",
+    @SerializedName("media_type") val mediaType: String,
+    val data: String
+)
+
+data class AnthropicResponse(
+    val id: String? = null,
+    val type: String? = null,
+    val role: String? = null,
+    val content: List<AnthropicContentBlock>? = null,
+    @SerializedName("stop_reason") val stopReason: String? = null
+) {
+    /** The reply's text, from whichever content blocks carried it. */
+    val text: String
+        get() = content?.filter { it.type == "text" }
+            ?.joinToString("") { it.text.orEmpty() }
+            .orEmpty()
+
+    /** The reply's thinking, if the model produced any extended-thinking blocks. */
+    val thinking: String?
+        get() = content?.filter { it.type == "thinking" }
+            ?.joinToString("") { it.thinking.orEmpty() }
+            ?.takeIf { it.isNotBlank() }
+}
+
+data class AnthropicStreamEvent(
+    val type: String? = null,
+    val index: Int? = null,
+    val delta: AnthropicDelta? = null,
+    val message: AnthropicResponse? = null
+)
+
+data class AnthropicDelta(
+    val type: String? = null,
+    val text: String? = null,
+    val thinking: String? = null
 )
 
 data class ModelInfo(
@@ -192,7 +264,7 @@ data class ModelInfo(
                 "llava", "qwen-vl", "qwen2-vl", "qwen2.5-vl",
                 "llama-3.2-11b-vision", "llama-3.2-90b-vision", "llama-4",
                 "minicpm-v", "internvl", "cogvlm", "florence", "phi-3-vision", "phi-3.5-vision",
-                "deepseek-v4-flash-vision", "nemotron"
+                "deepseek-v4-flash-vision"
             )
 
             return visionKeywords.any {

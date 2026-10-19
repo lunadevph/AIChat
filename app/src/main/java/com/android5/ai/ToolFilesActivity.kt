@@ -368,7 +368,7 @@ private fun ToolFileRow(
 
             IconButton(
                 onClick = onDelete,
-                modifier = Modifier.size(44.dp),
+                modifier = Modifier.size(48.dp),
                 shapes = ExpressiveIconButtonShapes
             ) {
                 Icon(
