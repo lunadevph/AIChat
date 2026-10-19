@@ -499,10 +499,25 @@ tasks.register("uploadGithubRelease") {
 
 // Convenience: build, push mirror, and create GitHub release in one go
 // Usage: gradlew uploadRelease [-PnoBump]
+tasks.register("checkChangelog") {
+    description = "Fails the build if app/changelog.txt is empty or has no bullets"
+    group = "verification"
+    doLast {
+        val f = file("changelog.txt")
+        if (!f.exists()) throw GradleException("app/changelog.txt is missing — update the release notes first.")
+        val text = f.readText().trim()
+        if (text.isEmpty()) throw GradleException("app/changelog.txt is empty — update the release notes first.")
+        if (!text.lines().any { it.trim().startsWith("- ") }) {
+            throw GradleException("app/changelog.txt has no '- ' bullets — update the release notes first.")
+        }
+        println("checkChangelog: OK (${text.lines().count { it.trim().startsWith(\"- \") }} bullets)")
+    }
+}
+
 tasks.register("uploadRelease") {
     description = "Builds release APK, updates mirror, and creates a GitHub Release"
     group = "publishing"
-    dependsOn("assembleRelease")
+    dependsOn("checkChangelog", "assembleRelease")
     finalizedBy("uploadGithubRelease")
 }
 

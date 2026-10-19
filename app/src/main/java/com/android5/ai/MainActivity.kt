@@ -176,16 +176,24 @@ fun ChatScreen(
         viewModel.selectedImageUri = uri
     }
 
-    // One effect keeps the view pinned to the newest message: instantly while a
-    // reply streams in, and with an animation once it lands. Two separate effects
-    // used to fire together on every new message and cancel each other's scroll.
+    // Auto-scroll to the newest message, but only when the user is already
+    // looking at the bottom. While a reply streams in this fires on every token,
+    // so without the guard the list would be yanked to the bottom on each one
+    // and the user could never scroll up to read earlier messages.
     val lastMessage = viewModel.messages.lastOrNull()
+    val atBottom by remember {
+        derivedStateOf {
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
+            lastVisible == null || lastVisible >= viewModel.messages.size - 2
+        }
+    }
     LaunchedEffect(
         viewModel.messages.size,
         lastMessage?.content,
         lastMessage?.isStreaming
     ) {
         if (viewModel.messages.isEmpty()) return@LaunchedEffect
+        if (!atBottom || listState.isScrollInProgress) return@LaunchedEffect
         val lastIndex = viewModel.messages.lastIndex
         if (lastMessage?.isStreaming == true) {
             listState.scrollToItem(lastIndex)

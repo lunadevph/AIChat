@@ -1,11 +1,2 @@
-- Diagnostics screen (Settings → Diagnostics): build status (official/unofficial based on the signing key), version and build date, provider/model/key/storage/conversation details, the bundled release notes, and a "Copy diagnostics" button.
-- Release notes are now bundled into the app and viewable offline, both in Diagnostics and on the About sheet.
-- Import/export backup: a portable, encrypted `.ai` file (AES/GCM, key derived from the app's signing certificate) covering conversations, settings and API keys. Export and import live in Diagnostics; setup offers "Restore from backup" for recovery.
-- Build status: an official build is signed with the LunaDevPH key; debug builds are accepted as official automatically.
-- Provider switching moved into the model picker: a provider chip row at the top re-fetches the catalog without a trip to Settings.
-- Empty-state suggestion cards now send the prompt instead of only filling the input box.
-- Switching appearance recreates the activity so the AppCompat window theme (status bar, window background) follows the new mode.
-- About sheet gains GitHub and "Report issue" links.
-- Every app launch checks the update mirror in the background (throttled to once per 30 minutes) and posts a notification plus an in-app banner when a newer build exists.
-- Restore from backup is available during setup.
-- Download URLs are cache-busted (`?v=<code>`) so a stale CDN copy of the APK is never served.
+- While a reply streams in, you can now scroll up to read earlier messages; the view no longer yanks itself to the bottom on every token.
+- A mechanical guard now fails the release build if `app/changelog.txt` is empty or has no bullets, so stale release notes can no longer ship.

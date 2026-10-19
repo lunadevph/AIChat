@@ -2,24 +2,27 @@
 
 Guidance for AI coding agents (and humans) working in this repository.
 
-## Always update the release notes
+## ⚠️ ALWAYS UPDATE THE RELEASE NOTES FIRST — MANDATORY ⚠️
 
-**Every release must ship with updated release notes.** `app/changelog.txt` is the
+**Every release MUST ship with updated release notes.** `app/changelog.txt` is the
 single source of truth for them:
 
 - `uploadGithubRelease` uses its contents as the GitHub Release body.
 - `UpdateMirrors` embeds it into `mirror.json` (`changelog` field) for the in-app updater.
 
-So, before running any release/publish task (`bumpVersion`, `assembleRelease`,
-`uploadRelease`, `uploadGithubRelease`, `UpdateMirrors`):
+**DO NOT run any release/publish task until the changelog is updated.** This has
+been forgotten multiple times. It is not optional. Before running ANY of
+`bumpVersion`, `assembleRelease`, `uploadRelease`, `uploadGithubRelease`,
+`UpdateMirrors`:
 
-1. Update `app/changelog.txt` to describe the changes in this release.
+1. **FIRST**, update `app/changelog.txt` to describe the changes in THIS release.
 2. Write it as one bullet per user-visible change, each line starting with `- `.
    Keep it plain language and end the file with a single trailing newline.
 3. Do not release with an empty, stale, or copied-over changelog. If the release
    contains no user-visible changes, say so explicitly in a bullet.
 4. Commit the changelog together with the version bump.
 
+**Failure to do this produces stale release notes in the app and on GitHub.**
 Keep it user-facing: describe what changed for the person using the app, not the
 internal implementation. Do not add a version header inside the file — the version
 comes from `app/version.properties`.
