@@ -285,11 +285,13 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
 
                 // A reply can ask for tools; when it does, the results are fed back
                 // and the request runs again, up to MAX_TOOL_STEPS rounds.
-                var toolResults: String? = null
+                val allRuns = mutableListOf<AiTools.Run>()
                 val maxSteps = if (settingsManager.toolsEnabled) MAX_TOOL_STEPS else 1
                 var correction: String? = null
 
                 for (step in 0 until maxSteps) {
+                    val toolResults = if (allRuns.isEmpty()) null
+                    else AiTools.formatResults(allRuns)
                     val turn = try {
                         if (Providers.isAnthropic(settingsManager.selectedProvider)) {
                             requestAnthropicTurn(apiKey, searchGrounding, toolResults, correction)
@@ -312,7 +314,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                     val runs = finalizeTurn(turn)
                     if (runs.isEmpty() || step == maxSteps - 1) break
 
-                    toolResults = AiTools.formatResults(runs)
+                    allRuns.addAll(runs)
                     loadingStatus = LoadingStatus.THINKING
                 }
 
