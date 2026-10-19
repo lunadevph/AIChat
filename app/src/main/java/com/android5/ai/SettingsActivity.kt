@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -1533,6 +1534,33 @@ fun AboutAppSheet(onDismiss: () -> Unit) {
                     modifier = Modifier.padding(20.dp)
                 )
             }
+
+            Spacer(Modifier.height(6.dp))
+
+            val uriHandler = LocalUriHandler.current
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedButton(
+                    onClick = { uriHandler.openUri("https://github.com/lunadevph/AIChat") },
+                    shape = RoundedCornerShape(18.dp),
+                    modifier = Modifier.weight(1f).height(44.dp)
+                ) {
+                    Icon(Icons.Rounded.OpenInNew, contentDescription = null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("GitHub", style = MaterialTheme.typography.labelLarge)
+                }
+                OutlinedButton(
+                    onClick = { uriHandler.openUri("https://github.com/lunadevph/AIChat/issues/new") },
+                    shape = RoundedCornerShape(18.dp),
+                    modifier = Modifier.weight(1f).height(44.dp)
+                ) {
+                    Icon(Icons.Rounded.BugReport, contentDescription = null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Report", style = MaterialTheme.typography.labelLarge)
+                }
+            }
         }
     }
 }
@@ -1549,6 +1577,7 @@ fun AppearanceSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
         Triple("compact", stringResource(R.string.theme_compact), MaterialTheme.colorScheme.primary)
     )
     val current = settingsManager.themeMode
+    val activity = LocalContext.current as? android.app.Activity
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -1572,6 +1601,9 @@ fun AppearanceSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
                     onClick = {
                         settingsManager.themeMode = key
                         onDismiss()
+                        // The AppCompat window theme only applies at creation, so
+                        // recreate to pick up the new status bar / window background.
+                        activity?.recreate()
                     },
                     shape = RoundedCornerShape(22.dp),
                     color = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)

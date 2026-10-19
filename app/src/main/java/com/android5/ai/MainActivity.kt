@@ -990,7 +990,9 @@ fun ChatScreen(
                             suggestions.forEach { (title, prompt) ->
                                 Surface(
                                     onClick = {
-                                        inputText = prompt
+                                        // Send the starter prompt straight away instead of
+                                        // only filling the input box.
+                                        viewModel.sendMessage(prompt, context)
                                     },
                                     shape = RoundedCornerShape(16.dp),
                                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -1020,8 +1022,8 @@ fun ChatScreen(
                                         )
 
                                         Icon(
-                                            Icons.AutoMirrored.Rounded.ArrowForward,
-                                            contentDescription = null,
+                                            Icons.AutoMirrored.Rounded.Send,
+                                            contentDescription = stringResource(R.string.desc_send),
                                             Modifier.size(18.dp),
                                             tint = MaterialTheme.colorScheme.primary
                                         )
