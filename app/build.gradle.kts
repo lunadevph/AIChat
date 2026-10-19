@@ -510,7 +510,8 @@ tasks.register("checkChangelog") {
         if (!text.lines().any { it.trim().startsWith("- ") }) {
             throw GradleException("app/changelog.txt has no '- ' bullets — update the release notes first.")
         }
-        println("checkChangelog: OK (${text.lines().count { it.trim().startsWith(\"- \") }} bullets)")
+        val bulletCount = text.lines().count { it.trim().startsWith("- ") }
+        println("checkChangelog: OK ($bulletCount bullets)")
     }
 }
 
