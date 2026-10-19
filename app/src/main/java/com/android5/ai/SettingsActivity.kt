@@ -1509,7 +1509,9 @@ fun AboutAppSheet(onDismiss: () -> Unit) {
             Text(stringResource(R.string.about_build_date, BuildConfig.BUILD_DATE), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
             Spacer(Modifier.height(4.dp))
             Text(
-                if (AppSigning.isOfficial(ctx)) "Official build" else "Unofficial build",
+                if (AppSigning.isOfficial(ctx)) {
+                    if (BuildConfig.DEBUG) "Official build (debug)" else "Official build"
+                } else "Unofficial build",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 color = if (AppSigning.isOfficial(ctx)) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error

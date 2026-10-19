@@ -43,6 +43,9 @@ object AppSigning {
     }
 
     fun isOfficial(context: Context): Boolean {
+        // A debug build is always the developer's own build, even though it is
+        // signed with the debug keystore rather than the release key.
+        if (BuildConfig.DEBUG) return true
         val hash = signingCertSha256(context) ?: return false
         return hash.equals(OFFICIAL_CERT_SHA256, ignoreCase = true)
     }

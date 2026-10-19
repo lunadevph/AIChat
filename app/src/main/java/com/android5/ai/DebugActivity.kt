@@ -115,7 +115,9 @@ private fun DebugScreen(settingsManager: SettingsManager, onBack: () -> Unit) {
             ) {
                 Column(Modifier.padding(16.dp)) {
                     Text(
-                        if (official) "Official build" else "Unofficial build",
+                        if (official) {
+                            if (BuildConfig.DEBUG) "Official build (debug)" else "Official build"
+                        } else "Unofficial build",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = if (official) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onErrorContainer
