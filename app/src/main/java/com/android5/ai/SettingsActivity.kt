@@ -1495,6 +1495,7 @@ fun AboutAppSheet(onDismiss: () -> Unit) {
                 contentDescription = stringResource(R.string.app_name)
             )
             Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.about_creator), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             
             Surface(
                 shape = RoundedCornerShape(50),

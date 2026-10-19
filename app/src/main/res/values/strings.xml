@@ -155,6 +155,7 @@
     <string name="msg_key_cleared">API Key removed.</string>
 
     <string name="about_description">Experience high-performance AI with vision, memory, and multi-provider support.</string>
+    <string name="about_creator">Created by LunaDevPH</string>
     <string name="about_build_date">Build Date: %1$s</string>
 
     <!-- Error Messages -->

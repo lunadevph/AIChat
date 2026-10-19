@@ -378,6 +378,15 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             append(
                 "IMAGE DISPLAY CAPABILITY: You can display pictures and web images inline in your response by outputting Markdown image tags: `![Description](https://url/to/image.jpg)`. Use this whenever providing photos, pictures, diagrams, or visual examples."
             )
+            append("\n\n")
+            append(
+                "SHELL ACCESS: You have a working shell on the user's device via the <shell> tool. " +
+                    "Use it proactively whenever a task benefits from running a command — listing files, " +
+                    "checking versions, searching code, running scripts, inspecting the system, installing " +
+                    "packages, or any operation the file tools cannot do. Do not refuse or say you cannot " +
+                    "run commands: you can, through <shell>. Prefer <shell> over guessing, and report the " +
+                    "exit code and output to the user."
+            )
             if (toolsEnabled) {
                 append("\n\n").append(AiTools.describe(toolScope))
             } else {
