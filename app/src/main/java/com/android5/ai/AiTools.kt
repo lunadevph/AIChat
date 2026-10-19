@@ -80,7 +80,8 @@ object AiTools {
     val names = listOf(
         "read", "cat", "write", "append", "edit", "replace", "list", "search", "find",
         "stat", "tail", "delete", "mkdir", "move", "copy", "download", "fetch",
-        "upload", "open", "storage", "memory", "compact", "websearch", "time"
+        "upload", "open", "storage", "memory", "compact", "websearch", "time",
+        "shell", "exec"
     )
 
     /**
@@ -306,6 +307,8 @@ object AiTools {
             "fetch" -> fetch(call, scope)
             "upload" -> upload(call, scope)
             "open" -> open(call, scope)
+            "shell" -> shell(call, scope)
+            "exec" -> shell(call, scope).copy(name = "exec")
             "storage" -> storage(scope)
             "memory" -> memory(call, scope)
             "compact" -> compact(call, scope)
@@ -993,6 +996,89 @@ object AiTools {
         .replace(Regex("\n{3,}"), "\n\n")
         .trim()
 
+    /**
+     * A minimal shell: runs a single command through `/system/bin/sh` with the
+     * workspace as its working directory. stdout and stderr are merged and
+     * returned together, capped at [maxChars]. The command runs as the app
+     * itself, so it can only touch what the app can touch — the workspace and,
+     * with storage access, the shared folders. There is no root and no way out
+     * of the app's sandbox beyond that.
+     */
+    private suspend fun shell(call: Call, scope: Scope): Run {
+        val command = call.attrs["command"] ?: call.attrs["cmd"]
+            ?: call.body.trim().takeIf { it.isNotBlank() }
+            ?: return fail("shell", """Missing command. Use <shell>ls -la</shell> or <shell command="ls -la"/>.""")
+        if (command.length > 4_000) {
+            return fail("shell", "That command is too long (max 4000 characters).")
+        }
+
+        val timeoutSec = (call.attrs["timeout"]?.toIntOrNull() ?: 30).coerceIn(1, 60)
+        val cwd = when (val raw = call.attrs["cwd"] ?: call.attrs["dir"]) {
+            null -> scope.root
+            else -> scope.resolveTarget(raw) ?: return outside(scope, "shell", raw)
+        }
+        if (!cwd.isDirectory) {
+            return fail("shell", "${scope.rel(cwd)} is not a folder, so it cannot be a working directory.")
+        }
+
+        return withContext(Dispatchers.IO) {
+            var process: Process? = null
+            try {
+                process = ProcessBuilder("sh", "-c", command)
+                    .directory(cwd)
+                    .redirectErrorStream(true)
+                    .start()
+                val reader = process.inputStream.bufferedReader()
+                val output = StringBuilder()
+                val deadline = System.currentTimeMillis() + timeoutSec * 1000L
+                var timedOut = false
+                // Read in a bounded way so a chatty command cannot OOM us.
+                while (true) {
+                    if (System.currentTimeMillis() > deadline) { timedOut = true; break }
+                    if (!reader.ready()) {
+                        if (!process.isAlive) break
+                        Thread.sleep(25)
+                        continue
+                    }
+                    val ch = reader.read()
+                    if (ch == -1) break
+                    if (output.length < scope.maxChars) output.append(ch.toChar())
+                }
+                if (timedOut) {
+                    try { process.destroyForcibly() } catch (_: Exception) { }
+                    return@withContext fail(
+                        "shell",
+                        "Timed out after ${timeoutSec}s. Partial output:\n${output}"
+                    )
+                }
+                // Drain anything left.
+                while (reader.ready()) {
+                    val ch = reader.read()
+                    if (ch == -1) break
+                    if (output.length < scope.maxChars) output.append(ch.toChar())
+                }
+                val exit = try { process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS); process.exitValue() }
+                catch (_: Exception) { -1 }
+                val body = buildString {
+                    append("$ ").append(command).append("\n")
+                    append("cwd: ").append(scope.rel(cwd)).append("\n")
+                    append("exit: ").append(exit).append("\n")
+                    if (output.isNotEmpty()) {
+                        append("--- output ---\n")
+                        append(output.toString().trimEnd())
+                        if (output.length >= scope.maxChars) append("\n…[truncated at ${scope.maxChars} characters]")
+                    } else {
+                        append("(no output)")
+                    }
+                }
+                Run("shell", exit == 0, scope.rel(cwd), body)
+            } catch (e: Exception) {
+                try { process?.destroyForcibly() } catch (_: Exception) { }
+                fail("shell", "Could not run the command: ${e.message ?: e.javaClass.simpleName}")
+            }
+        }
+    }
+
     private fun search(call: Call, scope: Scope): Run {
         val query = call.query
             ?: return fail("search", """Missing query. Use <search query="…"/>.""")
@@ -1187,6 +1273,12 @@ object AiTools {
         append("- `<upload path=\"/storage/emulated/0/Download/file.pdf\"/>` — copy a file from the user's ")
         append("device into the workspace (optional `to=\"name.ext\"`). The workspace is where you work; the ")
         append("shared folders are where the user looks.\n\n")
+        append("On the device (a minimal shell):\n")
+        append("- `<shell>command</shell>` (or `<shell command=\"…\"/>`) — run one command through ")
+        append("`sh` with the workspace as its working directory. stdout and stderr come back together ")
+        append("(add `timeout=\"30\"` for up to 60s, `cwd=\"sub\"` to run elsewhere). It runs as this app, ")
+        append("so it can only touch what the app can touch; there is no root and no way out of the sandbox.\n")
+        append("- `<exec command=\"…\"/>` — an alias for `<shell>`.\n\n")
         append("Showing and remembering:\n")
         append("- `<open path=\"chart.png\"/>` — open a file in the user's own viewer.\n")
         append("- `<memory>…</memory>` — save your COMPLETE memory of the user, replacing what is there. ")
