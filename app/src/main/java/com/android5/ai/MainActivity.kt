@@ -1523,10 +1523,6 @@ fun MessageBubble(
                     }
                 }
 
-                if (!isUser && !message.tools.isNullOrEmpty()) {
-                    ToolRunRow(tools = message.tools, alignment = alignment)
-                }
-
                 if (message.content.isNotBlank()) {
                     Surface(
                         color = bubbleColor,
@@ -1696,6 +1692,12 @@ fun MessageBubble(
                                 )
                             }
 
+                            if (!isUser && !message.tools.isNullOrEmpty()) {
+                                ToolRunRow(
+                                    tools = message.tools,
+                                    alignment = Alignment.Start
+                                )
+                            }
                             val context = LocalContext.current
                             Row(
                                 modifier = Modifier
