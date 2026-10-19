@@ -4,6 +4,9 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Update notifications on Android 13+. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- Self-updating: the app downloads the release APK and hands it to the
          package installer itself. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />

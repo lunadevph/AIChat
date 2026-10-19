@@ -62,6 +62,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.lifecycleScope
 import androidx.compose.ui.unit.sp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import coil.compose.AsyncImage
@@ -83,6 +84,11 @@ class MainActivity : ComponentActivity() {
 
         val settingsManager = SettingsManager(this)
         setTheme(settingsManager.activityThemeStyle())
+
+        // Check for updates in the background on every launch.
+        lifecycleScope.launch {
+            UpdateChecker.checkInBackground(this@MainActivity, this)
+        }
 
         if (!settingsManager.isSetupComplete) {
             startActivity(Intent(this, SetupActivity::class.java))
@@ -1042,6 +1048,52 @@ fun ChatScreen(
                         ),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        if (UpdateChecker.isUpdateAvailable(context)) {
+                            item(key = "update_banner") {
+                                Surface(
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                                    border = BorderStroke(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                                    ),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 4.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            Icons.Rounded.SystemUpdate,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(Modifier.width(10.dp))
+                                        Column(Modifier.weight(1f)) {
+                                            Text(
+                                                "Update available",
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                            )
+                                            Text(
+                                                "Version ${UpdateChecker.latestAvailableName(context)} is ready.",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                            )
+                                        }
+                                        TextButton(onClick = {
+                                            context.startActivity(Intent(context, UpdateActivity::class.java))
+                                        }) {
+                                            Text("Install")
+                                        }
+                                    }
+                                }
+                            }
+                        }
                         items(viewModel.messages, key = { it.id }) { message ->
                             MessageBubble(
                                 message = message,

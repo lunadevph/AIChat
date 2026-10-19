@@ -311,7 +311,11 @@ class UpdateActivity : ComponentActivity() {
                                                 canInstall = canInstall,
                                                 required = updateIsRequired(s.config),
                                                 onDownload = {
-                                                    val url = s.config.downloadUrl
+                                                    // Bust the CDN cache so a stale APK is never served.
+                                                    val url = s.config.downloadUrl?.let { base ->
+                                                        if (base.contains("?")) "$base&v=${s.config.appLatestCodeVersion}"
+                                                        else "$base?v=${s.config.appLatestCodeVersion}"
+                                                    }
                                                     if (url.isNullOrBlank()) {
                                                         install = InstallUi.Failed(
                                                             context.getString(R.string.update_error_no_link)

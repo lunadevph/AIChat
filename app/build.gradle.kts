@@ -295,7 +295,7 @@ tasks.register("UpdateMirrors") {
             // shipped before this one) still parses the file and still sees an
             // update. Gson ignores fields a client has no property for, and the
             // added properties all have defaults, so both directions are safe.
-            val rawDownloadUrl = "https://raw.githubusercontent.com/lunadevph/update-mirror/main/latest.apk"
+            val rawDownloadUrl = "https://raw.githubusercontent.com/lunadevph/update-mirror/main/latest.apk?v=$verCode"
             val mirrorFile = File(mirrorDir, "mirror.json")
             val jsonContent = """
 {

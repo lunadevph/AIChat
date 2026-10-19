@@ -4,7 +4,9 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -22,6 +24,8 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.*
@@ -71,6 +75,9 @@ class SetupActivity : ComponentActivity() {
                             settingsManager.setApiKey(provider, apiKey)
                             settingsManager.selectedProvider = provider
                             startMainActivity()
+                        },
+                        onRestoreComplete = {
+                            startMainActivity()
                         }
                     )
                 }
@@ -95,7 +102,8 @@ class SetupActivity : ComponentActivity() {
 fun SetupScreen(
     settingsManager: SettingsManager,
     modifier: Modifier = Modifier,
-    onComplete: (String, String, Map<String, String>) -> Unit
+    onComplete: (String, String, Map<String, String>) -> Unit,
+    onRestoreComplete: () -> Unit = {}
 ) {
     var selectedProvider by remember { mutableStateOf(settingsManager.selectedProvider) }
     var customProviders by remember { mutableStateOf(settingsManager.customProviders) }
@@ -117,6 +125,17 @@ fun SetupScreen(
     val focusManager = LocalFocusManager.current
     val scrollState = rememberScrollState()
     val context = LocalContext.current
+
+    val restoreLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val ok = BackupManager.import(context, uri)
+            if (ok) onRestoreComplete()
+        }
+    }
+    val onRestoreBackup: () -> Unit = { restoreLauncher.launch(arrayOf("*/*")) }
 
     val animatableOffset = remember { Animatable(0f) }
     var shakeTrigger by remember { mutableStateOf(0) }
@@ -406,6 +425,28 @@ fun SetupScreen(
             ) {
                 Text(stringResource(R.string.btn_skip_setup))
             }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Text(
+            "Already have a backup?",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        OutlinedButton(
+            onClick = { onRestoreBackup() },
+            shape = RoundedCornerShape(18.dp),
+            modifier = Modifier.fillMaxWidth().height(44.dp)
+        ) {
+            Icon(Icons.Rounded.Restore, null, Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Restore from backup", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
         }
 
         Spacer(modifier = Modifier.height(28.dp))
