@@ -481,9 +481,7 @@ fun ChatScreen(
                             AppLogo(size = 30.dp)
 
                             Text(
-                                text = viewModel.currentConversation?.title?.takeIf {
-                                    it.isNotBlank() && it != context.getString(R.string.chat_default_title)
-                                } ?: stringResource(R.string.app_name),
+                                text = stringResource(R.string.app_name),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface,
