@@ -176,15 +176,16 @@ fun ChatScreen(
         viewModel.selectedImageUri = uri
     }
 
-    // Auto-scroll to the newest message, but only when the user is already
-    // looking at the bottom. While a reply streams in this fires on every token,
-    // so without the guard the list would be yanked to the bottom on each one
-    // and the user could never scroll up to read earlier messages.
+    // Auto-scroll to the newest message. While a reply streams in this fires on
+    // every token, so we must not yank the view when the user has scrolled up to
+    // read earlier messages — only follow when they are already at the bottom.
+    // scrollToItem alone does not follow a growing item, so after it we scroll
+    // by the overflow to keep the tail of the reply on screen.
     val lastMessage = viewModel.messages.lastOrNull()
     val atBottom by remember {
         derivedStateOf {
             val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
-            lastVisible == null || lastVisible >= viewModel.messages.size - 2
+            lastVisible == null || lastVisible >= viewModel.messages.lastIndex
         }
     }
     LaunchedEffect(
@@ -195,11 +196,18 @@ fun ChatScreen(
         if (viewModel.messages.isEmpty()) return@LaunchedEffect
         if (!atBottom || listState.isScrollInProgress) return@LaunchedEffect
         val lastIndex = viewModel.messages.lastIndex
-        if (lastMessage?.isStreaming == true) {
-            listState.scrollToItem(lastIndex)
-        } else {
-            listState.animateScrollToItem(lastIndex)
-        }
+        // requestScrollToItem with a large offset scrolls as far down as possible,
+        // which keeps the tail of a growing reply on screen even though the item
+        // is already visible.
+        listState.requestScrollToItem(lastIndex, Int.MAX_VALUE)
+    }
+
+    // A brand-new message (user send or assistant reply arriving) always jumps
+    // to the bottom, even if the user was scrolled up reading history.
+    LaunchedEffect(viewModel.messages.size) {
+        if (viewModel.messages.isEmpty()) return@LaunchedEffect
+        val lastIndex = viewModel.messages.lastIndex
+        listState.requestScrollToItem(lastIndex, Int.MAX_VALUE)
     }
 
     ModalNavigationDrawer(
