@@ -1,23 +1,11 @@
-- Claude now actually works: the app speaks Anthropic's Messages API (`/v1/messages`, content blocks, SSE deltas) instead of the OpenAI shape it was sending, so Claude is a real provider rather than a 404 at chat time.
-- Tool runs (which tools a reply used and the files it touched) are now saved with the conversation and come back when you reopen a chat, instead of vanishing on reload.
-- Image search no longer fires on every prompt that happens to contain "image", "photo", "picture" or "show me" — only whole-word image terms trigger it.
-- Attaching an image that cannot be read now tells you instead of silently dropping it and answering a different question.
-- Setup can no longer trap you: a failed or invalid key offers a "Skip setup" button, and custom providers show the right key link instead of OpenRouter's.
-- Destructive actions are consistent: per-conversation delete, per-file delete, workspace clear, and custom-provider removal all ask for confirmation before acting.
-- Touch targets on the clear-key, delete-provider and delete-file buttons are now the standard 48dp.
-- Switch rows (AI settings, device storage) announce as a single switch to TalkBack instead of two overlapping nodes, and conversation rows no longer pretend to be tabs.
-- Copying a message or a code block shows a brief "Copied" toast.
-- "New chat" no longer creates duplicate empty conversations when tapped repeatedly.
-- The top bar now shows the current conversation's title instead of always "AI Chat".
-- The "Edit" action is labelled "Edit message" (it fills the box; it does not resend).
-- The update screen's version cards no longer clip long version names, and its top bar has a title.
-- The crash screen's stack trace is now selectable, matching the file preview.
-- The compact theme's emphasized type styles now scale down with the rest of the type.
-- The model picker's empty state has an icon and a centred message, matching the other empty states.
-- The update screen reports "No download link", "wrong package" and "low storage" distinctly instead of a generic connection error, and clears stale cached APKs before a new download.
-- Keys that cannot be encrypted are never stored in plaintext; the keystore failure is reported instead.
-- A killed mid-stream reply no longer reopens with a stuck "typing" indicator.
-- Attached images are deleted when their conversation is deleted or cleared, instead of accumulating forever.
-- NVIDIA models no longer show a spurious "Vision" badge.
-- The dead `CREATING_IMAGE` status, the unused remote-icon write, the dead `SettingsManager.conversations` property and several vestigial strings are gone.
-- The README provider table now lists NVIDIA, and documents the full `/storage/emulated/0` scope of device storage.
+- Diagnostics screen (Settings → Diagnostics): build status (official/unofficial based on the signing key), version and build date, provider/model/key/storage/conversation details, the bundled release notes, and a "Copy diagnostics" button.
+- Release notes are now bundled into the app and viewable offline, both in Diagnostics and on the About sheet.
+- Import/export backup: a portable, encrypted `.ai` file (AES/GCM, key derived from the app's signing certificate) covering conversations, settings and API keys. Export and import live in Diagnostics; setup offers "Restore from backup" for recovery.
+- Build status: an official build is signed with the LunaDevPH key; debug builds are accepted as official automatically.
+- Provider switching moved into the model picker: a provider chip row at the top re-fetches the catalog without a trip to Settings.
+- Empty-state suggestion cards now send the prompt instead of only filling the input box.
+- Switching appearance recreates the activity so the AppCompat window theme (status bar, window background) follows the new mode.
+- About sheet gains GitHub and "Report issue" links.
+- Every app launch checks the update mirror in the background (throttled to once per 30 minutes) and posts a notification plus an in-app banner when a newer build exists.
+- Restore from backup is available during setup.
+- Download URLs are cache-busted (`?v=<code>`) so a stale CDN copy of the APK is never served.
