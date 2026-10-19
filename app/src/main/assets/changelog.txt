@@ -1,2 +1,3 @@
-- While a reply streams in, you can now scroll up to read earlier messages; the view no longer yanks itself to the bottom on every token.
-- A mechanical guard now fails the release build if `app/changelog.txt` is empty or has no bullets, so stale release notes can no longer ship.
+- The assistant can now run shell commands on the device via the `<shell>` tool, and is explicitly instructed to use it instead of refusing — list directories, check versions, search code, run scripts, inspect the system.
+- The About sheet now shows the creator (LunaDevPH) and build date alongside the version.
+- A mechanical guard fails the release build if `app/changelog.txt` is empty or has no bullets, so stale release notes can no longer ship.
