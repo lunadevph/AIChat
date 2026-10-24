@@ -1,0 +1,72 @@
+
+name: OpenCode Runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: "Git repository URL to clone"
+        required: true
+        type: string
+        default: "https://github.com/lunadevph/AIChat"
+
+      model:
+        description: "OpenCode model (provider/model)"
+        required: true
+        type: string
+        default: "opencode/big-pickle"
+
+      message:
+        description: "Prompt to send to OpenCode"
+        required: true
+        type: string
+        default: "Analyze this repository and summarize its structure."
+
+      custom_instructions:
+        description: "Additional instructions for the AI"
+        required: false
+        type: string
+        default: "Keep changes minimal and explain what you changed."
+
+jobs:
+  run-opencode:
+    name: Clone and run OpenCode
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Clone repository
+        env:
+          REPOSITORY: ${{ inputs.repository }}
+        run: |
+          set -euo pipefail
+          git clone --depth 1 "$REPOSITORY" target-repo
+
+      - name: Install OpenCode
+        run: |
+          npm install --global opencode-ai
+          opencode --version
+
+      - name: Run OpenCode
+        working-directory: target-repo
+        env:
+          MODEL: ${{ inputs.model }}
+          MESSAGE: ${{ inputs.message }}
+          CUSTOM_INSTRUCTIONS: ${{ inputs.custom_instructions }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${OPENROUTER_API_KEY:-}" ]; then
+            echo "::error::Configure the OPENROUTER_API_KEY repository secret."
+            exit 1
+          fi
+
+          PROMPT="$(printf '%s\n\nCustom instructions:\n%s' \
+            "$MESSAGE" "$CUSTOM_INSTRUCTIONS")"
+
+          export OPENROUTER_API_KEY
+
+          opencode run \
+            --model "$MODEL" \
+            "$PROMPT"
