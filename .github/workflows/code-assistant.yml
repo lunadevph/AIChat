@@ -69,7 +69,7 @@ jobs:
             "$MESSAGE" "$CUSTOM_INSTRUCTIONS")"
 
           set +e
-          opencode run --model "$MODEL" "$PROMPT" \
+          opencode run --yolo --model "$MODEL" "$PROMPT" \
             2>&1 | tee "$RUNNER_TEMP/opencode.log"
           STATUS=${PIPESTATUS[0]}
           set -e
