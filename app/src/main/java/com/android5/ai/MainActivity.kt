@@ -41,7 +41,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -154,9 +153,6 @@ fun ChatScreen(
 
     var inputText by remember { mutableStateOf("") }
 
-    // The expressive ("flexible") app bar grows while the reader is at the top of
-    // the conversation and folds away as they scroll, instead of staying pinned.
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val listState = rememberLazyListState()
 
     var showMenu by remember { mutableStateOf(false) }
@@ -459,9 +455,6 @@ fun ChatScreen(
         }
 
         Scaffold(
-            modifier = Modifier.nestedScroll(
-                scrollBehavior.nestedScrollConnection
-            ),
             topBar = {
                 CenterAlignedTopAppBar(
                     navigationIcon = {
