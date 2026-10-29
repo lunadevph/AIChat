@@ -2,7 +2,7 @@
 
 ## Message
 
-Fix this issue https://github.com/lunadevph/AIChat/issues/1
+Fix https://github.com/lunadevph/AIChat/issues/1
 
 ## Custom Instructions
 
@@ -16,7 +16,7 @@ opencode/deepseek-v4.1-flash-free
 
 Commit and push requested.
 
-Code commit: No code changes
+Code commit: a4f2221291a255168ca1c4d21d4eb7e783f88c7d
 
 The final push result is reported by this workflow's commit step.
 
@@ -26,90 +26,91 @@ OpenCode completed successfully.
 
 ### Changed files
 
+ M app/src/main/java/com/android5/ai/MainActivity.kt
  M summary.md
 
 ## Diagnostic Information
 
 ```text
-androidx-compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
-androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
-androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
-androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
-androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
-androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version = "1.5.0-alpha24" }
-androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "splashscreen" }
-androidx-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
-google-android-material = { group = "com.google.android.material", name = "material", version.ref = "material" }
-androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
-retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
-retrofit-gson = { group = "com.squareup.retrofit2", name = "converter-gson", version.ref = "retrofit" }
-okhttp-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp" }
-mikepenz-markdown = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-m3-android", version.ref = "mikepenzMarkdown" }
-mikepenz-markdown-code = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-code-android", version.ref = "mikepenzMarkdown" }
-mikepenz-markdown-coil = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-coil2-android", version.ref = "mikepenzMarkdown" }
-androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycleRuntimeKtx" }
-coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 
-[plugins]
-android-application = { id = "com.android.application", version.ref = "agp" }
-kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+> Task :app:compileDebugKotlin
+w: file:///home/runner/work/AIChat/AIChat/target-repo/app/src/main/java/com/android5/ai/CrashActivity.kt:53:29 'val LocalClipboardManager: ProvidableCompositionLocal<ClipboardManager>' is deprecated. Use LocalClipboard instead which supports suspend functions.
+w: file:///home/runner/work/AIChat/AIChat/target-repo/app/src/main/java/com/android5/ai/MainActivity.kt:1380:9 'val LocalClipboardManager: ProvidableCompositionLocal<ClipboardManager>' is deprecated. Use LocalClipboard instead which supports suspend functions.
+w: file:///home/runner/work/AIChat/AIChat/target-repo/app/src/main/java/com/android5/ai/SettingsActivity.kt:1066:28 'val LocalClipboardManager: ProvidableCompositionLocal<ClipboardManager>' is deprecated. Use LocalClipboard instead which supports suspend functions.
+w: file:///home/runner/work/AIChat/AIChat/target-repo/app/src/main/java/com/android5/ai/SettingsActivity.kt:1553:40 'val Icons.Rounded.OpenInNew: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Rounded.OpenInNew.
+w: file:///home/runner/work/AIChat/AIChat/target-repo/app/src/main/java/com/android5/ai/UpdateChecker.kt:57:71 'field versionCode: Int' is deprecated. Deprecated in Java.
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:processDebugJavaRes
+> Task :app:mergeLibDexDebug
+> Task :app:mapDebugSourceSetPaths
+> Task :app:compileDebugNavigationResources
+> Task :app:mergeDebugJavaResource
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:processDebugMainManifest
+> Task :app:mergeDebugResources
+> Task :app:processDebugManifest
+> Task :app:mergeDebugJniLibFolders
+> Task :app:mergeDebugNativeLibs
+> Task :app:validateSigningDebug
+> Task :app:writeDebugAppMetadata
+
+> Task :app:stripDebugDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so. Run with --info option to learn more.
+
+> Task :app:writeDebugSigningConfigVersions
+> Task :app:processDebugManifestForPackage
+> Task :app:processDebugResources
+> Task :app:dexBuilderDebug
+> Task :app:mergeProjectDexDebug
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:assembleDebug
+
+BUILD SUCCESSFUL in 3m 19s
+39 actionable tasks: 39 executed
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.4.1/userguide/configuration_cache_enabling.html
 [0m
-[0m$ [0mgrep -rn "SelectionIndicator\|SelectionContainer\|Modifier.selectable\|selectable" app/src/main/java/com/android5/ai | head -40
-app/src/main/java/com/android5/ai/SelectionIndicator.kt:16: * The trailing check on a selectable row.
-app/src/main/java/com/android5/ai/SelectionIndicator.kt:25:fun SelectionIndicator(
-app/src/main/java/com/android5/ai/ToolFilesActivity.kt:30:import androidx.compose.foundation.text.selection.SelectionContainer
-app/src/main/java/com/android5/ai/ToolFilesActivity.kt:486:                                SelectionContainer {
-app/src/main/java/com/android5/ai/ProviderPicker.kt:95:                    SelectionIndicator(isSelected)
-app/src/main/java/com/android5/ai/SettingsActivity.kt:1653:                        SelectionIndicator(selected)
-app/src/main/java/com/android5/ai/CrashActivity.kt:28:import androidx.compose.foundation.text.selection.SelectionContainer
-app/src/main/java/com/android5/ai/CrashActivity.kt:230:                    SelectionContainer {
-app/src/main/java/com/android5/ai/ModelPickerSheet.kt:438:                                SelectionIndicator(selected, size = 20.dp)
+[0m$ [0mcd /home/runner/work/AIChat/AIChat/target-repo && git diff -- app/src/main/java/com/android5/ai/MainActivity.kt && git status --short
+diff --git a/app/src/main/java/com/android5/ai/MainActivity.kt b/app/src/main/java/com/android5/ai/MainActivity.kt
+index 430acb3..0a6d3a2 100644
+--- a/app/src/main/java/com/android5/ai/MainActivity.kt
++++ b/app/src/main/java/com/android5/ai/MainActivity.kt
+@@ -41,7 +41,6 @@ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.draw.alpha
+ import androidx.compose.ui.draw.clip
+ import androidx.compose.ui.graphics.Color
+-import androidx.compose.ui.input.nestedscroll.nestedScroll
+ import androidx.compose.ui.layout.ContentScale
+ import androidx.compose.ui.platform.LocalClipboardManager
+ import androidx.compose.ui.platform.LocalContext
+@@ -154,9 +153,6 @@ fun ChatScreen(
+ 
+     var inputText by remember { mutableStateOf("") }
+ 
+-    // The expressive ("flexible") app bar grows while the reader is at the top of
+-    // the conversation and folds away as they scroll, instead of staying pinned.
+-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+     val listState = rememberLazyListState()
+ 
+     var showMenu by remember { mutableStateOf(false) }
+@@ -459,9 +455,6 @@ fun ChatScreen(
+         }
+ 
+         Scaffold(
+-            modifier = Modifier.nestedScroll(
+-                scrollBehavior.nestedScrollConnection
+-            ),
+             topBar = {
+                 CenterAlignedTopAppBar(
+                     navigationIcon = {
+ M app/src/main/java/com/android5/ai/MainActivity.kt
 [0m
-[0m$ [0mgrep -n "data class Message" -A40 app/src/main/java/com/android5/ai/ChatModels.kt
-95:data class Message(
-96-    val id: String = UUID.randomUUID().toString(),
-97-    val role: String,
-98-    val content: String,
-99-    val reasoning: String? = null,
-100-    val localImageUrl: String? = null,
-101-    val isStreaming: Boolean = false,
-102-    /**
-103-     * Tools this message's reply invoked. Nullable so replies saved by older
-104-     * versions (which have no such field) still deserialize cleanly.
-105-     */
-106-    val tools: List<ToolRun>? = null,
-107-    val timestamp: Long = System.currentTimeMillis(),
-108-    /**
-109-     * True when this message is an error reported by the app rather than a
-110-     * reply from the model. Errors are styled differently in the transcript.
-111-     */
-112-    val isError: Boolean = false
-113-)
-114-
-115-data class Conversation(
-116-    val id: String = UUID.randomUUID().toString(),
-117-    val title: String = "New Chat",
-118-    val messages: List<Message> = emptyList(),
-119-    val lastUpdated: Long = System.currentTimeMillis()
-120-)
-121-
-122-data class ChatResponse(
-123-    val choices: List<Choice>
-124-)
-125-
-126-data class Choice(
-127-    val message: AssistantMessage
-128-)
-129-
-130-data class AssistantMessage(
-131-    val role: String,
-132-    val content: String,
-133-    @SerializedName("reasoning_content") val reasoningContent: String? = null,
-134-    val reasoning: String? = null,
-135-    /** Present only when a model used its own tool syntax instead of the tags. */
-[0m
-[93m[1m! [0mpermission requested: external_directory (/tmp/*); auto-rejecting
-[0m✗ [0mcd /tmp && curl -sL -o md-sources.jar "https://repo1.maven.org/maven2/com/mikepenz/multiplatform-markdown-renderer-m3-android/0.28.0/multiplatform-markdown-renderer-m3-android-0.28.0-sources.jar" && unzip -l md-sources.jar | head -40 failed
-[91m[1mError: [0mThe user rejected permission to use this specific tool call.
+Fixed in `app/src/main/java/com/android5/ai/MainActivity.kt`.
+
+**Cause:** an `exitUntilCollapsedScrollBehavior()` was still attached to the `Scaffold` via `Modifier.nestedScroll`, but it was no longer passed to the top bar. Its `heightOffsetLimit` therefore stayed at `-Float.MAX_VALUE`, so its nested-scroll connection consumed every downward scroll gesture — scrolling up still worked.
+
+**Change:** removed the unused `scrollBehavior`, the `nestedScroll(...)` modifier, and the now-unused import. Verified with `bash gradlew assembleDebug` — BUILD SUCCESSFUL.
 
 ```
