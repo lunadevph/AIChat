@@ -42,6 +42,7 @@ jobs:
 
     steps:
       - name: Clone repository
+        id: clone
         env:
           REPOSITORY: ${{ inputs.repository }}
         run: |
@@ -50,25 +51,89 @@ jobs:
 
       - name: Install OpenCode
         run: |
+          set -euo pipefail
           npm install --global opencode-ai
           opencode --version
 
       - name: Run OpenCode
+        id: opencode
         working-directory: target-repo
         env:
           MODEL: ${{ inputs.model }}
           MESSAGE: ${{ inputs.message }}
           CUSTOM_INSTRUCTIONS: ${{ inputs.custom_instructions }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
 
           PROMPT="$(printf '%s\n\nCustom instructions:\n%s' \
             "$MESSAGE" "$CUSTOM_INSTRUCTIONS")"
 
-          opencode run --model "$MODEL" "$PROMPT"
+          set +e
+          opencode run --model "$MODEL" "$PROMPT" \
+            2>&1 | tee "$RUNNER_TEMP/opencode.log"
+          STATUS=${PIPESTATUS[0]}
+          set -e
+
+          echo "exit_code=$STATUS" >> "$GITHUB_OUTPUT"
+
+          # Continue so the summary and logs can be uploaded.
+          exit 0
+
+      - name: Generate summary.md
+        if: ${{ always() && steps.clone.outcome == 'success' }}
+        working-directory: target-repo
+        env:
+          MODEL: ${{ inputs.model }}
+          MESSAGE: ${{ inputs.message }}
+          CUSTOM_INSTRUCTIONS: ${{ inputs.custom_instructions }}
+          PUSH_CHANGES: ${{ inputs.push_changes }}
+          OPENCODE_OUTCOME: ${{ steps.opencode.outputs.exit_code }}
+        run: |
+          set -euo pipefail
+
+          {
+            printf '# Task Summary\n\n'
+            printf '## Message\n\n%s\n\n' "$MESSAGE"
+            printf '## Custom Instructions\n\n' 
+            if [ -n "$CUSTOM_INSTRUCTIONS" ]; then
+              printf '%s\n\n' "$CUSTOM_INSTRUCTIONS"
+            else
+              printf 'None\n\n'
+            fi
+
+            printf '## Models\n\n%s\n\n' "$MODEL"
+
+            printf '## Commit Changes\n\n'
+            if [ "$PUSH_CHANGES" = "true" ]; then
+              printf 'Commit and push requested. See the workflow logs for the final status and commit hash.\n\n'
+            else
+              printf 'Disabled. Repository changes remain uncommitted.\n\n'
+            fi
+
+            printf '## Results\n\n'
+            if [ "${OPENCODE_OUTCOME:-}" = "0" ]; then
+              printf 'OpenCode completed successfully.\n\n'
+            else
+              printf 'OpenCode failed or did not complete. Exit code: %s\n\n' \
+                "${OPENCODE_OUTCOME:-unknown}"
+            fi
+
+            printf '### Changed files\n\n'
+            git status --short --untracked-files=all || true
+          } > summary.md
+
+          if [ -f "$RUNNER_TEMP/opencode.log" ]; then
+            {
+              printf '\n## Diagnostic Information\n\n'
+              printf '```text\n'
+              tail -n 80 "$RUNNER_TEMP/opencode.log"
+              printf '\n```\n'
+            } >> summary.md
+          fi
 
       - name: Commit and push changes
-        if: ${{ inputs.push_changes }}
+        id: commit
+        if: ${{ inputs.push_changes && steps.clone.outcome == 'success' }}
         working-directory: target-repo
         env:
           TARGET_REPO_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
@@ -86,17 +151,71 @@ jobs:
           git config user.email \
             "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add -A
+          # Commit AI changes first so their hash can be recorded
+          # inside summary.md without a self-referential hash.
+          git add -A -- . ':(exclude)summary.md'
 
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-            exit 0
+          if ! git diff --cached --quiet; then
+            git commit -m "Apply OpenCode changes"
+            CODE_COMMIT="$(git rev-parse HEAD)"
+          else
+            CODE_COMMIT="No code changes"
           fi
 
-          git commit -m "Apply OpenCode changes"
+          echo "code_commit=$CODE_COMMIT" >> "$GITHUB_OUTPUT"
+
+          # Update the summary with the actual code commit hash.
+          export CODE_COMMIT
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          path = Path("summary.md")
+          content = path.read_text(encoding="utf-8")
+          marker = "Commit and push requested. See the workflow logs for the final status and commit hash."
+          replacement = (
+              "Commit and push requested.\n\n"
+              f"Code commit: {os.environ['CODE_COMMIT']}\n\n"
+              "The final push result is reported by this workflow's commit step."
+          )
+          path.write_text(
+              content.replace(marker, replacement),
+              encoding="utf-8"
+          )
+          PY
+
+          # Include summary.md in the repository.
+          git add -A
+          git commit -m "Add OpenCode task summary"
 
           AUTH="$(printf 'x-access-token:%s' \
             "$TARGET_REPO_TOKEN" | base64 -w0)"
 
           git -c http.extraheader="AUTHORIZATION: basic $AUTH" \
             push origin "HEAD:refs/heads/$BRANCH"
+
+          echo "push_status=success" >> "$GITHUB_OUTPUT"
+
+      - name: Upload summary artifact
+        if: ${{ always() && steps.clone.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: opencode-summary
+          path: target-repo/summary.md
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload OpenCode logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: opencode-logs
+          path: ${{ runner.temp }}/opencode.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Report OpenCode failure
+        if: ${{ steps.opencode.outputs.exit_code != '0' }}
+        run: |
+          echo "::error::OpenCode failed. Check the opencode-logs artifact."
+          exit 1
