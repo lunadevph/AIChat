@@ -757,6 +757,9 @@ object AiTools {
         val source = scope.resolveTarget(from) ?: return outside(scope, "copy", from)
         val target = scope.resolveTarget(to) ?: return outside(scope, "copy", to)
         if (!source.isFile) return fail("copy", "No such file: ${scope.rel(source)}.")
+        if (source.canonicalFile == target.canonicalFile) {
+            return fail("copy", "Source and destination are the same file.")
+        }
         target.parentFile?.mkdirs()
         return try {
             source.copyTo(target, overwrite = true)
@@ -916,6 +919,9 @@ object AiTools {
         val name = call.attrs["to"] ?: call.attrs["dest"] ?: from.name
         val target = scope.resolve(name)
             ?: return fail("upload", "Cannot save to '$name': it is outside the workspace.")
+        if (from.canonicalFile == target.canonicalFile) {
+            return fail("upload", "Source and destination are the same file.")
+        }
 
         return withContext(Dispatchers.IO) {
             try {

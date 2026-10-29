@@ -158,6 +158,7 @@ object Providers {
     }
 
     fun defaultModel(provider: String, custom: List<Custom> = emptyList()): String = when (provider) {
+        "OpenRouter" -> "openrouter/free"
         "OpenAI" -> "gpt-5.6-sol"
         "Google" -> "gemini-3.8-flash"
         "Groq" -> "gpt-oss-120b"
@@ -172,6 +173,9 @@ object Providers {
     }
 
     fun defaultModels(provider: String, custom: List<Custom> = emptyList()): List<ModelInfo> = when (provider) {
+        "OpenRouter" -> listOf(
+            ModelInfo(id = "openrouter/free", name = "Auto (Free Router)", description = "Auto-selects the best free model for your request", architecture = Architecture(modality = "text+image->text"))
+        )
         "OpenAI" -> listOf(
             // GPT-5.6 family (Aug 2026)
             ModelInfo(id = "gpt-5.6-sol", name = "GPT-5.6 Sol", description = "Premier flagship for complex reasoning & coding", architecture = Architecture(modality = "text+image->text")),

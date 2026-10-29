@@ -312,9 +312,10 @@ class UpdateActivity : ComponentActivity() {
                                                 required = updateIsRequired(s.config),
                                                 onDownload = {
                                                     // Bust the CDN cache so a stale APK is never served.
-                                                    val url = s.config.downloadUrl?.let { base ->
-                                                        if (base.contains("?")) "$base&v=${s.config.appLatestCodeVersion}"
-                                                        else "$base?v=${s.config.appLatestCodeVersion}"
+                                                    val base = s.config.downloadUrl
+                                                    val url = base?.takeIf { it.isNotBlank() }?.let {
+                                                        if (it.contains("?")) "$it&v=${s.config.appLatestCodeVersion}"
+                                                        else "$it?v=${s.config.appLatestCodeVersion}"
                                                     }
                                                     if (url.isNullOrBlank()) {
                                                         install = InstallUi.Failed(

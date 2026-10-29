@@ -119,10 +119,16 @@ class SettingsManager(context: Context) {
     var selectedProvider: String
         get() = _prefs!!.getString("selected_provider", "OpenRouter") ?: "OpenRouter"
         set(value) {
+            // Migrate a legacy key for the outgoing provider before switching.
+            getApiKey(selectedProvider)
+            val storedKey = _prefs!!.getString("api_key_${value.lowercase()}", null)
+            val currentKey = storedKey?.let { KeyStoreHelper.decrypt(it) }
             _prefs!!.edit().putString("selected_provider", value).apply()
-            val currentKey = getApiKey(value)
-            if (currentKey != null) {
-                _prefs!!.edit().putString("api_key", currentKey).apply()
+            if (!currentKey.isNullOrBlank()) {
+                setApiKey(value, currentKey)
+            } else {
+                // Do not let the previous provider's legacy key be used for this one.
+                _prefs!!.edit().remove("api_key").apply()
             }
         }
 

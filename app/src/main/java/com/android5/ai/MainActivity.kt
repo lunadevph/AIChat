@@ -169,6 +169,8 @@ fun ChatScreen(
 
     val context = LocalContext.current
     val webSearchDescription = stringResource(R.string.desc_web_search)
+    val updateAvailable = UpdateChecker.isUpdateAvailable(context)
+    val listOffset = if (updateAvailable) 1 else 0
 
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -183,19 +185,17 @@ fun ChatScreen(
     // by the overflow to keep the tail of the reply on screen.
     val lastMessage = viewModel.messages.lastOrNull()
     val atBottom by remember {
-        derivedStateOf {
-            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
-            lastVisible == null || lastVisible >= viewModel.messages.lastIndex
-        }
+        derivedStateOf { !listState.canScrollForward }
     }
     LaunchedEffect(
         viewModel.messages.size,
         lastMessage?.content,
-        lastMessage?.isStreaming
+        lastMessage?.isStreaming,
+        listOffset
     ) {
         if (viewModel.messages.isEmpty()) return@LaunchedEffect
         if (!atBottom || listState.isScrollInProgress) return@LaunchedEffect
-        val lastIndex = viewModel.messages.lastIndex
+        val lastIndex = listOffset + viewModel.messages.lastIndex
         // requestScrollToItem with a large offset scrolls as far down as possible,
         // which keeps the tail of a growing reply on screen even though the item
         // is already visible.
@@ -204,9 +204,9 @@ fun ChatScreen(
 
     // A brand-new message (user send or assistant reply arriving) always jumps
     // to the bottom, even if the user was scrolled up reading history.
-    LaunchedEffect(viewModel.messages.size) {
+    LaunchedEffect(viewModel.messages.size, listOffset) {
         if (viewModel.messages.isEmpty()) return@LaunchedEffect
-        val lastIndex = viewModel.messages.lastIndex
+        val lastIndex = listOffset + viewModel.messages.lastIndex
         listState.requestScrollToItem(lastIndex, Int.MAX_VALUE)
     }
 
@@ -1062,7 +1062,7 @@ fun ChatScreen(
                         ),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        if (UpdateChecker.isUpdateAvailable(context)) {
+                        if (updateAvailable) {
                             item(key = "update_banner") {
                                 Surface(
                                     shape = RoundedCornerShape(16.dp),
@@ -1127,7 +1127,7 @@ fun ChatScreen(
                             scope.launch {
                                 if (viewModel.messages.isNotEmpty()) {
                                     listState.animateScrollToItem(
-                                        viewModel.messages.size - 1
+                                        listOffset + viewModel.messages.size - 1
                                     )
                                 }
                             }

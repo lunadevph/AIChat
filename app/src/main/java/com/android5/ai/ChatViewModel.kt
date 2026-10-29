@@ -60,7 +60,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
     private val defaultChatTitle = context.getString(R.string.chat_default_title)
 
     private fun getApi(): OpenRouterApi {
-        return Providers.api(settingsManager.selectedProvider)
+        return Providers.api(settingsManager.selectedProvider, settingsManager.customProviders)
     }
 
     val conversations = mutableStateListOf<Conversation>()
