@@ -35,7 +35,7 @@ OpenCode failed or did not complete. Exit code: 1
   "name": "UnknownError",
   "data": {
     "message": "Unexpected server error. Check server logs for details.",
-    "ref": "err_a5973885"
+    "ref": "err_48333ea7"
   }
 }
 
