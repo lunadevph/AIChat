@@ -6,3 +6,5 @@
 - New backups use a password and include attached images so they can be restored on another device.
 - Large image attachments are resized to reduce memory use.
 - Shell execution is disabled to keep tools within their allowed storage folders.
+- Provider switching keeps API keys separate, and custom provider endpoints are used correctly.
+- Copying or importing a file onto itself no longer risks damaging its contents.
