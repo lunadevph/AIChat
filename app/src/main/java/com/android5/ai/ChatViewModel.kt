@@ -13,14 +13,13 @@ import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import retrofit2.HttpException
 import java.io.BufferedReader
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.FileOutputStream
 import java.io.InputStreamReader
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -31,7 +30,7 @@ enum class LoadingStatus {
 }
 
 /** How many tool rounds a single reply may trigger before the app stops looping. */
-private const val MAX_TOOL_STEPS = 3
+private const val MAX_TOOL_STEPS = 8
 
 /**
  * Rate limits are retried rather than reported: providers answer 429 for a busy key
@@ -59,9 +58,14 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
     /** Title shown for a conversation that has not been auto-titled yet. */
     private val defaultChatTitle = context.getString(R.string.chat_default_title)
 
-    private fun getApi(): OpenRouterApi {
-        return Providers.api(settingsManager.selectedProvider)
-    }
+    private var requestProvider: String? = null
+    private var requestModel: String? = null
+    private var requestTranscript: List<Message>? = null
+    private val toolHistory = mutableListOf<ApiMessage>()
+    private var allowToolCalls = true
+    private var forceNonStream = false
+
+    private fun getApi(): OpenRouterApi = Providers.api(requestProvider ?: settingsManager.selectedProvider)
 
     val conversations = mutableStateListOf<Conversation>()
     var currentConversation by mutableStateOf<Conversation?>(null)
@@ -77,6 +81,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         private set
 
     private var currentJob: Job? = null
+    private var activeStream: okhttp3.ResponseBody? = null
 
     /**
      * Error body read while classifying a failure, kept so the handler that shows
@@ -109,6 +114,8 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
     }
 
     fun selectConversation(conversation: Conversation) {
+        if (currentConversation?.id == conversation.id) return
+        if (currentConversation?.id != conversation.id) stopGeneration()
         val full = conversationStore.loadConversation(conversation.id) ?: conversation
         val index = conversations.indexOfFirst { it.id == full.id }
         if (index != -1) conversations[index] = full
@@ -128,6 +135,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
     }
 
     fun deleteConversation(conversation: Conversation) {
+        if (currentConversation?.id == conversation.id) stopGeneration()
         val full = conversationStore.loadConversation(conversation.id)
         full?.messages?.forEach { msg ->
             msg.localImageUrl?.let { path -> File(path).takeIf { it.exists() }?.delete() }
@@ -242,6 +250,8 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         if (currentJob != null) return
         if (messages.none { it.role == "user" }) return
         while (messages.isNotEmpty() && messages.last().role != "user") {
+            // Keep completed actions when retrying the answer, so writes are not repeated.
+            if (messages.last().tools.orEmpty().any { it.result != null }) break
             messages.removeAt(messages.lastIndex)
         }
         updateCurrentConversation()
@@ -259,6 +269,11 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             return
         }
 
+        val conversationId = currentConversation?.id
+        requestProvider = settingsManager.selectedProvider
+        requestModel = settingsManager.selectedModel
+        requestTranscript = messages.toList()
+        toolHistory.clear()
         currentJob = viewModelScope.launch {
             val webSearchOn = settingsManager.webSearchEnabled
             // Only fire the automatic image search for a prompt that clearly asks
@@ -283,45 +298,32 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                     loadingStatus = LoadingStatus.THINKING
                 }
 
-                // A reply can ask for tools; when it does, the results are fed back
-                // and the request runs again, up to MAX_TOOL_STEPS rounds.
-                val allRuns = mutableListOf<AiTools.Run>()
-                val maxSteps = if (settingsManager.toolsEnabled) MAX_TOOL_STEPS else 1
-                var correction: String? = null
-
-                for (step in 0 until maxSteps) {
-                    val toolResults = if (allRuns.isEmpty()) null
-                    else AiTools.formatResults(allRuns)
-                    val turn = try {
-                        if (Providers.isAnthropic(settingsManager.selectedProvider)) {
-                            requestAnthropicTurn(apiKey, searchGrounding, toolResults, correction)
-                        } else {
-                            requestTurn(apiKey, searchGrounding, toolResults, correction)
-                        }
-                    } catch (e: kotlinx.coroutines.CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        // Some providers reject a reply that used their own native
-                        // tool syntax (Groq's "tool_use_failed") instead of the plain
-                        // tags this app asked for; others accept it and leave the
-                        // reply blank. Either way: say so and ask again, once.
-                        if (correction != null || !isNativeToolCallFailure(e)) throw e
-                        correction = context.getString(R.string.tool_syntax_correction)
+                ToolReplyLoop.run(
+                    maxToolRounds = if (settingsManager.toolsEnabled) MAX_TOOL_STEPS else 0,
+                    request = { allowTools, retryEmpty ->
+                        allowToolCalls = settingsManager.toolsEnabled && allowTools
+                        forceNonStream = retryEmpty
                         loadingStatus = LoadingStatus.THINKING
-                        requestTurn(apiKey, searchGrounding, toolResults, correction)
-                    } ?: break
-
-                    val runs = finalizeTurn(turn)
-                    if (runs.isEmpty() || step == maxSteps - 1) break
-
-                    allRuns.addAll(runs)
-                    loadingStatus = LoadingStatus.THINKING
-                }
+                        val correction = if (retryEmpty || !allowTools) context.getString(R.string.tool_followup_instruction) else null
+                        val turn = if (Providers.isAnthropic(requestProvider.orEmpty())) {
+                            requestAnthropicTurn(apiKey, searchGrounding, null, correction)
+                        } else {
+                            requestTurn(apiKey, searchGrounding, null, correction)
+                        }
+                        if (turn != null && turn.raw.isBlank() && turn.calls.isEmpty() && turn.index in messages.indices) {
+                            messages.removeAt(turn.index)
+                            updateCurrentConversation()
+                        }
+                        turn
+                    },
+                    apply = { turn -> finalizeTurn(turn) }
+                )
 
                 if (currentConversation?.title == defaultChatTitle && messages.size >= 2) {
                     generateChatTitle(apiKey)
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
+                if (currentConversation?.id != conversationId) return@launch
                 val lastIdx = messages.lastIndex
                 if (lastIdx >= 0 && messages[lastIdx].isStreaming) {
                     if (messages[lastIdx].content.isBlank()) {
@@ -331,18 +333,14 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                     }
                     updateCurrentConversation()
                 }
-            } catch (e: NativeToolCallException) {
-                // The model answered with its own tool syntax and nothing else, and
-                // the provider took it: there is no text to show, so explain instead.
-                android.util.Log.w("AIChat", "The reply was a native tool call with no text")
-                showReplyError(context.getString(R.string.err_native_tool_call))
+            } catch (e: EmptyReplyException) {
+                showReplyError(context.getString(R.string.err_empty_reply))
             } catch (e: HttpException) {
+                if (currentJob?.isCancelled == true || currentConversation?.id != conversationId) return@launch
                 val body = lastErrorBody ?: try { e.response()?.errorBody()?.string() } catch (_: Exception) { null }
                 lastErrorBody = null
                 android.util.Log.e("AIChat", "HTTP ${e.code()}: $body")
-                val errorMsg = if (e.code() == 400 && saysNativeToolCall(body)) {
-                    context.getString(R.string.err_native_tool_call)
-                } else when (e.code()) {
+                val errorMsg = when (e.code()) {
                     401 -> context.getString(R.string.err_unauthorized)
                     402 -> context.getString(R.string.err_insufficient_credits)
                     403 -> context.getString(R.string.err_forbidden)
@@ -353,12 +351,19 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 }
                 showReplyError(errorMsg)
             } catch (e: Exception) {
+                if (currentJob?.isCancelled == true || currentConversation?.id != conversationId) return@launch
                 android.util.Log.e("AIChat", "Request failed", e)
                 showReplyError(context.getString(R.string.err_network, e.localizedMessage ?: "Unknown error"))
             } finally {
                 loadingStatus = LoadingStatus.IDLE
                 rateLimitRetryIn = 0
+                activeStream = null
                 currentJob = null
+                requestProvider = null
+                requestModel = null
+                requestTranscript = null
+                toolHistory.clear()
+                forceNonStream = false
             }
         }
     }
@@ -381,14 +386,6 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 "IMAGE DISPLAY CAPABILITY: You can display pictures and web images inline in your response by outputting Markdown image tags: `![Description](https://url/to/image.jpg)`. Use this whenever providing photos, pictures, diagrams, or visual examples."
             )
             append("\n\n")
-            append(
-                "SHELL ACCESS: You have a working shell on the user's device via the <shell> tool. " +
-                    "Use it proactively whenever a task benefits from running a command — listing files, " +
-                    "checking versions, searching code, running scripts, inspecting the system, installing " +
-                    "packages, or any operation the file tools cannot do. Do not refuse or say you cannot " +
-                    "run commands: you can, through <shell>. Prefer <shell> over guessing, and report the " +
-                    "exit code and output to the user."
-            )
             if (toolsEnabled) {
                 append("\n\n").append(AiTools.describe(toolScope))
             } else {
@@ -417,14 +414,13 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             apiMessages.add(ApiMessage(role = "system", content = systemContent))
         }
 
-        apiMessages.addAll(messages.map { msg ->
-            if (msg.localImageUrl != null && msg.role == "user") {
+        apiMessages.addAll((requestTranscript ?: messages.toList()).filterNot { it.isError }.flatMap { msg ->
+            val exchange = NativeTools.restoreExchange(msg)
+            if (exchange.isNotEmpty()) return@flatMap exchange
+            listOf(if (msg.localImageUrl != null && msg.role == "user") {
                 val file = File(msg.localImageUrl)
                 val base64Image = if (file.exists()) {
-                    val bitmap = BitmapFactory.decodeFile(file.absolutePath)
-                    val outputStream = ByteArrayOutputStream()
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 60, outputStream)
-                    Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
+                    Base64.encodeToString(file.readBytes(), Base64.NO_WRAP)
                 } else null
                 
                 val contentParts = mutableListOf<ContentPart>()
@@ -439,10 +435,12 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 }
                 ApiMessage(role = msg.role, content = contentParts)
             } else {
-                ApiMessage(role = msg.role, content = msg.content)
-            }
+                ApiMessage(role = msg.role, content = msg.content, reasoningContent = if (msg.role == "assistant") msg.reasoning.orEmpty() else null)
+            })
         })
-        return apiMessages
+        apiMessages.addAll(toolHistory)
+        val needsReasoning = requestProvider == "DeepSeek" || requestModel.orEmpty().contains("deepseek", ignoreCase = true)
+        return if (needsReasoning) apiMessages else apiMessages.map { it.copy(reasoningContent = null) }
     }
 
     private fun isReasoningModel(modelId: String): Boolean {
@@ -457,19 +455,18 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         searchGrounding: String?,
         toolResults: String?,
         correction: String?
-    ): Turn? {
+    ): ToolReply? {
         lastErrorBody = null
-        val isReasoning = isReasoningModel(settingsManager.selectedModel)
-        val isGoogle = settingsManager.selectedProvider == "Google"
-        val webSearchOn = settingsManager.webSearchEnabled
-
+        val isReasoning = isReasoningModel((requestModel ?: settingsManager.selectedModel))
+        val isGoogle = (requestProvider ?: settingsManager.selectedProvider) == "Google"
+        val apiMessages = buildApiMessages(searchGrounding, toolResults, correction)
+        val hasToolContext = apiMessages.any { !it.toolCalls.isNullOrEmpty() }
         val request = ChatRequest(
-            model = settingsManager.selectedModel,
-            messages = buildApiMessages(searchGrounding, toolResults, correction),
-            tools = if (webSearchOn && settingsManager.selectedProvider == "OpenAI") {
-                buildWebSearchTools(settingsManager.selectedProvider)
-            } else null,
-            stream = if (settingsManager.streamingEnabled) true else null,
+            model = (requestModel ?: settingsManager.selectedModel),
+            messages = apiMessages,
+            tools = if (allowToolCalls || hasToolContext) NativeTools.openAiDefinitions() else null,
+            toolChoice = if (!allowToolCalls && hasToolContext) "none" else null,
+            stream = if (settingsManager.streamingEnabled && !forceNonStream) true else null,
             temperature = if (isReasoning) null else settingsManager.temperature.toDouble(),
             topP = if (isReasoning) null else settingsManager.topP.toDouble(),
             maxTokens = if (isReasoning) null else settingsManager.maxTokens,
@@ -478,13 +475,13 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             presencePenalty = if (isReasoning || isGoogle) null else settingsManager.presencePenalty.toDouble()
         )
 
-        val isAnthropic = Providers.isAnthropic(settingsManager.selectedProvider)
+        val isAnthropic = Providers.isAnthropic((requestProvider ?: settingsManager.selectedProvider))
         val authHeader = if (isAnthropic) null else "Bearer $apiKey"
         val xApiKeyHeader = if (isAnthropic) apiKey else null
         val anthropicHeader = if (isAnthropic) Providers.ANTHROPIC_VERSION else null
 
         return retryingOnRateLimit {
-            if (settingsManager.streamingEnabled) {
+            if (settingsManager.streamingEnabled && !forceNonStream) {
                 streamResponse(authHeader, xApiKeyHeader, anthropicHeader, request)
             } else {
                 nonStreamResponse(authHeader, xApiKeyHeader, anthropicHeader, request)
@@ -496,8 +493,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
     // Anthropic (Claude) path. Claude is the one provider that is not
     // OpenAI-shaped: it speaks the Messages API at /v1/messages, with a
     // separate `system` field and content blocks instead of a `content` string.
-    // The app's in-band tool tags still work, so no native tool support is
-    // needed here — only text and images in, text out.
+    // Native tool_use/tool_result blocks are translated to the shared executor.
     // ---------------------------------------------------------------------
 
     private suspend fun requestAnthropicTurn(
@@ -505,25 +501,28 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         searchGrounding: String?,
         toolResults: String?,
         correction: String?
-    ): Turn? {
+    ): ToolReply? {
         lastErrorBody = null
-        val isReasoning = isReasoningModel(settingsManager.selectedModel)
+        val isReasoning = isReasoningModel((requestModel ?: settingsManager.selectedModel))
         val apiMessages = buildApiMessages(searchGrounding, toolResults, correction)
         val (system, messages) = buildAnthropicMessages(apiMessages)
+        val hasToolContext = apiMessages.any { !it.toolCalls.isNullOrEmpty() }
 
         val request = AnthropicRequest(
-            model = settingsManager.selectedModel,
+            model = (requestModel ?: settingsManager.selectedModel),
             messages = messages,
             system = system,
+            tools = if (allowToolCalls || hasToolContext) NativeTools.anthropicDefinitions() else null,
+            toolChoice = if (!allowToolCalls && hasToolContext) mapOf("type" to "none") else null,
             maxTokens = settingsManager.maxTokens.coerceAtLeast(1),
-            stream = if (settingsManager.streamingEnabled) true else null,
+            stream = if (settingsManager.streamingEnabled && !forceNonStream) true else null,
             temperature = if (isReasoning) null else settingsManager.temperature.toDouble(),
             topP = if (isReasoning) null else settingsManager.topP.toDouble()
         )
 
         return retryingOnRateLimit {
             val api = getAnthropicApi()
-            if (settingsManager.streamingEnabled) {
+            if (settingsManager.streamingEnabled && !forceNonStream) {
                 anthropicStreamResponse(api, apiKey, request)
             } else {
                 anthropicNonStreamResponse(api, apiKey, request)
@@ -544,6 +543,14 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 if (text.isNotBlank()) systemParts.add(text)
                 continue
             }
+            if (am.role == "tool") {
+                val block = AnthropicContentBlock(type = "tool_result", toolUseId = am.toolCallId, content = am.content.toString())
+                if (messages.lastOrNull()?.role == "user") {
+                    val previous = messages.removeAt(messages.lastIndex)
+                    messages.add(previous.copy(content = previous.content + block))
+                } else messages.add(AnthropicMessage("user", listOf(block)))
+                continue
+            }
             val blocks = when (val c = am.content) {
                 is String -> listOf(AnthropicContentBlock(type = "text", text = c))
                 is List<*> -> c.filterIsInstance<ContentPart>().mapNotNull { part ->
@@ -562,11 +569,15 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                         else -> null
                     }
                 }
+                null -> emptyList()
                 else -> listOf(AnthropicContentBlock(type = "text", text = c.toString()))
             }
-            if (blocks.isNotEmpty()) {
-                messages.add(AnthropicMessage(role = am.role, content = blocks))
+            val toolBlocks = am.toolCalls.orEmpty().map { call ->
+                AnthropicContentBlock(type = "tool_use", id = call.id, name = call.function?.name,
+                    input = com.google.gson.JsonParser.parseString(call.function?.arguments ?: "{}").asJsonObject)
             }
+            val allBlocks = blocks.filterNot { it.type == "text" && it.text.isNullOrBlank() } + toolBlocks
+            if (allBlocks.isNotEmpty()) messages.add(AnthropicMessage(role = am.role, content = allBlocks))
         }
         return systemParts.joinToString("\n\n").takeIf { it.isNotBlank() } to messages
     }
@@ -575,13 +586,16 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         api: AnthropicApi,
         apiKey: String,
         request: AnthropicRequest
-    ): Turn? {
+    ): ToolReply? {
         val response = api.getMessages(
             xApiKey = apiKey,
             anthropicVersion = Providers.ANTHROPIC_VERSION,
             request = request
         )
         val raw = response.text
+        val calls = response.content.orEmpty().filter { it.type == "tool_use" }.map {
+            StreamToolCall(id = it.id, type = "function", function = StreamToolFunction(it.name, it.input?.toString() ?: "{}"))
+        }
         val reasoning = response.thinking
         messages.add(
             Message(
@@ -592,19 +606,20 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             )
         )
         updateCurrentConversation()
-        return Turn(raw, messages.lastIndex, reasoning)
+        return ToolReply(raw, messages.lastIndex, reasoning, calls)
     }
 
     private suspend fun anthropicStreamResponse(
         api: AnthropicApi,
         apiKey: String,
         request: AnthropicRequest
-    ): Turn? {
+    ): ToolReply? {
         val body = api.getMessagesStream(
             xApiKey = apiKey,
             anthropicVersion = Providers.ANTHROPIC_VERSION,
             request = request
         )
+        activeStream = body
         val streamingMessage = Message(role = "assistant", content = "", isStreaming = true)
         messages.add(streamingMessage)
         val msgIndex = messages.lastIndex
@@ -612,6 +627,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
 
         val contentBuilder = StringBuilder()
         val thinkingBuilder = StringBuilder()
+        val toolCalls = NativeTools.Accumulator()
         var lastUiUpdateTime = 0L
 
         withContext(Dispatchers.IO) {
@@ -628,9 +644,15 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                     try {
                         val event = gson.fromJson(data, AnthropicStreamEvent::class.java) ?: continue
                         when (event.type) {
+                            "error" -> throw java.io.IOException(event.error?.message ?: "Provider stream failed")
+                            "content_block_start" -> event.contentBlock?.takeIf { it.type == "tool_use" }?.let {
+                                toolCalls.add(StreamToolCall(index = event.index, id = it.id, function = StreamToolFunction(it.name)))
+                            }
                             "content_block_delta" -> {
                                 val delta = event.delta
                                 when (delta?.type) {
+                                    "input_json_delta" -> toolCalls.add(StreamToolCall(index = event.index,
+                                        function = StreamToolFunction(arguments = delta.partialJson)))
                                     "text_delta" -> delta.text?.let { contentBuilder.append(it) }
                                     "thinking_delta" -> delta.thinking?.let { thinkingBuilder.append(it) }
                                     else -> {}
@@ -652,7 +674,9 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                                 }
                             }
                         }
-                    } catch (_: Exception) {
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (_: com.google.gson.JsonParseException) {
                         // Skip malformed chunks.
                     }
                 }
@@ -670,7 +694,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 )
             }
         }
-        return Turn(raw, msgIndex, reasoning)
+        return ToolReply(raw, msgIndex, reasoning, toolCalls.complete())
     }
 
     private fun getAnthropicApi(): AnthropicApi = Providers.anthropicApi()
@@ -714,48 +738,6 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         }
     }
 
-    /**
-     * True when a failed request looks like the model used its provider's own
-     * function-calling format instead of this app's plain tags: a 400 rejection
-     * (Groq's "tool_use_failed") or a reply that was nothing but a tool call.
-     */
-    private fun isNativeToolCallFailure(e: Exception): Boolean = when (e) {
-        is NativeToolCallException -> true
-        is HttpException -> isNativeToolCallRejection(e)
-        else -> false
-    }
-
-    /**
-     * True when a provider answered 400 because the model emitted its *own* native
-     * tool call while the request declared no tools. Groq watches gpt-oss and Llama
-     * replies for their tool-call syntax and rejects the turn with "tool_use_failed"
-     * — which a system prompt full of tool tags can provoke, even though this app
-     * never asks for a native call.
-     */
-    private fun isNativeToolCallRejection(e: HttpException): Boolean {
-        if (e.code() != 400) return false
-
-        val body = try {
-            e.response()?.errorBody()?.string()
-        } catch (_: Exception) {
-            null
-        }
-        lastErrorBody = body
-
-        if (!saysNativeToolCall(body)) return false
-        android.util.Log.w("AIChat", "Provider rejected a native tool call: $body")
-        return true
-    }
-
-    /** Recognises the wordings providers use for a rejected native tool call. */
-    private fun saysNativeToolCall(body: String?): Boolean {
-        if (body.isNullOrBlank()) return false
-        val lower = body.lowercase()
-        return lower.contains("tool_use_failed") ||
-            lower.contains("called a tool") ||
-            lower.contains("tool_choice")
-    }
-
     /** A 429's Retry-After in milliseconds, whether it is seconds or an HTTP date. */
     private fun retryAfterMs(e: HttpException): Long? {
         val raw = try {
@@ -777,7 +759,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         }
     }
 
-    private suspend fun streamResponse(authHeader: String?, xApiKey: String?, anthropicHeader: String?, request: ChatRequest): Turn? {
+    private suspend fun streamResponse(authHeader: String?, xApiKey: String?, anthropicHeader: String?, request: ChatRequest): ToolReply? {
         val responseBody = getApi().getCompletionStream(
             authorization = authHeader,
             xApiKey = xApiKey,
@@ -785,6 +767,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             request = request
         )
 
+        activeStream = responseBody
         // Add placeholder streaming message
         val streamingMessage = Message(role = "assistant", content = "", isStreaming = true)
         messages.add(streamingMessage)
@@ -794,7 +777,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         val contentBuilder = StringBuilder()
         val reasoningBuilder = StringBuilder()
         var lastUiUpdateTime = 0L
-        var nativeToolCallSeen = false
+        val toolCalls = NativeTools.Accumulator()
 
         withContext(Dispatchers.IO) {
             responseBody.use { body ->
@@ -819,18 +802,14 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
 
                         // Check for mid-stream error from provider
                         if (chunk.error != null) {
-                            val errMsg = chunk.error.message ?: "Stream error"
-                            contentBuilder.append(errMsg)
-                            break
+                            throw java.io.IOException(chunk.error.message ?: "Provider stream failed")
                         }
 
                         val choice = chunk.choices?.firstOrNull() ?: continue
-                        if (choice.finishReason == "tool_calls") nativeToolCallSeen = true
                         val delta = choice.delta ?: continue
 
-                        // The model used the provider's own function-calling format
-                        // instead of this app's tags; there will be no text.
-                        if (delta.toolCalls?.isNotEmpty() == true) nativeToolCallSeen = true
+                        // Multiple tool calls may interleave their argument fragments.
+                        delta.toolCalls.orEmpty().forEach { toolCalls.add(it) }
 
                         // Accumulate content and reasoning
                         delta.content?.let { contentBuilder.append(it) }
@@ -854,21 +833,13 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
 
                         // Check finish reason
                         if (choice.finishReason != null) break
-                    } catch (_: Exception) {
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (_: com.google.gson.JsonParseException) {
                         // Skip malformed chunks
                     }
                 }
             }
-        }
-
-        // A provider that runs its own tool parser can emit a native tool call even
-        // though this request declared no tools — and then the reply has no text at
-        // all. Drop the empty placeholder and let the caller ask the model again.
-        if (contentBuilder.isBlank() && nativeToolCallSeen) {
-            withContext(Dispatchers.Main) {
-                if (msgIndex in messages.indices) messages.removeAt(msgIndex)
-            }
-            throw NativeToolCallException()
         }
 
         // The message stays in its slot; finalizeTurn() decides what the transcript
@@ -884,10 +855,10 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 )
             }
         }
-        return Turn(raw, msgIndex, reasoning)
+        return ToolReply(raw, msgIndex, reasoning, toolCalls.complete())
     }
 
-    private suspend fun nonStreamResponse(authHeader: String?, xApiKey: String?, anthropicHeader: String?, request: ChatRequest): Turn? {
+    private suspend fun nonStreamResponse(authHeader: String?, xApiKey: String?, anthropicHeader: String?, request: ChatRequest): ToolReply? {
         val nonStreamRequest = request.copy(stream = null)
         val response = getApi().getCompletion(
             authorization = authHeader,
@@ -898,47 +869,48 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
 
         val assistantMsg = response.choices.firstOrNull()?.message ?: return null
 
-        // Some providers accept a native tool call and return no text alongside it;
-        // a blank bubble would be the whole reply, so let the caller ask again.
-        if (assistantMsg.content.isNullOrBlank() && assistantMsg.toolCalls?.isNotEmpty() == true) {
-            throw NativeToolCallException()
-        }
+        val calls = assistantMsg.toolCalls.orEmpty()
 
         val reasoning = assistantMsg.thinking?.takeIf { it.isNotBlank() }
         messages.add(
             Message(
                 role = "assistant",
-                content = visibleText(assistantMsg.content, streaming = false),
+                content = visibleText(assistantMsg.content.orEmpty(), streaming = false),
                 reasoning = reasoning,
                 isStreaming = false
             )
         )
         updateCurrentConversation()
-        return Turn(assistantMsg.content, messages.lastIndex, reasoning)
+        return ToolReply(assistantMsg.content.orEmpty(), messages.lastIndex, reasoning, calls)
     }
-
-    /** A completed assistant reply, before its tool tags have been acted on. */
-    private data class Turn(val raw: String, val index: Int, val reasoning: String?)
 
     /**
      * Applies a finished reply: saves any memory it asked for, runs the tool calls
-     * it made, and rewrites the message with the tags hidden. Returns the tool runs
+     * it made, and adds tool status to the transcript. Returns the tool runs
      * so the caller can feed their results back to the model.
      */
-    private suspend fun finalizeTurn(turn: Turn): List<AiTools.Run> {
+    private suspend fun finalizeTurn(turn: ToolReply): List<AiTools.Run> {
         val (withoutMemory, newMemory) = extractMemory(turn.raw)
         if (newMemory != null) settingsManager.agentMemory = newMemory
 
-        val calls = if (settingsManager.toolsEnabled) AiTools.parse(withoutMemory) else emptyList()
-        val runs = calls.map { AiTools.execute(it, toolScope) }
+        val calls = if (settingsManager.toolsEnabled && allowToolCalls) turn.calls else emptyList()
+        require(calls.size <= 32 && calls.all { !it.id.isNullOrBlank() } && calls.map { it.id }.distinct().size == calls.size) {
+            "Invalid tool call IDs or too many tool calls"
+        }
+        val runs = calls.map { call ->
+            try { withContext(Dispatchers.IO) { AiTools.execute(NativeTools.decode(call), toolScope) } }
+            catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) { AiTools.Run(call.function?.name.orEmpty(), false, "", e.message ?: "Invalid arguments") }
+        }
+        if (calls.isNotEmpty()) toolHistory.addAll(NativeTools.exchange(turn.raw, turn.reasoning, calls, runs))
 
         withContext(Dispatchers.Main) {
             if (turn.index in messages.indices) {
                 messages[turn.index] = messages[turn.index].copy(
-                    content = AiTools.strip(withoutMemory).trim(),
+                    content = withoutMemory.trim(),
                     reasoning = turn.reasoning,
                     isStreaming = false,
-                    tools = runs.map { run ->
+                    tools = runs.mapIndexed { index, run ->
                         // `label` is the path for the file tools, which is exactly
                         // what the transcript needs to link a run back to the file
                         // it touched. Device paths are absolute and live outside
@@ -950,7 +922,8 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                         } else {
                             null
                         }
-                        ToolRun(run.name, run.label, run.ok, filePath)
+                        ToolRun(run.name, run.label, run.ok, filePath,
+                            callId = calls[index].id, arguments = calls[index].function?.arguments ?: "{}", result = run.result)
                     }.ifEmpty { null }
                 )
             }
@@ -971,15 +944,14 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             val fence = text.indexOf("```memory")
             if (fence != -1 && text.indexOf("```", fence + 3) == -1) text = text.substring(0, fence)
         }
-        if (text.contains('<')) {
-            text = if (streaming) AiTools.stripPartial(text) else AiTools.strip(text)
-        }
         val display = extractMemory(text).first
         return if (streaming) display else display.trim()
     }
 
     fun stopGeneration() {
         currentJob?.cancel()
+        try { activeStream?.close() } catch (_: Exception) { }
+        activeStream = null
         val lastIdx = messages.lastIndex
         if (lastIdx >= 0 && messages[lastIdx].isStreaming) {
             if (messages[lastIdx].content.isBlank()) {
@@ -992,25 +964,6 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         loadingStatus = LoadingStatus.IDLE
     }
 
-    private fun buildWebSearchTools(provider: String): List<Map<String, Any>> {
-        return when (provider) {
-            "OpenAI" -> listOf(mapOf("type" to "web_search_preview"))
-            "Claude" -> listOf(
-                mapOf(
-                    "type" to "web_search_20250305",
-                    "name" to "web_search",
-                    "max_uses" to 5
-                )
-            )
-            else -> listOf(
-                mapOf(
-                    "type" to "web_search",
-                    "search_context_size" to "medium"
-                )
-            )
-        }
-    }
-
     private fun generateChatTitle(apiKey: String) {
         // The title request is fire-and-forget, so remember which conversation it
         // belongs to: the user can open another chat while it is still in flight,
@@ -1018,25 +971,27 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         val conv = currentConversation ?: return
         val firstMessage = messages.find { it.role == "user" }?.content ?: return
 
+        val provider = requestProvider ?: settingsManager.selectedProvider
+        val model = requestModel ?: settingsManager.selectedModel
         viewModelScope.launch {
             try {
                 val summaryPrompt = "Generate a short title (max 4 words) for this chat. Return only the title."
 
                 val request = ChatRequest(
-                    model = settingsManager.selectedModel,
+                    model = model,
                     messages = listOf(
                         ApiMessage(role = "system", content = summaryPrompt),
                         ApiMessage(role = "user", content = firstMessage)
                     )
                 )
-                val isAnthropic = Providers.isAnthropic(settingsManager.selectedProvider)
-                val response = getApi().getCompletion(
-                    authorization = if (isAnthropic) null else "Bearer $apiKey",
-                    xApiKey = if (isAnthropic) apiKey else null,
-                    anthropicVersion = if (isAnthropic) Providers.ANTHROPIC_VERSION else null,
-                    request = request
-                )
-                val raw = response.choices.firstOrNull()?.message?.content ?: return@launch
+                val raw = if (Providers.isAnthropic(provider)) {
+                    getAnthropicApi().getMessages(apiKey, Providers.ANTHROPIC_VERSION,
+                        AnthropicRequest(model = model, system = summaryPrompt,
+                            messages = listOf(AnthropicMessage("user", listOf(AnthropicContentBlock(text = firstMessage)))))).text
+                } else {
+                    Providers.api(provider).getCompletion(authorization = "Bearer $apiKey", request = request)
+                        .choices.firstOrNull()?.message?.content ?: return@launch
+                }
                 // Keep the first line only and drop the quoting/bullet decoration
                 // models like to wrap titles in.
                 val title = raw.lineSequence().firstOrNull().orEmpty()
@@ -1050,19 +1005,32 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 val updatedConv = conversations[index].copy(title = title)
                 conversations[index] = updatedConv
                 if (currentConversation?.id == conv.id) currentConversation = updatedConv
-                saveConversations()
+                val full = conversationStore.loadConversation(conv.id) ?: return@launch
+                conversationStore.saveConversation(full.copy(title = title))
             } catch (e: Exception) {}
         }
     }
 
     private fun saveImageLocally(context: Context, uri: Uri): String? {
         return try {
-            val inputStream = context.contentResolver.openInputStream(uri) ?: return null
-            val bitmap = BitmapFactory.decodeStream(inputStream)
-            val file = File(context.filesDir, "img_${System.currentTimeMillis()}.jpg")
-            val outputStream = FileOutputStream(file)
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream)
-            outputStream.close()
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+                ?: return null
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+            var sample = 1
+            while (bounds.outWidth / sample > 2048 || bounds.outHeight / sample > 2048) sample *= 2
+            val options = BitmapFactory.Options().apply { inSampleSize = sample }
+            val bitmap = context.contentResolver.openInputStream(uri)?.use {
+                BitmapFactory.decodeStream(it, null, options)
+            } ?: return null
+            val file = File(context.filesDir, "img_${UUID.randomUUID()}.jpg")
+            try {
+                file.outputStream().use { output ->
+                    check(bitmap.compress(Bitmap.CompressFormat.JPEG, 90, output))
+                }
+            } finally {
+                bitmap.recycle()
+            }
             file.absolutePath
         } catch (e: Exception) { null }
     }
@@ -1085,6 +1053,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
     }
 
     fun clearHistory() {
+        stopGeneration()
         messages.forEach { msg ->
             msg.localImageUrl?.let { path -> File(path).takeIf { it.exists() }?.delete() }
         }
@@ -1114,11 +1083,4 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         updateCurrentConversation()
     }
 }
-
-/**
- * Thrown when a reply consisted only of a tool call in the provider's own format.
- * This app asks for tools in plain text tags, so such a reply has no text to show
- * and is answered by asking the model again with that spelling out.
- */
-private class NativeToolCallException : Exception("The reply was a native tool call")
 

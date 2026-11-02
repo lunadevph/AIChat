@@ -3,6 +3,8 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.Properties
 import java.util.Date
 import java.util.Locale
@@ -11,22 +13,8 @@ import java.text.SimpleDateFormat
 import java.net.URL
 import java.net.HttpURLConnection
 import java.security.MessageDigest
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 val versionPropsFile = file("version.properties")
-
-// Calendar versioning: YY.MM.DD.build  (e.g. 261010.001)
-// VERSION_CODE is derived as YYMMDD * 1000 + build so it strictly increases every
-// build and sorts chronologically. YYMMDD tops out at 991231, giving a ceiling of
-// 992230999 -- comfortably inside Int.MAX (2147483647).
-val DAY_STAMP = DateTimeFormatter.ofPattern("yyMMdd")
-
-fun todayStamp(): String = LocalDate.now().format(DAY_STAMP)
-
-fun codeFor(stamp: String, build: Int): Int = stamp.toInt() * 1000 + build
-
-fun nameFor(stamp: String, build: Int): String = "$stamp.%03d".format(build)
 
 fun loadVersionProps(): Properties {
     val props = Properties()
@@ -58,46 +46,43 @@ fun nowIso(): String {
     return format.format(Date())
 }
 
-// Computes the version a release build should use: same calendar-versioning rule
-// as BumpAppVersions, but without writing anything. It is called during
-// configuration (so the new version is stamped into *this* build) and again by
-// the BumpAppVersions task (so it is persisted). Both reads see the same file,
-// so both produce the same value.
-fun nextBump(): Triple<String, Int, String> {
-    val props = loadVersionProps()
-    val stamp = todayStamp()
+// Display versions are semantic; Android's independent code must never decrease.
+data class AppVersion(val code: Int, val name: String)
 
-    val storedStamp = props["VERSION_STAMP"] as? String
-    val storedBuild = (props["BUILD_COUNTER"] as? String)?.toIntOrNull() ?: 0
-
-    // Counter resets to 1 on a new day; within the same day it keeps climbing.
-    val build = if (storedStamp == stamp && storedBuild > 0) storedBuild + 1 else 1
-    return Triple(stamp, build, nameFor(stamp, build))
+fun readAppVersion(props: Properties): AppVersion {
+    val code = props.getProperty("VERSION_CODE")?.toIntOrNull()
+        ?: error("version.properties needs a valid VERSION_CODE")
+    val name = props.getProperty("VERSION_NAME") ?: error("version.properties needs VERSION_NAME")
+    require(code > 0 && Regex("[0-9]+\\.[0-9]+\\.[0-9]+").matches(name)) {
+        "Use a positive VERSION_CODE and a major.minor.patch VERSION_NAME"
+    }
+    return AppVersion(code, name)
 }
 
-// Auto-bump on release builds unless -PnoBump is passed. Never bumps on debug builds.
+fun incrementVersion(version: AppVersion, part: String): AppVersion {
+    val (major, minor, patch) = version.name.split('.').map { it.toInt() }
+    val nextName = when (part) {
+        "major" -> "${Math.addExact(major, 1)}.0.0"
+        "minor" -> "$major.${Math.addExact(minor, 1)}.0"
+        "patch" -> "$major.$minor.${Math.addExact(patch, 1)}"
+        else -> error("versionBump must be patch, minor or major")
+    }
+    return AppVersion(Math.addExact(version.code, 1), nextName)
+}
+
+val requestedTasks = gradle.startParameter.taskNames.map { it.substringAfterLast(':') }
+val explicitBump = requestedTasks.any { it in setOf("bumpVersion", "bumpPatch", "BumpAppVersions") }
 val noBumpRequested = project.hasProperty("noBump")
-val isReleaseBuildRequested = gradle.startParameter.taskNames.any { name ->
-    name.contains("Release", ignoreCase = true)
+val isReleaseBuildRequested = requestedTasks.any {
+    (it.contains("Release", ignoreCase = true) && it != "uploadGithubRelease") || it == "installAndPushApk"
 }
 val shouldBump = isReleaseBuildRequested && !noBumpRequested
-
-val versionProps = loadVersionProps()
-val currentVersion: Pair<Int, String> = if (shouldBump) {
-    // AGP resolves versionName/versionCode at configuration time, so the bump must
-    // be applied here -- a task-time-only bump would ship an APK still carrying the
-    // previous version (the write only lands on the *next* build).
-    val (stamp, build, name) = nextBump()
-    codeFor(stamp, build) to name
-} else {
-    val code = (versionProps["VERSION_CODE"] as? String)?.toIntOrNull()
-        ?: codeFor(todayStamp(), 1)
-    val name = (versionProps["VERSION_NAME"] as? String)
-        ?: nameFor(todayStamp(), 1)
-    code to name
-}
-val currentVersionCode = currentVersion.first
-val currentVersionName = currentVersion.second
+val storedVersion = readAppVersion(loadVersionProps())
+val bumpedVersion = incrementVersion(storedVersion, providers.gradleProperty("versionBump").getOrElse("patch"))
+// Resolve once at configuration time and persist exactly these values before building.
+val currentVersion = if (shouldBump || explicitBump) bumpedVersion else storedVersion
+val currentVersionCode = currentVersion.code
+val currentVersionName = currentVersion.name
 
 android {
     namespace = "com.android5.ai"
@@ -159,59 +144,46 @@ android {
 }
 
 val bumpAppVersionsTask = tasks.register("BumpAppVersions") {
-    description = "Stamps today's date into version.properties and increments the per-day build counter"
+    description = "Increments the semantic version and Android version code once"
     group = "versioning"
+    dependsOn("checkChangelog")
     doLast {
-        val props = loadVersionProps()
-        // Same computation the release build used to stamp this APK, so the
-        // persisted version always matches the artifact that was built.
-        val (stamp, build, name) = nextBump()
-
-        props["VERSION_STAMP"] = stamp
-        props["BUILD_COUNTER"] = build.toString()
-        props["VERSION_CODE"] = codeFor(stamp, build).toString()
-        props["VERSION_NAME"] = name
-
-        versionPropsFile.outputStream().use {
-            props.store(it, "Auto-generated calendar version (YY.MM.DD.build)")
+        check(readAppVersion(loadVersionProps()) == storedVersion) {
+            "version.properties changed during this build; retry to avoid a version mismatch"
         }
-
-        println("==================================================")
-        println("  BumpAppVersions: Version Bumped Successfully!")
-        println("  Version Name: ${props["VERSION_NAME"]}")
-        println("  Version Code: ${props["VERSION_CODE"]}")
-        println("==================================================")
+        val temporary = File(versionPropsFile.parentFile, "version.properties.tmp")
+        temporary.writeText("VERSION_CODE=${bumpedVersion.code}\nVERSION_NAME=${bumpedVersion.name}\n")
+        Files.move(temporary.toPath(), versionPropsFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        println("Version: ${bumpedVersion.name} (code ${bumpedVersion.code})")
     }
 }
 
-// Wire the persisting bump task into release builds (unless -PnoBump). The value
-// stamped into this build was already resolved above (shouldBump).
-// Usage: gradlew assembleRelease            (bumps and stamps this build)
-//        gradlew assembleRelease -PnoBump   (skips the bump)
-if (shouldBump) {
-    tasks.named("preBuild") {
-        dependsOn(bumpAppVersionsTask)
-    }
+if (shouldBump || explicitBump) {
+    tasks.named("preBuild") { dependsOn(bumpAppVersionsTask) }
 }
 
 tasks.register("bumpVersion") {
-    description = "Alias for BumpAppVersions"
+    description = "Increment patch version; use -PversionBump=minor or major for a larger change"
     group = "versioning"
     dependsOn(bumpAppVersionsTask)
 }
 
 tasks.register("bumpPatch") {
-    description = "Re-stamps today's date and resets the build counter to 001"
+    description = "Deprecated alias for bumpVersion; never resets the Android version code"
     group = "versioning"
+    dependsOn(bumpAppVersionsTask)
+}
+
+// Read-only regression checks; no APK publishing or version file writes.
+tasks.register("verifyVersioning") {
+    group = "verification"
     doLast {
-        val props = loadVersionProps()
-        val stamp = todayStamp()
-        props["VERSION_STAMP"] = stamp
-        props["BUILD_COUNTER"] = "1"
-        props["VERSION_CODE"] = codeFor(stamp, 1).toString()
-        props["VERSION_NAME"] = nameFor(stamp, 1)
-        versionPropsFile.outputStream().use { props.store(it, "Version Properties") }
-println("Bumped to ${props["VERSION_NAME"]} (Code: ${props["VERSION_CODE"]})")
+        check(incrementVersion(AppVersion(261019016, "1.0.0"), "patch") == AppVersion(261019017, "1.0.1"))
+        check(incrementVersion(AppVersion(261019017, "1.2.9"), "minor") == AppVersion(261019018, "1.3.0"))
+        check(incrementVersion(AppVersion(261019018, "1.2.9"), "major") == AppVersion(261019019, "2.0.0"))
+        check(runCatching { incrementVersion(AppVersion(Int.MAX_VALUE, "1.0.0"), "patch") }.isFailure)
+        check(currentVersion.code >= storedVersion.code)
+        println("Versioning checks passed: ${currentVersion.name} (code ${currentVersion.code})")
     }
 }
 
@@ -396,8 +368,7 @@ tasks.register("printVersion") {
     description = "Prints current app version name and version code"
     group = "versioning"
     doLast {
-        val props = loadVersionProps()
-        println("App Version: ${props["VERSION_NAME"]} (Code: ${props["VERSION_CODE"]})")
+        println("App Version: $currentVersionName (Code: $currentVersionCode)")
     }
 }
 

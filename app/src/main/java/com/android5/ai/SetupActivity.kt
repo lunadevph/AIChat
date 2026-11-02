@@ -126,14 +126,23 @@ fun SetupScreen(
     val scrollState = rememberScrollState()
     val context = LocalContext.current
 
+    var restoreUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    if (restoreUri != null) BackupPasswordDialog(false, onDismiss = { restoreUri = null }) { password ->
+        val uri = restoreUri!!
+        restoreUri = null
+        scope.launch {
+            try {
+                val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { BackupManager.import(context, uri, password) }
+                if (ok) onRestoreComplete() else errorText = context.getString(R.string.backup_import_failed)
+            } finally { password.fill('\u0000') }
+        }
+    }
+
     val restoreLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            val ok = BackupManager.import(context, uri)
-            if (ok) onRestoreComplete()
-        }
+        restoreUri = uri
     }
     val onRestoreBackup: () -> Unit = { restoreLauncher.launch(arrayOf("*/*")) }
 

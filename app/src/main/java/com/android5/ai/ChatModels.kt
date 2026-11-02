@@ -7,6 +7,7 @@ data class ChatRequest(
     val model: String,
     val messages: List<ApiMessage>,
     val tools: List<Map<String, Any>>? = null,
+    @SerializedName("tool_choice") val toolChoice: String? = null,
     val stream: Boolean? = null,
     val temperature: Double? = null,
     @com.google.gson.annotations.SerializedName("top_p")
@@ -27,17 +28,14 @@ data class StreamDelta(
     val role: String? = null,
     @SerializedName("reasoning_content") val reasoningContent: String? = null,
     val reasoning: String? = null,
-    /**
-     * A provider's own tool call. This app asks for tools in plain text tags, so
-     * this is only ever seen when a model ignores that and uses its native
-     * function-calling format — in which case there is no text to show.
-     */
+    /** Native function call deltas, assembled by index while streaming. */
     @SerializedName("tool_calls") val toolCalls: List<StreamToolCall>? = null
 ) {
     val thinking: String? get() = reasoningContent ?: reasoning
 }
 
 data class StreamToolCall(
+    val index: Int? = null,
     val id: String? = null,
     val type: String? = null,
     val function: StreamToolFunction? = null
@@ -66,7 +64,10 @@ data class StreamChunk(
 
 data class ApiMessage(
     val role: String,
-    val content: Any
+    val content: Any? = null,
+    @SerializedName("tool_calls") val toolCalls: List<StreamToolCall>? = null,
+    @SerializedName("tool_call_id") val toolCallId: String? = null,
+    @SerializedName("reasoning_content") val reasoningContent: String? = null
 )
 
 data class ContentPart(
@@ -89,7 +90,10 @@ data class ToolRun(
      * Workspace-relative path the call touched, for the file tools. Null for
      * tools that do not work on one file, and for runs saved by older versions.
      */
-    val path: String? = null
+    val path: String? = null,
+    val callId: String? = null,
+    val arguments: String? = null,
+    val result: String? = null
 )
 
 data class Message(
@@ -129,10 +133,10 @@ data class Choice(
 
 data class AssistantMessage(
     val role: String,
-    val content: String,
+    val content: String? = null,
     @SerializedName("reasoning_content") val reasoningContent: String? = null,
     val reasoning: String? = null,
-    /** Present only when a model used its own tool syntax instead of the tags. */
+    /** Native function calls returned by the provider. */
     @SerializedName("tool_calls") val toolCalls: List<StreamToolCall>? = null
 ) {
     val thinking: String? get() = reasoningContent ?: reasoning
@@ -155,7 +159,9 @@ data class AnthropicRequest(
     @SerializedName("max_tokens") val maxTokens: Int = 4096,
     val stream: Boolean? = null,
     val temperature: Double? = null,
-    @SerializedName("top_p") val topP: Double? = null
+    @SerializedName("top_p") val topP: Double? = null,
+    val tools: List<Map<String, Any>>? = null,
+    @SerializedName("tool_choice") val toolChoice: Map<String, String>? = null
 )
 
 data class AnthropicMessage(
@@ -167,7 +173,12 @@ data class AnthropicContentBlock(
     val type: String = "text",
     val text: String? = null,
     val thinking: String? = null,
-    val source: AnthropicImageSource? = null
+    val source: AnthropicImageSource? = null,
+    val id: String? = null,
+    val name: String? = null,
+    val input: com.google.gson.JsonObject? = null,
+    @SerializedName("tool_use_id") val toolUseId: String? = null,
+    val content: String? = null
 )
 
 data class AnthropicImageSource(
@@ -200,13 +211,16 @@ data class AnthropicStreamEvent(
     val type: String? = null,
     val index: Int? = null,
     val delta: AnthropicDelta? = null,
-    val message: AnthropicResponse? = null
+    val message: AnthropicResponse? = null,
+    @SerializedName("content_block") val contentBlock: AnthropicContentBlock? = null,
+    val error: StreamError? = null
 )
 
 data class AnthropicDelta(
     val type: String? = null,
     val text: String? = null,
-    val thinking: String? = null
+    val thinking: String? = null,
+    @SerializedName("partial_json") val partialJson: String? = null
 )
 
 data class ModelInfo(

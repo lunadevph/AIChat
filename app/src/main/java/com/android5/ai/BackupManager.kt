@@ -13,21 +13,12 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
-/**
- * Portable, encrypted backup of the app's data.
- *
- * Everything — conversations, settings and API keys — is serialized to JSON and
- * encrypted as a single AES/GCM blob, then written to a `.ai` file the user
- * picks. The key is derived from the app's signing certificate, so a backup
- * made by an official build can only be read by another official build, and a
- * tampered build cannot read it at all. That is what "encrypted with the app's
- * signing key" means here: the signing identity is the secret the encryption
- * leans on.
- */
+/** Password-encrypted portable backups. Version 1 is supported only for legacy import. */
 object BackupManager {
 
     private const val MAGIC = "AICHATBACKUP"
-    private const val VERSION = 1
+    private const val VERSION = 2
+    private const val MAX_BACKUP_BYTES = 64 * 1024 * 1024
     private val gson = Gson()
 
     data class BackupSettings(
@@ -44,7 +35,9 @@ object BackupManager {
         val showThinking: Boolean = true,
         val webSearchEnabled: Boolean = false,
         val toolsEnabled: Boolean = true,
-        val customProviders: List<Providers.Custom> = emptyList()
+        val customProviders: List<Providers.Custom> = emptyList(),
+        val selectedProvider: String? = null,
+        val selectedModel: String? = null
     )
 
     data class Backup(
@@ -52,11 +45,12 @@ object BackupManager {
         val createdAt: String = "",
         val conversations: List<Conversation> = emptyList(),
         val settings: BackupSettings = BackupSettings(),
-        val apiKeys: Map<String, String?> = emptyMap()
+        val apiKeys: Map<String, String?> = emptyMap(),
+        val images: Map<String, String> = emptyMap()
     )
 
-    /** Derives the AES key from the app's signing certificate. */
-    private fun deriveKey(context: Context): SecretKey {
+    /** Legacy files used a public certificate hash; never use this for new exports. */
+    private fun legacyKey(context: Context): SecretKey {
         val certHash = AppSigning.signingCertSha256(context)
             ?.toByteArray(Charsets.UTF_8)
             ?: "fallback".toByteArray(Charsets.UTF_8)
@@ -67,7 +61,7 @@ object BackupManager {
         return SecretKeySpec(md.digest(), "AES")
     }
 
-    fun export(context: Context, uri: Uri): Boolean {
+    fun export(context: Context, uri: Uri, password: CharArray): Boolean {
         return try {
             val store = ConversationStore(context)
             val convs = store.listConversations().mapNotNull { store.loadConversation(it.id) }
@@ -86,18 +80,29 @@ object BackupManager {
                 showThinking = sm.showThinking,
                 webSearchEnabled = sm.webSearchEnabled,
                 toolsEnabled = sm.toolsEnabled,
-                customProviders = sm.customProviders
+                customProviders = sm.customProviders,
+                selectedProvider = sm.selectedProvider,
+                selectedModel = sm.selectedModel
             )
             val apiKeys = (Providers.ALL.map { it.name } + sm.customProviders.map { it.name })
                 .associateWith { sm.getApiKey(it) }
+            val images = convs.flatMap { it.messages }.mapNotNull { it.localImageUrl }.distinct()
+                .associateWith { path ->
+                    val file = java.io.File(path).canonicalFile
+                    require(file.parentFile == context.filesDir.canonicalFile && file.name.startsWith("img_"))
+                    android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP)
+                }
             val backup = Backup(
                 createdAt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).format(Date()),
                 conversations = convs,
                 settings = settings,
-                apiKeys = apiKeys
+                apiKeys = apiKeys,
+                images = images
             )
             val json = gson.toJson(backup)
-            val key = deriveKey(context)
+            require(json.toByteArray(Charsets.UTF_8).size <= MAX_BACKUP_BYTES - 128)
+            val salt = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }
+            val key = BackupCrypto.deriveKey(password, salt)
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.ENCRYPT_MODE, key)
             val iv = cipher.iv
@@ -105,6 +110,7 @@ object BackupManager {
             context.contentResolver.openOutputStream(uri)?.use { out ->
                 out.write(MAGIC.toByteArray(Charsets.UTF_8))
                 out.write(VERSION)
+                out.write(salt)
                 out.write(iv)
                 out.write(ct)
                 out.flush()
@@ -116,17 +122,31 @@ object BackupManager {
         }
     }
 
-    fun import(context: Context, uri: Uri): Boolean {
+    fun import(context: Context, uri: Uri, password: CharArray): Boolean {
         return try {
-            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return false
+            val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
+                val out = java.io.ByteArrayOutputStream()
+                val buffer = ByteArray(8192)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    require(out.size() + count <= MAX_BACKUP_BYTES)
+                    out.write(buffer, 0, count)
+                }
+                out.toByteArray()
+            } ?: return false
             val magic = MAGIC.toByteArray(Charsets.UTF_8)
             if (bytes.size < magic.size + 1 + 12) return false
             if (!bytes.copyOfRange(0, magic.size).contentEquals(magic)) return false
             val version = bytes[magic.size].toInt()
-            if (version != VERSION) return false
-            val iv = bytes.copyOfRange(magic.size + 1, magic.size + 1 + 12)
-            val ct = bytes.copyOfRange(magic.size + 1 + 12, bytes.size)
-            val key = deriveKey(context)
+            if (version !in 1..VERSION) return false
+            val saltLength = if (version == 2) 16 else 0
+            val offset = magic.size + 1
+            if (bytes.size < offset + saltLength + 12 + 16) return false
+            val salt = bytes.copyOfRange(offset, offset + saltLength)
+            val iv = bytes.copyOfRange(offset + saltLength, offset + saltLength + 12)
+            val ct = bytes.copyOfRange(offset + saltLength + 12, bytes.size)
+            val key = if (version == 1) legacyKey(context) else BackupCrypto.deriveKey(password, salt)
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, iv))
             val json = String(cipher.doFinal(ct), Charsets.UTF_8)
@@ -134,7 +154,18 @@ object BackupManager {
             val backup = gson.fromJson<Backup>(json, type) ?: return false
 
             val store = ConversationStore(context)
-            backup.conversations.forEach { store.saveConversation(it) }
+            // Validate identifiers before any writes; imported paths never select local files.
+            require(backup.conversations.all { it.id.matches(Regex("[A-Za-z0-9_-]{1,128}")) })
+            val restoredImages = backup.images.mapValues { (_, encoded) ->
+                val data = android.util.Base64.decode(encoded, android.util.Base64.NO_WRAP)
+                require(data.size <= 25 * 1024 * 1024)
+                java.io.File(context.filesDir, "img_${java.util.UUID.randomUUID()}.jpg").apply { writeBytes(data) }.absolutePath
+            }
+            backup.conversations.forEach { conv ->
+                store.saveConversation(conv.copy(messages = conv.messages.map { msg ->
+                    msg.copy(localImageUrl = restoredImages[msg.localImageUrl], isStreaming = false)
+                }))
+            }
             val sm = SettingsManager(context)
             val s = backup.settings
             sm.customInstructions = s.customInstructions
@@ -151,7 +182,14 @@ object BackupManager {
             sm.webSearchEnabled = s.webSearchEnabled
             sm.toolsEnabled = s.toolsEnabled
             sm.customProviders = s.customProviders
-            backup.apiKeys.forEach { (p, k) -> if (!k.isNullOrBlank()) sm.setApiKey(p, k) }
+            backup.apiKeys.forEach { (p, k) -> if (!k.isNullOrBlank()) check(sm.setApiKey(p, k)) }
+            val provider = s.selectedProvider?.takeIf { sm.hasApiKey(it) }
+                ?: backup.apiKeys.entries.firstOrNull { !it.value.isNullOrBlank() }?.key
+            if (provider != null && Providers.all(sm.customProviders).any { it.name == provider }) {
+                sm.selectedProvider = provider
+                sm.selectedModel = s.selectedModel?.takeIf { provider == s.selectedProvider }
+                    ?: Providers.defaultModel(provider, sm.customProviders)
+            }
             true
         } catch (e: Exception) {
             android.util.Log.e("BackupManager", "Import failed", e)

@@ -66,24 +66,41 @@ private fun DebugScreen(settingsManager: SettingsManager, onBack: () -> Unit) {
 
     var status by remember { mutableStateOf<String?>(null) }
 
+    var backupUri by remember { mutableStateOf<Uri?>(null) }
+    var exporting by remember { mutableStateOf(false) }
+    var backupBusy by remember { mutableStateOf(false) }
+    if (backupUri != null) BackupPasswordDialog(exporting, onDismiss = { backupUri = null }) { password ->
+        val uri = backupUri!!
+        backupUri = null
+        backupBusy = true
+        scope.launch {
+            try {
+                val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    if (exporting) BackupManager.export(context, uri, password) else BackupManager.import(context, uri, password)
+                }
+                status = context.getString(if (exporting) {
+                    if (ok) R.string.backup_export_ok else R.string.backup_export_failed
+                } else {
+                    if (ok) R.string.backup_import_ok else R.string.backup_import_failed
+                })
+            } finally { password.fill('\u0000'); backupBusy = false }
+        }
+    }
+
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/octet-stream")
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            val ok = BackupManager.export(context, uri)
-            status = if (ok) "Backup exported." else "Export failed."
-        }
+        exporting = true
+        backupUri = uri
     }
 
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            val ok = BackupManager.import(context, uri)
-            status = if (ok) "Backup imported. Restart the app to see everything." else "Import failed (wrong key or corrupt file)."
-        }
+        exporting = false
+        backupUri = uri
     }
 
     Scaffold(
@@ -163,15 +180,14 @@ private fun DebugScreen(settingsManager: SettingsManager, onBack: () -> Unit) {
             // Backup
             DebugCard(title = "Backup & restore") {
                 Text(
-                    "Export everything (conversations, settings, keys) to an encrypted .ai file, or import one. " +
-                        "The file is encrypted with a key derived from this app's signing certificate, so it only " +
-                        "opens in an official build.",
+                    androidx.compose.ui.res.stringResource(R.string.backup_description),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
+                        enabled = !backupBusy,
                         onClick = {
                             exportLauncher.launch("aichat-backup-${System.currentTimeMillis()}.ai")
                         },
@@ -183,6 +199,7 @@ private fun DebugScreen(settingsManager: SettingsManager, onBack: () -> Unit) {
                         Text("Export")
                     }
                     OutlinedButton(
+                        enabled = !backupBusy,
                         onClick = {
                             importLauncher.launch(arrayOf("*/*"))
                         },

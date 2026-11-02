@@ -271,4 +271,16 @@
 
     <string name="update_label_code">Code %1$s</string>
     <string name="about_version_code">Version %1$s (Code %2$d)</string>
+    <string name="backup_password_title">Backup password</string>
+    <string name="backup_password_confirm">Confirm password</string>
+    <string name="backup_password_export_help">Use at least 8 characters. Keep this password safe: it is required to restore your backup on another device.</string>
+    <string name="backup_password_import_help">Enter the password used to export this backup. Leave it empty only for an older backup made without a password.</string>
+    <string name="backup_continue">Continue</string>
+    <string name="backup_description">Export conversations, attached images, settings and API keys to a password-encrypted .ai file, or restore a backup.</string>
+    <string name="backup_export_ok">Backup exported.</string>
+    <string name="backup_export_failed">Export failed.</string>
+    <string name="backup_import_ok">Backup imported. Restart the app to see everything.</string>
+    <string name="backup_import_failed">Import failed. Check the password and backup file.</string>
+    <string name="tool_followup_instruction">Use the tool results already provided to finish answering the user. Do not stop at a tool action or return an empty reply. Explain what you found or changed, including any failures.</string>
+    <string name="err_empty_reply">The provider returned no answer after a retry. Your tool results are saved; retry the reply or choose another model.</string>
 </resources>

@@ -1,4 +1,8 @@
-- Tool results are now accumulated across all tool rounds instead of being replaced each step, so the model keeps seeing earlier results when it chains multiple tool calls.
-- The assistant can run shell commands on the device via the `<shell>` tool, and is explicitly instructed to use it instead of refusing.
-- The About sheet shows the creator (LunaDevPH) and build date alongside the version.
-- A mechanical guard fails the release build if `app/changelog.txt` is empty or has no bullets, so stale release notes can no longer ship.
+- Versions now use simple major.minor.patch numbers instead of date-based names.
+- The assistant continues after running tools, retains their results for follow-up questions, and reports empty provider replies instead of silently stopping.
+- The assistant now uses structured tool calls and receives each tool result directly, with support for streaming and Claude.
+- Switching or clearing chats stops the current reply so it cannot overwrite another conversation.
+- Chat saves preserve the previous messages if a save fails.
+- New backups use a password and include attached images so they can be restored on another device.
+- Large image attachments are resized to reduce memory use.
+- Shell execution is disabled to keep tools within their allowed storage folders.

@@ -13,7 +13,8 @@ A native Android client for chatting with large language models. Bring your own 
 - **Streaming responses.** Tokens render as they arrive, and generation can be stopped mid-flight, including while a retry is counting down.
 - **Retries instead of errors.** A rate-limited request (HTTP 429) is held and retried with a doubling backoff, honouring the provider's Retry-After, with the countdown shown in the transcript.
 - **Web search.** Optional per-request toggle for up-to-date answers.
-- **Tool calls.** The assistant works on the device with tags such as `<read path="notes.md"/>`, `<write>`, `<edit>`, `<replace>` (regex), `<append>`, `<list>`, `<search>`, `<find>`, `<stat>`, `<tail>`, `<mkdir>`, `<move>`, `<copy>`, `<delete>`, `<download url="…"/>`, `<fetch url="…"/>`, `<upload path="…"/>`, `<open>`, `<storage/>`, `<memory>`, `<compact/>`, `<websearch>` and `<time/>`. Runs are shown in the transcript and can be switched off in settings. Models are told to write these tags as plain text; if one uses its provider's native function-calling format instead — which some providers reject outright and others answer with a blank reply — the app detects it and asks once more with that spelled out.
+- **Tool calls.** Native structured function calls support scoped file operations, downloads, web search, memory and time. Streaming calls are assembled before execution, and each result is returned with its matching call ID. Claude uses native `tool_use` and `tool_result` blocks. Tool calls can be switched off in settings. Shell execution is disabled because an app-owned shell can access private app data outside the tool workspace.
+- **Password-protected backups.** Export conversations, attached images, settings and API keys to an AES-GCM encrypted `.ai` file. A password-derived key with a random salt protects new backups; keep the password to restore on another device. Older certificate-derived backups remain importable but their encryption does not provide confidentiality.
 - **Device storage.** Once you grant "All files access" in Settings → AI settings → Device storage, the assistant can read, search, write, move, copy and delete anywhere under `/storage/emulated/0/…` with absolute paths — the entire shared storage, not just Downloads, Documents and pictures. The app works fully without it; the tools stay in their private workspace.
 - **Tool file history.** Everything the assistant writes in its workspace is listed in its own screen — size, age, a preview, per-file delete and clear-all — and each reply links to the files it touched.
 - **Memory.** Custom instructions, long-term user memory, and AI self-managed memory.
@@ -56,7 +57,11 @@ That file is gitignored. The build also falls back to Gradle properties and envi
 
 ### Versioning
 
-`app/version.properties` holds the current version. `assembleRelease` auto-increments `VERSION_CODE` on every run — pass `-PnoBump` to skip it:
+`app/version.properties` holds a semantic display version (`1.0.0`) and an independent,
+always-increasing Android `VERSION_CODE`. Release builds increment the patch version
+and version code once. Use `-PversionBump=minor` or `-PversionBump=major` for a larger
+release, or `-PnoBump` to rebuild the current version. Calendar versions are retired;
+the internal version code stays above older releases so installed apps can update:
 
 ```bash
 ./gradlew assembleRelease -PnoBump
@@ -67,7 +72,8 @@ Other useful tasks:
 | Task | Purpose |
 |---|---|
 | `printVersion` | Print the current version name and code |
-| `bumpVersion` | Increment the patch version |
+| `bumpVersion` | Increment patch and version code (or use `-PversionBump=minor` / `major`) |
+| `verifyVersioning` | Check version increments without changing files |
 | `installAndPushApk` | Build, install to device, and copy the APK to `/sdcard` |
 | `UpdateMirrors` | Publish the APK and update the update mirror |
 | `uploadGithubRelease` | Create a GitHub Release and upload the APK |

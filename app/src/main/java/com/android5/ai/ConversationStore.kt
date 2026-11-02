@@ -163,9 +163,9 @@ class ConversationStore(context: Context) {
                     "reasoning TEXT, local_image_url TEXT, is_streaming INTEGER NOT NULL DEFAULT 0, " +
                     "is_error INTEGER NOT NULL DEFAULT 0, tools TEXT, timestamp INTEGER NOT NULL)"
             )
-            db.execSQL("DELETE FROM messages")
             db.beginTransaction()
             try {
+                db.execSQL("DELETE FROM messages")
                 conversation.messages.forEach { msg ->
                     db.execSQL(
                         "INSERT INTO messages (id, role, content, reasoning, local_image_url, is_streaming, is_error, tools, timestamp) " +

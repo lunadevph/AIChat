@@ -54,8 +54,12 @@ Kotlin + Jetpack Compose (Material 3). See `README.md` for features and layout.
 
 ## Versioning
 
-- `app/version.properties` is auto-generated calendar versioning (`YY.MM.DD.build`,
-  e.g. `261017.001`); `VERSION_CODE = YYMMDD * 1000 + build`.
+- `app/version.properties` holds a semantic `VERSION_NAME` (`major.minor.patch`) and
+  an independent, increasing Android `VERSION_CODE`. Calendar versioning is retired.
+- Releases increment patch and version code once. Use `-PversionBump=minor` or
+  `-PversionBump=major` for a larger release. Never lower `VERSION_CODE`, including
+  when migrating from old date-based versions. `bumpPatch` is a deprecated alias
+  for `bumpVersion` and must never reset the code.
 - Release builds (`assembleRelease`, `uploadRelease`, …) bump the version once. AGP
   resolves `versionName`/`versionCode` at **configuration** time, so the bumped
   values are computed there and stamped into the APK, while `BumpAppVersions`
