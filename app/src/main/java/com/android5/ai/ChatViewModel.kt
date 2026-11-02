@@ -26,7 +26,7 @@ import java.util.Locale
 import java.util.UUID
 
 enum class LoadingStatus {
-    IDLE, THINKING, SEARCHING, STREAMING, RATE_LIMITED
+    IDLE, THINKING, SEARCHING, STREAMING, EXECUTING, RATE_LIMITED
 }
 
 /** How many tool rounds a single reply may trigger before the app stops looping. */
@@ -574,7 +574,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             }
             val toolBlocks = am.toolCalls.orEmpty().map { call ->
                 AnthropicContentBlock(type = "tool_use", id = call.id, name = call.function?.name,
-                    input = com.google.gson.JsonParser.parseString(call.function?.arguments ?: "{}").asJsonObject)
+                    input = com.google.gson.JsonParser.parseString(call.function?.arguments?.takeIf { it.isNotBlank() } ?: "{}").asJsonObject)
             }
             val allBlocks = blocks.filterNot { it.type == "text" && it.text.isNullOrBlank() } + toolBlocks
             if (allBlocks.isNotEmpty()) messages.add(AnthropicMessage(role = am.role, content = allBlocks))
@@ -897,6 +897,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         require(calls.size <= 32 && calls.all { !it.id.isNullOrBlank() } && calls.map { it.id }.distinct().size == calls.size) {
             "Invalid tool call IDs or too many tool calls"
         }
+        if (calls.isNotEmpty()) loadingStatus = LoadingStatus.EXECUTING
         val runs = calls.map { call ->
             try { withContext(Dispatchers.IO) { AiTools.execute(NativeTools.decode(call), toolScope) } }
             catch (e: kotlinx.coroutines.CancellationException) { throw e }
@@ -923,7 +924,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                             null
                         }
                         ToolRun(run.name, run.label, run.ok, filePath,
-                            callId = calls[index].id, arguments = calls[index].function?.arguments ?: "{}", result = run.result)
+                            callId = calls[index].id, arguments = calls[index].function?.arguments?.takeIf { it.isNotBlank() } ?: "{}", result = run.result)
                     }.ifEmpty { null }
                 )
             }

@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.verticalScroll
@@ -36,6 +37,7 @@ import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -151,7 +153,9 @@ fun ChatScreen(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    var inputText by remember { mutableStateOf("") }
+    val conversationId = viewModel.currentConversation?.id
+    var inputText by rememberSaveable(conversationId) { mutableStateOf("") }
+    var followLatest by rememberSaveable(conversationId) { mutableStateOf(true) }
 
     val listState = rememberLazyListState()
 
@@ -174,36 +178,23 @@ fun ChatScreen(
         viewModel.selectedImageUri = uri
     }
 
-    // Auto-scroll to the newest message. While a reply streams in this fires on
-    // every token, so we must not yank the view when the user has scrolled up to
-    // read earlier messages — only follow when they are already at the bottom.
-    // scrollToItem alone does not follow a growing item, so after it we scroll
-    // by the overflow to keep the tail of the reply on screen.
+    // Only user scrolling changes follow mode. Growing content or an opening
+    // keyboard must not be mistaken for a deliberate scroll away from the tail.
     val lastMessage = viewModel.messages.lastOrNull()
-    val atBottom by remember {
-        derivedStateOf { !listState.canScrollForward }
+    LaunchedEffect(listState, conversationId) {
+        snapshotFlow { listState.isScrollInProgress to listState.canScrollForward }
+            .collect { (scrolling, canScrollForward) ->
+                if (scrolling) followLatest = !canScrollForward
+            }
     }
     LaunchedEffect(
-        viewModel.messages.size,
-        lastMessage?.content,
-        lastMessage?.isStreaming,
-        listOffset
+        conversationId, viewModel.messages.size, lastMessage?.content,
+        lastMessage?.reasoning, lastMessage?.tools, lastMessage?.isStreaming,
+        listOffset, listState.layoutInfo.viewportEndOffset, followLatest
     ) {
-        if (viewModel.messages.isEmpty()) return@LaunchedEffect
-        if (!atBottom || listState.isScrollInProgress) return@LaunchedEffect
-        val lastIndex = listOffset + viewModel.messages.lastIndex
-        // requestScrollToItem with a large offset scrolls as far down as possible,
-        // which keeps the tail of a growing reply on screen even though the item
-        // is already visible.
-        listState.requestScrollToItem(lastIndex, Int.MAX_VALUE)
-    }
-
-    // A brand-new message (user send or assistant reply arriving) always jumps
-    // to the bottom, even if the user was scrolled up reading history.
-    LaunchedEffect(viewModel.messages.size, listOffset) {
-        if (viewModel.messages.isEmpty()) return@LaunchedEffect
-        val lastIndex = listOffset + viewModel.messages.lastIndex
-        listState.requestScrollToItem(lastIndex, Int.MAX_VALUE)
+        if (followLatest && !listState.isScrollInProgress && viewModel.messages.isNotEmpty()) {
+            listState.requestScrollToItem(listOffset + viewModel.messages.lastIndex, Int.MAX_VALUE)
+        }
     }
 
     ModalNavigationDrawer(
@@ -680,7 +671,7 @@ fun ChatScreen(
                         )
                 ) {
                     AnimatedVisibility(
-                        visible = viewModel.isLoading,
+                        visible = viewModel.isLoading && viewModel.messages.lastOrNull()?.isStreaming != true,
                         enter = fadeIn() + expandVertically(),
                         exit = fadeOut() + shrinkVertically(),
                         modifier = Modifier.padding(
@@ -770,28 +761,21 @@ fun ChatScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Expressive toggle button: web search is a filter on
-                                // the request, so it belongs next to the input.
                                 ToggleButton(
                                     checked = webSearchOn,
-                                    onCheckedChange = {
-                                        settingsManager.webSearchEnabled = it
-                                    },
-                                    modifier = Modifier
-                                        .padding(end = 6.dp)
-                                        .semantics { contentDescription = webSearchDescription },
-                                    contentPadding = PaddingValues(
-                                        horizontal = 12.dp,
-                                        vertical = 10.dp
-                                    )
+                                    onCheckedChange = { settingsManager.webSearchEnabled = it },
+                                    modifier = Modifier.semantics { contentDescription = webSearchDescription },
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                                 ) {
-                                    Icon(
-                                        Icons.Rounded.Public,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
-                                    )
+                                    Icon(Icons.Rounded.Public, null, Modifier.size(18.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(webSearchDescription, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
-
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.Bottom
+                            ) {
                                 OutlinedTextField(
                                     value = inputText,
                                     onValueChange = {
@@ -850,6 +834,7 @@ fun ChatScreen(
                                             SplitButtonDefaults.LeadingButton(
                                                 onClick = {
                                                     if (canSend) {
+                                                        followLatest = true
                                                         viewModel.sendMessage(
                                                             inputText,
                                                             context
@@ -1005,6 +990,7 @@ fun ChatScreen(
                                     onClick = {
                                         // Send the starter prompt straight away instead of
                                         // only filling the input box.
+                                        followLatest = true
                                         viewModel.sendMessage(prompt, context)
                                     },
                                     shape = RoundedCornerShape(16.dp),
@@ -1081,13 +1067,13 @@ fun ChatScreen(
                                         Spacer(Modifier.width(10.dp))
                                         Column(Modifier.weight(1f)) {
                                             Text(
-                                                "Update available",
+                                                stringResource(R.string.update_available_title),
                                                 style = MaterialTheme.typography.titleSmall,
                                                 fontWeight = FontWeight.Bold,
                                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                                             )
                                             Text(
-                                                "Version ${UpdateChecker.latestAvailableName(context)} is ready.",
+                                                stringResource(R.string.update_available_sub, UpdateChecker.latestAvailableName(context).orEmpty()),
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                                             )
@@ -1095,7 +1081,7 @@ fun ChatScreen(
                                         TextButton(onClick = {
                                             context.startActivity(Intent(context, UpdateActivity::class.java))
                                         }) {
-                                            Text("Install")
+                                            Text(stringResource(R.string.btn_install_update))
                                         }
                                     }
                                 }
@@ -1105,6 +1091,7 @@ fun ChatScreen(
                             MessageBubble(
                                 message = message,
                                 settingsManager = settingsManager,
+                                actionsEnabled = !viewModel.isLoading,
                                 onRetry = { viewModel.regenerateLast() },
                                 onEdit = { content ->
                                     inputText = content
@@ -1119,8 +1106,9 @@ fun ChatScreen(
                         onClick = {
                             scope.launch {
                                 if (viewModel.messages.isNotEmpty()) {
-                                    listState.animateScrollToItem(
-                                        listOffset + viewModel.messages.size - 1
+                                    followLatest = true
+                                    listState.requestScrollToItem(
+                                        listOffset + viewModel.messages.lastIndex, Int.MAX_VALUE
                                     )
                                 }
                             }
@@ -1176,11 +1164,10 @@ fun ThinkingIndicator(status: LoadingStatus, rateLimitRetryIn: Int = 0) {
                     stringResource(R.string.status_rate_limited)
                 }
 
-            LoadingStatus.THINKING ->
-                stringResource(R.string.status_thinking)
+            LoadingStatus.EXECUTING ->
+                stringResource(R.string.status_executing)
 
-            else ->
-                stringResource(R.string.status_typing)
+            else -> stringResource(R.string.status_working)
         }
 
     // A rate limit is a wait rather than progress, so it gets its own tint.
@@ -1332,6 +1319,7 @@ fun StreamingText(
 fun MessageBubble(
     message: Message,
     settingsManager: SettingsManager,
+    actionsEnabled: Boolean = true,
     onRetry: () -> Unit = {},
     onEdit: (String) -> Unit = {}
 ) {
@@ -1393,6 +1381,7 @@ fun MessageBubble(
                 if (
                     !isUser &&
                     settingsManager.showThinking &&
+                    message.content.isNotBlank() &&
                     !message.reasoning.isNullOrBlank()
                 ) {
                     var showThinking by remember(message.id) {
@@ -1522,6 +1511,10 @@ fun MessageBubble(
                     ) {
                         TypingIndicatorRow()
                     }
+                }
+
+                if (!isUser && !message.tools.isNullOrEmpty()) {
+                    ToolRunRow(message.tools, Alignment.Start)
                 }
 
                 if (message.content.isNotBlank()) {
@@ -1693,12 +1686,6 @@ fun MessageBubble(
                                 )
                             }
 
-                            if (!isUser && !message.tools.isNullOrEmpty()) {
-                                ToolRunRow(
-                                    tools = message.tools,
-                                    alignment = Alignment.Start
-                                )
-                            }
                             val context = LocalContext.current
                             Row(
                                 modifier = Modifier
@@ -1758,6 +1745,7 @@ fun MessageBubble(
                                     // 3. Retry / Regenerate Action for AI Responses
                                     IconButton(
                                         onClick = onRetry,
+                                        enabled = actionsEnabled,
                                         modifier = Modifier.size(48.dp),
                                         shapes = ExpressiveIconButtonShapes
                                     ) {
@@ -1772,6 +1760,7 @@ fun MessageBubble(
                                     // 4. Edit Action for User Messages
                                     IconButton(
                                         onClick = { onEdit(message.content) },
+                                        enabled = actionsEnabled,
                                         modifier = Modifier.size(48.dp),
                                         shapes = ExpressiveIconButtonShapes
                                     ) {
@@ -1833,12 +1822,12 @@ fun ToolRunRow(tools: List<ToolRun>, alignment: Alignment.Horizontal) {
             )
 
             tools.forEachIndexed { index, tool ->
-                // Only the file tools can be opened; the rest stay plain pills.
+                // Every saved result can be inspected, including search and failures.
                 val contentDescription = stringResource(
                     if (tool.ok) R.string.desc_tool_ran else R.string.desc_tool_failed,
                     tool.name
                 )
-                val openable = !tool.path.isNullOrBlank()
+                val openable = !tool.path.isNullOrBlank() || !tool.result.isNullOrBlank()
                 val expanded = expandedIndex == index
 
                 Surface(
@@ -1869,7 +1858,7 @@ fun ToolRunRow(tools: List<ToolRun>, alignment: Alignment.Horizontal) {
                     }
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        modifier = Modifier.heightIn(min = 48.dp).padding(horizontal = 10.dp, vertical = 5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
@@ -1894,76 +1883,34 @@ fun ToolRunRow(tools: List<ToolRun>, alignment: Alignment.Horizontal) {
         }
 
         val expandedTool = tools.getOrNull(expandedIndex)
-        if (expandedTool?.path != null) {
-            Spacer(Modifier.height(6.dp))
-
+        if (expandedTool != null) {
             Surface(
                 shape = RoundedCornerShape(14.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                border = BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                ),
-                tonalElevation = 1.dp,
-                modifier = Modifier.widthIn(max = 320.dp)
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(
-                        start = 12.dp,
-                        end = 4.dp,
-                        top = 6.dp,
-                        bottom = 6.dp
-                    ),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        toolIcon(expandedTool.name),
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.primary
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        stringResource(if (expandedTool.ok) R.string.label_tool_used else R.string.label_tool_failed, expandedTool.name),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (expandedTool.ok) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error
                     )
-
-                    Spacer(Modifier.width(10.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            stringResource(
-                                if (expandedTool.ok) {
-                                    R.string.label_tool_used
-                                } else {
-                                    R.string.label_tool_failed
-                                },
-                                expandedTool.name
-                            ),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-
-                        Text(
-                            expandedTool.path,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-
-                    TextButton(
-                        onClick = {
-                            context.startActivity(
-                                Intent(context, ToolFilesActivity::class.java)
-                                    .putExtra(
-                                        ToolFilesActivity.EXTRA_FILE,
-                                        expandedTool.path
-                                    )
-                            )
+                    if (expandedTool.label.isNotBlank()) Text(expandedTool.label,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (!expandedTool.result.isNullOrBlank()) {
+                        SelectionContainer {
+                            Text(expandedTool.result,
+                                modifier = Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState()),
+                                style = MaterialTheme.typography.bodySmall)
                         }
-                    ) {
-                        Text(
-                            stringResource(R.string.btn_view_file),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                    }
+                    if (!expandedTool.path.isNullOrBlank() && expandedTool.ok) {
+                        TextButton(onClick = {
+                            context.startActivity(Intent(context, ToolFilesActivity::class.java)
+                                .putExtra(ToolFilesActivity.EXTRA_FILE, expandedTool.path))
+                        }) { Text(stringResource(R.string.btn_view_file)) }
                     }
                 }
             }

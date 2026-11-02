@@ -63,7 +63,7 @@ object NativeTools {
     fun decode(call: StreamToolCall): AiTools.Call {
         val name = requireNotNull(call.function?.name)
         require(name in descriptions) { "Unknown tool: $name" }
-        val args = JsonParser.parseString(call.function?.arguments ?: "{}").asJsonObject
+        val args = JsonParser.parseString(call.function?.arguments?.takeIf { it.isNotBlank() } ?: "{}").asJsonObject
         require(args.entrySet().all { (_, value) -> value.isJsonPrimitive }) { "Tool arguments must be scalar values" }
         require(args.keySet().all { it in parameters.getValue(name) } && required(name).all { args.has(it) }) {
             "Unknown or missing tool arguments"
@@ -84,7 +84,7 @@ object NativeTools {
     fun restoreExchange(message: Message): List<ApiMessage> {
         val tools = message.tools.orEmpty()
         if (message.role != "assistant" || tools.isEmpty() || tools.any { it.callId == null || it.arguments == null || it.result == null }) return emptyList()
-        val calls = tools.map { StreamToolCall(id = it.callId, type = "function", function = StreamToolFunction(it.name, it.arguments)) }
+        val calls = tools.map { StreamToolCall(id = it.callId, type = "function", function = StreamToolFunction(it.name, it.arguments?.ifBlank { "{}" })) }
         return exchange(message.content, message.reasoning, calls, tools.map { AiTools.Run(it.name, it.ok, it.label, it.result!!) })
     }
 
@@ -101,7 +101,7 @@ object NativeTools {
         }
         fun complete(): List<StreamToolCall> = partials.values.map {
             require(it.id.isNotBlank() && it.name.isNotBlank()) { "Incomplete tool call" }
-            StreamToolCall(id = it.id, type = "function", function = StreamToolFunction(it.name, it.arguments.toString()))
+            StreamToolCall(id = it.id, type = "function", function = StreamToolFunction(it.name, it.arguments.toString().ifBlank { "{}" }))
         }
     }
 }

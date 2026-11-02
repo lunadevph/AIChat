@@ -13,7 +13,7 @@ class SettingsManager(context: Context) {
         if (_prefs == null) {
             _prefs = context.applicationContext.getSharedPreferences("ai_chat_prefs", Context.MODE_PRIVATE)
             _gson = Gson()
-            _showThinkingState = mutableStateOf(_prefs!!.getBoolean("show_thinking", true))
+            _showThinkingState = mutableStateOf(_prefs!!.getBoolean("show_thinking", false))
             _webSearchState = mutableStateOf(_prefs!!.getBoolean("web_search_enabled", false))
             _themeModeState = mutableStateOf(_prefs!!.getString("theme_mode", "dynamic") ?: "dynamic")
 

@@ -5,6 +5,33 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class NativeToolsTest {
+    @Test fun acceptsEmptyArgumentsForNoArgumentTools() {
+        for (name in listOf("time", "storage", "list", "memory", "compact")) {
+            val call = NativeTools.decode(StreamToolCall(function = StreamToolFunction(name, "")))
+            assertEquals(name, call.name)
+            assertTrue(call.attrs.isEmpty())
+        }
+    }
+
+    @Test fun normalizesStreamedCallsWithoutArgumentDeltas() {
+        val accumulator = NativeTools.Accumulator()
+        accumulator.add(StreamToolCall(index = 0, id = "call_time", function = StreamToolFunction("time")))
+        val call = accumulator.complete().single()
+        assertEquals("{}", call.function!!.arguments)
+        assertEquals("time", NativeTools.decode(call).name)
+    }
+
+    @Test fun createsTheWorkspaceBeforeAnyFileOperation() {
+        val temporary = java.nio.file.Files.createTempDirectory("aichat-tools-test").toFile()
+        try {
+            val workspace = java.io.File(temporary, "workspace")
+            AiTools.prepareWorkspace(workspace)
+            assertTrue(workspace.isDirectory)
+            AiTools.prepareWorkspace(workspace)
+            assertTrue(workspace.isDirectory)
+        } finally { temporary.deleteRecursively() }
+    }
+
     @Test fun assemblesInterleavedStreamedCallsInIndexOrder() {
         val calls = NativeTools.Accumulator()
         calls.add(StreamToolCall(1, "b", function = StreamToolFunction("read", "{\"path\":")))

@@ -1,6 +1,12 @@
 package com.android5.ai
 
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.res.stringResource
@@ -14,12 +20,19 @@ fun BackupPasswordDialog(exporting: Boolean, onDismiss: () -> Unit, onConfirm: (
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.backup_password_title)) },
         text = {
-            Column {
+            Column(
+                modifier = Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 Text(stringResource(if (exporting) R.string.backup_password_export_help else R.string.backup_password_import_help))
                 OutlinedTextField(password, { password = it }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     label = { Text(stringResource(R.string.backup_password_title)) },
                     visualTransformation = PasswordVisualTransformation())
                 if (exporting) OutlinedTextField(confirmation, { confirmation = it }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     label = { Text(stringResource(R.string.backup_password_confirm)) },
                     visualTransformation = PasswordVisualTransformation())
             }

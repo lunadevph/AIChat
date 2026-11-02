@@ -283,4 +283,7 @@
     <string name="backup_import_failed">Import failed. Check the password and backup file.</string>
     <string name="tool_followup_instruction">Use the tool results already provided to finish answering the user. Do not stop at a tool action or return an empty reply. Explain what you found or changed, including any failures.</string>
     <string name="err_empty_reply">The provider returned no answer after a retry. Your tool results are saved; retry the reply or choose another model.</string>
+    <string name="status_executing">Running tools…</string>
+    <string name="label_tool_result">Tool result</string>
+    <string name="status_working">Working…</string>
 </resources>
