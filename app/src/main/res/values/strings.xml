@@ -282,7 +282,7 @@
     <string name="backup_import_ok">Backup imported. Restart the app to see everything.</string>
     <string name="backup_import_failed">Import failed. Check the password and backup file.</string>
     <string name="tool_followup_instruction">Use the tool results already provided to finish answering the user. Do not stop at a tool action or return an empty reply. Explain what you found or changed, including any failures.</string>
-    <string name="err_empty_reply">The provider returned no answer after a retry. Your tool results are saved; retry the reply or choose another model.</string>
+    <string name="err_empty_reply">No answer was received from %1$s (%2$s). Try another model or retry.</string>
     <string name="status_executing">Running tools…</string>
     <string name="label_tool_result">Tool result</string>
     <string name="status_working">Working…</string>
@@ -320,4 +320,7 @@
     <string name="tool_title_shell">Command line</string>
     <string name="tool_title_exec">Command line</string>
     <string name="tool_output_copied">Copied</string>
+    <string name="reply_retry_instruction">Your previous response contained no visible answer. Answer the user\'s last request in plain text now. Use any existing tool results, do not call additional tools, and do not repeat tool actions.</string>
+    <string name="err_reply_token_limit">The model used its reply limit before producing an answer. Increase Max tokens or choose another model.</string>
+    <string name="err_reply_filtered">The provider blocked this reply. Try rephrasing the request or choose another model.</string>
 </resources>

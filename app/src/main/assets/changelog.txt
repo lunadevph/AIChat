@@ -1,4 +1,4 @@
-- The assistant receives the current device date, time and timezone with every request, including resumed conversations.
-- Backup timestamps now correctly record UTC.
-- Activity labels are shorter, tool results use clearer expandable cards, and the actions arrow follows the menu state.
-- Command-line access is restored through shell and exec tools, with exit codes, output limits, timeouts and cancellation.
+- Empty-reply retries now request a text answer without rerunning tools.
+- Replies that run out of tokens get more room on retry, and blocked or truncated replies show a specific explanation.
+- More provider response formats are read correctly, including text blocks and non-streamed responses returned during streaming.
+- Empty-reply recovery reduces reasoning on supported providers so the retry can produce a visible answer.

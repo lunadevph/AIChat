@@ -64,6 +64,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
     private val toolHistory = mutableListOf<ApiMessage>()
     private var allowToolCalls = true
     private var forceNonStream = false
+    private var retryNeedsMoreTokens = false
 
     private fun getApi(): OpenRouterApi = Providers.api(requestProvider ?: settingsManager.selectedProvider, settingsManager.customProviders)
 
@@ -304,15 +305,23 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                         allowToolCalls = settingsManager.toolsEnabled && allowTools
                         forceNonStream = retryEmpty
                         loadingStatus = LoadingStatus.THINKING
-                        val correction = if (retryEmpty || !allowTools) context.getString(R.string.tool_followup_instruction) else null
+                        val correction = when {
+                            retryEmpty -> context.getString(R.string.reply_retry_instruction)
+                            !allowTools -> context.getString(R.string.tool_followup_instruction)
+                            else -> null
+                        }
                         val turn = if (Providers.isAnthropic(requestProvider.orEmpty())) {
                             requestAnthropicTurn(apiKey, searchGrounding, null, correction)
                         } else {
                             requestTurn(apiKey, searchGrounding, null, correction)
                         }
-                        if (turn != null && turn.raw.isBlank() && turn.calls.isEmpty() && turn.index in messages.indices) {
-                            messages.removeAt(turn.index)
-                            updateCurrentConversation()
+                        if (turn != null && turn.raw.isBlank() && turn.calls.isEmpty()) {
+                            retryNeedsMoreTokens = ReplyRecovery.needsMoreTokens(turn)
+                            android.util.Log.w("AIChat", "Empty reply: provider=$requestProvider model=$requestModel finish=${turn.finishReason} reasoningChars=${turn.reasoning?.length ?: 0}")
+                            if (turn.index in messages.indices) {
+                                messages.removeAt(turn.index)
+                                updateCurrentConversation()
+                            }
                         }
                         turn
                     },
@@ -334,7 +343,13 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                     updateCurrentConversation()
                 }
             } catch (e: EmptyReplyException) {
-                showReplyError(context.getString(R.string.err_empty_reply))
+                val error = when (e.finishReason) {
+                    "length", "max_tokens" -> context.getString(R.string.err_reply_token_limit)
+                    "content_filter", "refusal" -> context.getString(R.string.err_reply_filtered)
+                    else -> context.getString(R.string.err_empty_reply,
+                        requestProvider ?: settingsManager.selectedProvider, requestModel ?: settingsManager.selectedModel)
+                }
+                showReplyError(error)
             } catch (e: HttpException) {
                 if (currentJob?.isCancelled == true || currentConversation?.id != conversationId) return@launch
                 val body = lastErrorBody ?: try { e.response()?.errorBody()?.string() } catch (_: Exception) { null }
@@ -364,6 +379,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 requestTranscript = null
                 toolHistory.clear()
                 forceNonStream = false
+                retryNeedsMoreTokens = false
             }
         }
     }
@@ -388,7 +404,8 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             )
             append("\n\n")
             if (toolsEnabled) {
-                append("\n\n").append(AiTools.describe(toolScope))
+                append("\n\n").append(if (allowToolCalls) AiTools.describe(toolScope)
+                    else "Tool execution is paused for this response. Answer the user's request using any existing tool results. Do not request or simulate additional tool calls.")
             } else {
                 // With tools switched off the model can still keep memory; it just
                 // does so with the older fenced block instead of the <memory> tool.
@@ -462,7 +479,8 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         val isGoogle = (requestProvider ?: settingsManager.selectedProvider) == "Google"
         val apiMessages = buildApiMessages(searchGrounding, toolResults, correction)
         val hasToolContext = apiMessages.any { !it.toolCalls.isNullOrEmpty() }
-        val request = ChatRequest(
+        val outputLimit = ReplyRecovery.tokenLimit(settingsManager.maxTokens, forceNonStream, retryNeedsMoreTokens)
+        val request = ReplyRecovery.retryRequest(ChatRequest(
             model = (requestModel ?: settingsManager.selectedModel),
             messages = apiMessages,
             tools = if (allowToolCalls || hasToolContext) NativeTools.openAiDefinitions() else null,
@@ -470,11 +488,11 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             stream = if (settingsManager.streamingEnabled && !forceNonStream) true else null,
             temperature = if (isReasoning) null else settingsManager.temperature.toDouble(),
             topP = if (isReasoning) null else settingsManager.topP.toDouble(),
-            maxTokens = if (isReasoning) null else settingsManager.maxTokens,
-            maxCompletionTokens = if (isReasoning) settingsManager.maxTokens else null,
+            maxTokens = if (isReasoning) null else outputLimit,
+            maxCompletionTokens = if (isReasoning) outputLimit else null,
             frequencyPenalty = if (isReasoning || isGoogle) null else settingsManager.frequencyPenalty.toDouble(),
             presencePenalty = if (isReasoning || isGoogle) null else settingsManager.presencePenalty.toDouble()
-        )
+        ), requestProvider ?: settingsManager.selectedProvider, forceNonStream)
 
         val isAnthropic = Providers.isAnthropic((requestProvider ?: settingsManager.selectedProvider))
         val authHeader = if (isAnthropic) null else "Bearer $apiKey"
@@ -515,7 +533,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             system = system,
             tools = if (allowToolCalls || hasToolContext) NativeTools.anthropicDefinitions() else null,
             toolChoice = if (!allowToolCalls && hasToolContext) mapOf("type" to "none") else null,
-            maxTokens = settingsManager.maxTokens.coerceAtLeast(1),
+            maxTokens = ReplyRecovery.tokenLimit(settingsManager.maxTokens, forceNonStream, retryNeedsMoreTokens),
             stream = if (settingsManager.streamingEnabled && !forceNonStream) true else null,
             temperature = if (isReasoning) null else settingsManager.temperature.toDouble(),
             topP = if (isReasoning) null else settingsManager.topP.toDouble()
@@ -607,7 +625,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             )
         )
         updateCurrentConversation()
-        return ToolReply(raw, messages.lastIndex, reasoning, calls)
+        return ToolReply(raw, messages.lastIndex, reasoning, calls, response.stopReason)
     }
 
     private suspend fun anthropicStreamResponse(
@@ -628,6 +646,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
 
         val contentBuilder = StringBuilder()
         val thinkingBuilder = StringBuilder()
+        var finishReason: String? = null
         val toolCalls = NativeTools.Accumulator()
         var lastUiUpdateTime = 0L
 
@@ -646,6 +665,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                         val event = gson.fromJson(data, AnthropicStreamEvent::class.java) ?: continue
                         when (event.type) {
                             "error" -> throw java.io.IOException(event.error?.message ?: "Provider stream failed")
+                            "message_delta" -> finishReason = event.delta?.stopReason ?: finishReason
                             "content_block_start" -> event.contentBlock?.takeIf { it.type == "tool_use" }?.let {
                                 toolCalls.add(StreamToolCall(index = event.index, id = it.id, function = StreamToolFunction(it.name)))
                             }
@@ -695,7 +715,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 )
             }
         }
-        return ToolReply(raw, msgIndex, reasoning, toolCalls.complete())
+        return ToolReply(raw, msgIndex, reasoning, toolCalls.complete(), finishReason)
     }
 
     private fun getAnthropicApi(): AnthropicApi = Providers.anthropicApi()
@@ -769,6 +789,10 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         )
 
         activeStream = responseBody
+        if (withContext(Dispatchers.IO) { ReplyRecovery.isJson(responseBody.source()) }) {
+            val response = withContext(Dispatchers.IO) { responseBody.use { gson.fromJson(it.string(), ChatResponse::class.java) } }
+            return appendOpenAiResponse(response)
+        }
         // Add placeholder streaming message
         val streamingMessage = Message(role = "assistant", content = "", isStreaming = true)
         messages.add(streamingMessage)
@@ -777,6 +801,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
 
         val contentBuilder = StringBuilder()
         val reasoningBuilder = StringBuilder()
+        var finishReason: String? = null
         var lastUiUpdateTime = 0L
         val toolCalls = NativeTools.Accumulator()
 
@@ -807,14 +832,19 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                         }
 
                         val choice = chunk.choices?.firstOrNull() ?: continue
-                        val delta = choice.delta ?: continue
-
-                        // Multiple tool calls may interleave their argument fragments.
-                        delta.toolCalls.orEmpty().forEach { toolCalls.add(it) }
-
-                        // Accumulate content and reasoning
-                        delta.content?.let { contentBuilder.append(it) }
-                        delta.thinking?.let { reasoningBuilder.append(it) }
+                        finishReason = ReplyRecovery.finishReason(choice.finishReason) ?: finishReason
+                        val delta = choice.delta
+                        delta?.toolCalls.orEmpty().forEach { toolCalls.add(it) }
+                        delta?.content?.let { contentBuilder.append(it) }
+                        delta?.refusal?.let { contentBuilder.append(it) }
+                        delta?.thinking?.let { reasoningBuilder.append(it) }
+                        // Some compatible servers put a whole message in an SSE event.
+                        choice.message?.let { message ->
+                            message.content?.let { contentBuilder.append(it) }
+                            message.refusal?.let { contentBuilder.append(it) }
+                            message.thinking?.let { reasoningBuilder.append(it) }
+                            message.toolCalls.orEmpty().forEachIndexed { index, call -> toolCalls.add(call.copy(index = index)) }
+                        }
 
                         val now = System.currentTimeMillis()
                         if (now - lastUiUpdateTime >= 35) {
@@ -833,7 +863,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                         }
 
                         // Check finish reason
-                        if (choice.finishReason != null) break
+                        if (ReplyRecovery.finishReason(choice.finishReason) != null) break
                     } catch (e: kotlinx.coroutines.CancellationException) {
                         throw e
                     } catch (_: com.google.gson.JsonParseException) {
@@ -856,7 +886,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 )
             }
         }
-        return ToolReply(raw, msgIndex, reasoning, toolCalls.complete())
+        return ToolReply(raw, msgIndex, reasoning, toolCalls.complete(), finishReason)
     }
 
     private suspend fun nonStreamResponse(authHeader: String?, xApiKey: String?, anthropicHeader: String?, request: ChatRequest): ToolReply? {
@@ -868,7 +898,13 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             request = nonStreamRequest
         )
 
-        val assistantMsg = response.choices.firstOrNull()?.message ?: return null
+        return appendOpenAiResponse(response)
+    }
+
+    private fun appendOpenAiResponse(response: ChatResponse): ToolReply? {
+        response.error?.let { throw java.io.IOException(it.message ?: "Provider returned an error") }
+        val choice = response.choices.orEmpty().firstOrNull() ?: return null
+        val assistantMsg = choice.message ?: return ToolReply("", -1, null, finishReason = choice.finishReason)
 
         val calls = assistantMsg.toolCalls.orEmpty()
 
@@ -876,13 +912,14 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         messages.add(
             Message(
                 role = "assistant",
-                content = visibleText(assistantMsg.content.orEmpty(), streaming = false),
+                content = visibleText(assistantMsg.content?.takeIf { it.isNotBlank() } ?: assistantMsg.refusal.orEmpty(), streaming = false),
                 reasoning = reasoning,
                 isStreaming = false
             )
         )
         updateCurrentConversation()
-        return ToolReply(assistantMsg.content.orEmpty(), messages.lastIndex, reasoning, calls)
+        return ToolReply(assistantMsg.content?.takeIf { it.isNotBlank() } ?: assistantMsg.refusal.orEmpty(),
+            messages.lastIndex, reasoning, calls, ReplyRecovery.finishReason(choice.finishReason))
     }
 
     /**

@@ -7,10 +7,11 @@ internal data class ToolReply(
     val raw: String,
     val index: Int,
     val reasoning: String?,
-    val calls: List<StreamToolCall> = emptyList()
+    val calls: List<StreamToolCall> = emptyList(),
+    val finishReason: String? = null
 )
 
-internal class EmptyReplyException : Exception()
+internal class EmptyReplyException(val finishReason: String? = null) : Exception()
 
 /** A tool response is an intermediate turn. Only a text answer completes the reply. */
 internal object ToolReplyLoop {
@@ -24,11 +25,12 @@ internal object ToolReplyLoop {
         var retryEmpty = false
         while (true) {
             currentCoroutineContext().ensureActive()
-            val allowTools = toolRounds < maxToolRounds
+            val allowTools = toolRounds < maxToolRounds && !retryEmpty
             val reply = request(allowTools, retryEmpty)
             currentCoroutineContext().ensureActive()
             if (reply == null || (reply.raw.isBlank() && reply.calls.isEmpty())) {
-                if (retryEmpty) throw EmptyReplyException()
+                if (reply?.finishReason in setOf("content_filter", "refusal")) throw EmptyReplyException(reply?.finishReason)
+                if (retryEmpty) throw EmptyReplyException(reply?.finishReason)
                 retryEmpty = true
                 continue
             }

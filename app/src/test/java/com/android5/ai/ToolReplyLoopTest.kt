@@ -53,6 +53,26 @@ class ToolReplyLoopTest {
         assertEquals(2, requests)
     }
 
+    @Test fun emptyReplyRetryDisablesFurtherToolExecution() = runBlocking {
+        var requests = 0
+        ToolReplyLoop.run(8, request = { allowTools, retry ->
+            if (++requests == 1) { assertTrue(allowTools); ToolReply("", 0, "reasoning", finishReason = "length") }
+            else { assertFalse(allowTools); assertTrue(retry); ToolReply("Recovered answer", 1, null) }
+        }, apply = {})
+        assertEquals(2, requests)
+    }
+
+    @Test fun filteredResponseIsNotPointlesslyRetried() = runBlocking {
+        var requests = 0
+        try {
+            ToolReplyLoop.run(8, request = { _, _ -> requests++; ToolReply("", 0, null, finishReason = "content_filter") }, apply = {})
+            fail("Expected a specific filtered response")
+        } catch (e: EmptyReplyException) {
+            assertEquals("content_filter", e.finishReason)
+            assertEquals(1, requests)
+        }
+    }
+
     @Test fun repeatedEmptyResponseRaisesVisibleFailure() = runBlocking {
         var requests = 0
         try {

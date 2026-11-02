@@ -19,12 +19,17 @@ data class ChatRequest(
     @com.google.gson.annotations.SerializedName("frequency_penalty")
     val frequencyPenalty: Double? = null,
     @com.google.gson.annotations.SerializedName("presence_penalty")
-    val presencePenalty: Double? = null
+    val presencePenalty: Double? = null,
+    @SerializedName("reasoning_effort") val reasoningEffort: String? = null,
+    val reasoning: Map<String, String>? = null,
+    val thinking: Map<String, String>? = null
 )
 
 // SSE streaming response models
 data class StreamDelta(
+    @com.google.gson.annotations.JsonAdapter(ProviderTextAdapter::class)
     val content: String? = null,
+    val refusal: String? = null,
     val role: String? = null,
     @SerializedName("reasoning_content") val reasoningContent: String? = null,
     val reasoning: String? = null,
@@ -48,6 +53,7 @@ data class StreamToolFunction(
 
 data class StreamChoice(
     val delta: StreamDelta? = null,
+    val message: AssistantMessage? = null,
     @SerializedName("finish_reason") val finishReason: String? = null
 )
 
@@ -124,16 +130,20 @@ data class Conversation(
 )
 
 data class ChatResponse(
-    val choices: List<Choice>
+    val choices: List<Choice> = emptyList(),
+    val error: StreamError? = null
 )
 
 data class Choice(
-    val message: AssistantMessage
+    val message: AssistantMessage?,
+    @SerializedName("finish_reason") val finishReason: String? = null
 )
 
 data class AssistantMessage(
     val role: String,
+    @com.google.gson.annotations.JsonAdapter(ProviderTextAdapter::class)
     val content: String? = null,
+    val refusal: String? = null,
     @SerializedName("reasoning_content") val reasoningContent: String? = null,
     val reasoning: String? = null,
     /** Native function calls returned by the provider. */
@@ -220,7 +230,8 @@ data class AnthropicDelta(
     val type: String? = null,
     val text: String? = null,
     val thinking: String? = null,
-    @SerializedName("partial_json") val partialJson: String? = null
+    @SerializedName("partial_json") val partialJson: String? = null,
+    @SerializedName("stop_reason") val stopReason: String? = null
 )
 
 data class ModelInfo(
