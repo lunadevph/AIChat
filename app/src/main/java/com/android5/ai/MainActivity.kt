@@ -52,6 +52,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -59,6 +60,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
@@ -861,8 +863,8 @@ fun ChatScreen(
                                                 }
                                             ) {
                                                 Icon(
-                                                    Icons.Rounded.KeyboardArrowDown,
-                                                    stringResource(R.string.desc_more_actions),
+                                                    if (menuExpanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
+                                                    stringResource(if (menuExpanded) R.string.tool_collapse else R.string.desc_more_actions),
                                                     Modifier.size(20.dp)
                                                 )
                                             }
@@ -1792,7 +1794,38 @@ private fun toolIcon(name: String) = when (name) {
     "compact" -> Icons.Rounded.Compress
     "websearch" -> Icons.Rounded.Public
     "time" -> Icons.Rounded.Schedule
+    "shell", "exec" -> Icons.Rounded.Terminal
     else -> Icons.Rounded.Build
+}
+
+private fun toolTitleRes(name: String): Int = when (name) {
+    "read" -> R.string.tool_title_read
+    "cat" -> R.string.tool_title_cat
+    "write" -> R.string.tool_title_write
+    "append" -> R.string.tool_title_append
+    "edit" -> R.string.tool_title_edit
+    "replace" -> R.string.tool_title_replace
+    "list" -> R.string.tool_title_list
+    "search" -> R.string.tool_title_search
+    "find" -> R.string.tool_title_find
+    "stat" -> R.string.tool_title_stat
+    "tail" -> R.string.tool_title_tail
+    "delete" -> R.string.tool_title_delete
+    "mkdir" -> R.string.tool_title_mkdir
+    "move" -> R.string.tool_title_move
+    "copy" -> R.string.tool_title_copy
+    "download" -> R.string.tool_title_download
+    "fetch" -> R.string.tool_title_fetch
+    "upload" -> R.string.tool_title_upload
+    "open" -> R.string.tool_title_open
+    "storage" -> R.string.tool_title_storage
+    "memory" -> R.string.tool_title_memory
+    "compact" -> R.string.tool_title_compact
+    "websearch" -> R.string.tool_title_websearch
+    "time" -> R.string.tool_title_time
+    "shell" -> R.string.tool_title_shell
+    "exec" -> R.string.tool_title_exec
+    else -> R.string.label_tool_result
 }
 
 /**
@@ -1802,115 +1835,94 @@ private fun toolIcon(name: String) = when (name) {
 @Composable
 fun ToolRunRow(tools: List<ToolRun>, alignment: Alignment.Horizontal) {
     var expandedIndex by remember(tools) { mutableStateOf(-1) }
+    var copiedIndex by remember(tools) { mutableStateOf(-1) }
     val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 6.dp),
-        horizontalAlignment = alignment
+        modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+        horizontalAlignment = alignment,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                stringResource(R.string.label_tools_used),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            tools.forEachIndexed { index, tool ->
-                // Every saved result can be inspected, including search and failures.
-                val contentDescription = stringResource(
-                    if (tool.ok) R.string.desc_tool_ran else R.string.desc_tool_failed,
-                    tool.name
-                )
-                val openable = !tool.path.isNullOrBlank() || !tool.result.isNullOrBlank()
-                val expanded = expandedIndex == index
-
-                Surface(
-                    onClick = {
-                        expandedIndex = if (expanded) -1 else index
-                    },
-                    enabled = openable,
-                    shape = RoundedCornerShape(50),
-                    color = if (tool.ok) {
-                        if (expanded) {
-                            MaterialTheme.colorScheme.secondaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.secondaryContainer
-                                .copy(alpha = 0.75f)
-                        }
-                    } else {
-                        MaterialTheme.colorScheme.errorContainer
-                    },
-                    contentColor = if (tool.ok) {
-                        MaterialTheme.colorScheme.onSecondaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onErrorContainer
-                    },
-                    tonalElevation = 1.dp,
-                    modifier = Modifier.semantics {
-                        this.contentDescription = contentDescription
-                        if (openable) this.role = Role.Button
-                    }
-                ) {
-                    Row(
-                        modifier = Modifier.heightIn(min = 48.dp).padding(horizontal = 10.dp, vertical = 5.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            toolIcon(tool.name),
-                            contentDescription = null,
-                            modifier = Modifier.size(13.dp)
-                        )
-
-                        Spacer(Modifier.width(5.dp))
-
-                        Text(
-                            text = if (tool.label.isBlank()) tool.name else "${tool.name} · ${tool.label}",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.widthIn(max = 200.dp)
-                        )
-                    }
-                }
-            }
-        }
-
-        val expandedTool = tools.getOrNull(expandedIndex)
-        if (expandedTool != null) {
+        tools.forEachIndexed { index, tool ->
+            val expanded = expandedIndex == index
+            val inspectable = !tool.path.isNullOrBlank() || !tool.result.isNullOrBlank()
+            val stateLabel = stringResource(if (expanded) R.string.tool_collapse else R.string.tool_expand)
+            val statusColor = if (tool.ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
             Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-                modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                border = BorderStroke(1.dp, if (tool.ok) MaterialTheme.colorScheme.outlineVariant else MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                modifier = Modifier.fillMaxWidth().animateContentSize()
             ) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        stringResource(if (expandedTool.ok) R.string.label_tool_used else R.string.label_tool_failed, expandedTool.name),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (expandedTool.ok) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error
-                    )
-                    if (expandedTool.label.isNotBlank()) Text(expandedTool.label,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (!expandedTool.result.isNullOrBlank()) {
-                        SelectionContainer {
-                            Text(expandedTool.result,
-                                modifier = Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState()),
-                                style = MaterialTheme.typography.bodySmall)
+                Column {
+                    Surface(
+                        onClick = { expandedIndex = if (expanded) -1 else index; copiedIndex = -1 },
+                        enabled = inspectable,
+                        color = Color.Transparent,
+                        modifier = Modifier.fillMaxWidth().semantics {
+                            if (inspectable) stateDescription = stateLabel
+                        }
+                    ) {
+                        Row(
+                            modifier = Modifier.heightIn(min = 64.dp).padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Surface(shape = RoundedCornerShape(12.dp),
+                                color = if (tool.ok) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer) {
+                                Icon(toolIcon(tool.name), null, Modifier.padding(10.dp).size(20.dp), tint = statusColor)
+                            }
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(stringResource(toolTitleRes(tool.name)), style = MaterialTheme.typography.titleSmall,
+                                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                if (tool.label.isNotBlank()) Text(tool.label,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Text(stringResource(if (tool.ok) R.string.tool_status_completed else R.string.tool_status_failed),
+                                    style = MaterialTheme.typography.labelSmall, color = statusColor)
+                            }
+                            Icon(if (tool.ok) Icons.Rounded.CheckCircle else Icons.Rounded.ErrorOutline,
+                                null, Modifier.size(18.dp), tint = statusColor)
+                            if (inspectable) Icon(if (expanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
+                                null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
-                    if (!expandedTool.path.isNullOrBlank() && expandedTool.ok) {
-                        TextButton(onClick = {
-                            context.startActivity(Intent(context, ToolFilesActivity::class.java)
-                                .putExtra(ToolFilesActivity.EXTRA_FILE, expandedTool.path))
-                        }) { Text(stringResource(R.string.btn_view_file)) }
+                    AnimatedVisibility(visible = expanded) {
+                        Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Text(stringResource(R.string.label_tool_result),
+                                    style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
+                                if (!tool.result.isNullOrBlank()) TextButton(onClick = {
+                                    clipboard.setText(AnnotatedString(tool.result))
+                                    copiedIndex = index
+                                }) {
+                                    Icon(if (copiedIndex == index) Icons.Rounded.Check else Icons.Rounded.ContentCopy,
+                                        null, Modifier.size(16.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(stringResource(if (copiedIndex == index) R.string.tool_output_copied else R.string.tool_copy_output))
+                                }
+                            }
+                            Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerLowest) {
+                                SelectionContainer {
+                                    Text(tool.result?.takeIf { it.isNotBlank() } ?: stringResource(R.string.tool_no_output),
+                                        modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp)
+                                            .verticalScroll(rememberScrollState()).padding(12.dp),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontFamily = if (tool.name in setOf("shell", "exec")) FontFamily.Monospace else FontFamily.Default)
+                                }
+                            }
+                            val viewable = remember(tool.path, tool.ok) {
+                                tool.ok && tool.path?.let { ToolFiles.resolve(context, it)?.isFile } == true
+                            }
+                            if (viewable) TextButton(onClick = {
+                                context.startActivity(Intent(context, ToolFilesActivity::class.java)
+                                    .putExtra(ToolFilesActivity.EXTRA_FILE, tool.path))
+                            }) { Text(stringResource(R.string.btn_view_file)) }
+                        }
                     }
                 }
             }

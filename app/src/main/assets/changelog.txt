@@ -1,8 +1,4 @@
-- Tool activity and results stay visible even when the assistant has no accompanying text.
-- Reading earlier messages no longer jumps to the bottom when a reply or tool result arrives.
-- The message composer gives text more space on small screens and keeps the current draft after rotation.
-- Tool execution shows a clear working status, and result details can be opened for every tool.
-- Backup password fields remain accessible with the keyboard open.
-- Duplicate thinking indicators are removed, and reasoning panels are hidden by default.
-- Tools with no arguments work correctly, and a fresh workspace is created before the first tool runs.
-- Tool errors now explain the current JSON format instead of suggesting obsolete tags.
+- The assistant receives the current device date, time and timezone with every request, including resumed conversations.
+- Backup timestamps now correctly record UTC.
+- Activity labels are shorter, tool results use clearer expandable cards, and the actions arrow follows the menu state.
+- Command-line access is restored through shell and exec tools, with exit codes, output limits, timeouts and cancellation.

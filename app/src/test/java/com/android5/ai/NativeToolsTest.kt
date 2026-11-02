@@ -58,9 +58,13 @@ class NativeToolsTest {
         assertEquals("true", call.attrs["all"])
     }
 
-    @Test(expected = IllegalArgumentException::class)
-    fun rejectsShellExecution() {
-        NativeTools.decode(StreamToolCall(function = StreamToolFunction("shell", "{}")))
+    @Test fun acceptsNativeShellAndExecCalls() {
+        for (name in listOf("shell", "exec")) {
+            val call = NativeTools.decode(StreamToolCall(function = StreamToolFunction(name,
+                """{"command":"echo hello","cwd":".","timeout":5}""")))
+            assertEquals("echo hello", call.attrs["command"])
+            assertEquals("5", call.attrs["timeout"])
+        }
     }
 
     @Test(expected = IllegalArgumentException::class)
@@ -87,7 +91,7 @@ class NativeToolsTest {
         assertFalse(json.has("content"))
         val result = gson.toJsonTree(ApiMessage("tool", "ok", toolCallId = "a")).asJsonObject
         assertEquals("a", result["tool_call_id"].asString)
-        assertTrue(NativeTools.openAiDefinitions().none { it.toString().contains("shell") })
+        assertTrue(NativeTools.openAiDefinitions().any { it.toString().contains("shell") })
         assertEquals(NativeTools.openAiDefinitions().size, NativeTools.anthropicDefinitions().size)
     }
 }

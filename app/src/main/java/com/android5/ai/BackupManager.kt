@@ -5,9 +5,6 @@ import android.net.Uri
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import java.security.MessageDigest
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import javax.crypto.Cipher
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
@@ -93,7 +90,7 @@ object BackupManager {
                     android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP)
                 }
             val backup = Backup(
-                createdAt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).format(Date()),
+                createdAt = AppClock.utcTimestamp(),
                 conversations = convs,
                 settings = settings,
                 apiKeys = apiKeys,

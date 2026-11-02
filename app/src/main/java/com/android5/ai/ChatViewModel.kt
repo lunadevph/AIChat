@@ -379,6 +379,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         val agentMemory = settingsManager.agentMemory
         val toolsEnabled = settingsManager.toolsEnabled
         val systemContent = buildString {
+            append(AppClock.context()).append("\n\n")
             if (instructions.isNotBlank()) append(instructions).append("\n\n")
             if (userMemory.isNotBlank()) append("User-provided long-term memory:\n").append(userMemory).append("\n\n")
             if (agentMemory.isNotBlank()) append("Your self-managed memory of this user:\n").append(agentMemory).append("\n\n")

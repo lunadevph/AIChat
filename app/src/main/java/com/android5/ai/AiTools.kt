@@ -49,7 +49,7 @@ object AiTools {
     val names = listOf(
         "read", "cat", "write", "append", "edit", "replace", "list", "search", "find",
         "stat", "tail", "delete", "mkdir", "move", "copy", "download", "fetch",
-        "upload", "open", "storage", "memory", "compact", "websearch", "time"
+        "upload", "open", "storage", "memory", "compact", "websearch", "time", "shell", "exec"
     )
 
     /**
@@ -285,12 +285,33 @@ object AiTools {
             "compact" -> compact(call, scope)
             "websearch" -> webSearch(call)
             "time" -> Run("time", true, "time", time())
+            "shell", "exec" -> shell(call, scope)
             else -> fail(call.name, "Unknown tool. Available: ${names.joinToString(", ")}.")
         }
     } catch (e: kotlinx.coroutines.CancellationException) {
         throw e
     } catch (e: Exception) {
         fail(call.name, "${e.javaClass.simpleName}: ${e.message ?: "no detail"}")
+    }
+
+    private suspend fun shell(call: Call, scope: Scope): Run {
+        val command = call.attrs["command"]?.takeIf { it.isNotBlank() }
+            ?: return fail(call.name, "Provide a nonempty command argument.")
+        val cwd = call.attrs["cwd"]?.let { scope.resolveTarget(it) } ?: scope.root
+        if (call.attrs.containsKey("cwd") && scope.resolveTarget(call.attrs.getValue("cwd")) == null) {
+            return outside(scope, call.name, call.attrs.getValue("cwd"))
+        }
+        val timeout = (call.attrs["timeout"]?.toLongOrNull() ?: 30L).coerceIn(1L, 60L)
+        val result = ShellRunner.run(command, cwd, timeout * 1000, scope.maxChars)
+        val details = buildString {
+            append("$ ").append(command).append("\n")
+            append("Working directory: ").append(scope.rel(cwd)).append("\n")
+            if (result.timedOut) append("Timed out after $timeout seconds\n")
+            else append("Exit code: ").append(result.exitCode).append("\n")
+            append(result.output)
+            if (result.truncated) append("\n[Output truncated]")
+        }
+        return Run(call.name, !result.timedOut && result.exitCode == 0, command, details)
     }
 
     private fun fail(name: String, message: String) = Run(name, false, name, "Error: $message")
@@ -1157,6 +1178,9 @@ object AiTools {
             append("Absolute paths may access these shared roots: ")
             append(scope.deviceRoots.joinToString { it.absolutePath })
         } else append("Device storage access is off; absolute paths are unavailable.")
-        append(" Shell execution is unavailable. Use the scoped file tools instead.")
+        append(" The shell and exec tools run commands with this app's Android permissions, including access to its private data. ")
+        append("Their working directory is not a filesystem sandbox. They cannot gain root or bypass Android permissions. ")
+        append("Use command for the command text, cwd for an optional allowed starting directory, and timeout for 1-60 seconds. ")
+        append("Use shell commands when the task needs them; report the actual exit code and output, and never claim a command succeeded without its result.")
     }
 }

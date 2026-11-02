@@ -20,7 +20,9 @@ object NativeTools {
         "open" to "Open path in the user's viewer.", "storage" to "Inspect allowed storage and free space.",
         "memory" to "Read saved memory, or set complete memory using content; mode=append appends.",
         "compact" to "Deduplicate and shorten memory to max characters.",
-        "websearch" to "Search the web for query.", "time" to "Read current date and time."
+        "websearch" to "Search the web for query.", "time" to "Read current date and time.",
+        "shell" to "Run an Android shell command as the app; required command, optional relative cwd and timeout in seconds (1-60). Returns merged output and exit code. The working directory does not restrict filesystem access.",
+        "exec" to "Alias for shell: execute command with optional cwd and timeout (1-60 seconds)."
     )
     private val parameters = mapOf(
         "read" to listOf("path"), "cat" to listOf("path"),
@@ -34,7 +36,8 @@ object NativeTools {
         "download" to listOf("url", "path"), "fetch" to listOf("url"),
         "upload" to listOf("path", "to"), "open" to listOf("path"), "storage" to emptyList(),
         "memory" to listOf("content", "mode"), "compact" to listOf("max"),
-        "websearch" to listOf("query"), "time" to emptyList()
+        "websearch" to listOf("query"), "time" to emptyList(),
+        "shell" to listOf("command", "cwd", "timeout"), "exec" to listOf("command", "cwd", "timeout")
     )
     private val optional = setOf("list", "storage", "memory", "compact", "time")
     private fun required(name: String): List<String> = when (name) {
@@ -47,7 +50,7 @@ object NativeTools {
     }
     private fun schema(name: String): Map<String, Any> = mapOf(
         "type" to "object", "properties" to parameters.getValue(name).associateWith {
-            mapOf("type" to when (it) { "all", "ignorecase", "first" -> "boolean"; "lines", "max" -> "integer"; else -> "string" })
+            mapOf("type" to when (it) { "all", "ignorecase", "first" -> "boolean"; "lines", "max", "timeout" -> "integer"; else -> "string" })
         }, "required" to required(name), "additionalProperties" to false
     )
 

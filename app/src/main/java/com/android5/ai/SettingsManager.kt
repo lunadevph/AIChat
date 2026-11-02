@@ -219,7 +219,7 @@ class SettingsManager(context: Context) {
             _prefs!!.edit().putBoolean("web_search_enabled", value).apply()
         }
 
-    /** Whether the assistant may run in-band tool calls (`<read>`, `<memory>`, …). */
+    /** Whether the assistant may run native tools, including shell commands. */
     var toolsEnabled: Boolean
         get() = _prefs!!.getBoolean("tools_enabled", true)
         set(value) = _prefs!!.edit().putBoolean("tools_enabled", value).apply()
