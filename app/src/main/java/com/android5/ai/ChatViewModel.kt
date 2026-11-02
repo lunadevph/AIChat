@@ -65,7 +65,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
     private var allowToolCalls = true
     private var forceNonStream = false
 
-    private fun getApi(): OpenRouterApi = Providers.api(requestProvider ?: settingsManager.selectedProvider)
+    private fun getApi(): OpenRouterApi = Providers.api(requestProvider ?: settingsManager.selectedProvider, settingsManager.customProviders)
 
     val conversations = mutableStateListOf<Conversation>()
     var currentConversation by mutableStateOf<Conversation?>(null)
@@ -989,7 +989,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                         AnthropicRequest(model = model, system = summaryPrompt,
                             messages = listOf(AnthropicMessage("user", listOf(AnthropicContentBlock(text = firstMessage)))))).text
                 } else {
-                    Providers.api(provider).getCompletion(authorization = "Bearer $apiKey", request = request)
+                    Providers.api(provider, settingsManager.customProviders).getCompletion(authorization = "Bearer $apiKey", request = request)
                         .choices.firstOrNull()?.message?.content ?: return@launch
                 }
                 // Keep the first line only and drop the quoting/bullet decoration

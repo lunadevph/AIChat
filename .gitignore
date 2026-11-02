@@ -12,7 +12,7 @@ local.properties
 *.jks
 *.env
 keystore.properties
-
+summary.md
 github_token.txt
 mirror_token.txt
 hs_err_pid*.log
