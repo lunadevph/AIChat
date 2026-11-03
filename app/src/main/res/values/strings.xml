@@ -323,4 +323,12 @@
     <string name="reply_retry_instruction">Your previous response contained no visible answer. Answer the user\'s last request in plain text now. Use any existing tool results, do not call additional tools, and do not repeat tool actions.</string>
     <string name="err_reply_token_limit">The model used its reply limit before producing an answer. Increase Max tokens or choose another model.</string>
     <string name="err_reply_filtered">The provider blocked this reply. Try rephrasing the request or choose another model.</string>
+    <string name="setting_show_tool_output">Show tool output</string>
+    <string name="setting_show_tool_output_sub">Show tool result details in chat. Activity labels remain visible when hidden.</string>
+    <string name="activity_thinking">Thinking…</string>
+    <string name="activity_responding">Responding…</string>
+    <string name="activity_running_tool">Running %1$s…</string>
+    <string name="tool_status_queued">Waiting</string>
+    <string name="tool_status_running">Running</string>
+    <string name="tool_status_cancelled">Stopped</string>
 </resources>

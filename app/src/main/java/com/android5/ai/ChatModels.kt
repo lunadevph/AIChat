@@ -99,7 +99,8 @@ data class ToolRun(
     val path: String? = null,
     val callId: String? = null,
     val arguments: String? = null,
-    val result: String? = null
+    val result: String? = null,
+    val state: String? = null
 )
 
 data class Message(

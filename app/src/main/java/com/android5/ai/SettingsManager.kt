@@ -14,6 +14,7 @@ class SettingsManager(context: Context) {
             _prefs = context.applicationContext.getSharedPreferences("ai_chat_prefs", Context.MODE_PRIVATE)
             _gson = Gson()
             _showThinkingState = mutableStateOf(_prefs!!.getBoolean("show_thinking", false))
+            _showToolOutputState = mutableStateOf(_prefs!!.getBoolean("show_tool_output", true))
             _webSearchState = mutableStateOf(_prefs!!.getBoolean("web_search_enabled", false))
             _themeModeState = mutableStateOf(_prefs!!.getString("theme_mode", "dynamic") ?: "dynamic")
 
@@ -212,6 +213,13 @@ class SettingsManager(context: Context) {
             _prefs!!.edit().putBoolean("show_thinking", value).apply()
         }
 
+    var showToolOutput: Boolean
+        get() = _showToolOutputState!!.value
+        set(value) {
+            _showToolOutputState!!.value = value
+            _prefs!!.edit().putBoolean("show_tool_output", value).apply()
+        }
+
     var webSearchEnabled: Boolean
         get() = _webSearchState!!.value
         set(value) {
@@ -257,6 +265,7 @@ class SettingsManager(context: Context) {
         private var _prefs: SharedPreferences? = null
         private var _gson: Gson? = null
         private var _showThinkingState: MutableState<Boolean>? = null
+        private var _showToolOutputState: MutableState<Boolean>? = null
         private var _webSearchState: MutableState<Boolean>? = null
         private var _themeModeState: MutableState<String>? = null
     }

@@ -85,8 +85,8 @@ object NativeTools {
 
     /** Rebuild complete tool exchanges saved in the existing tools JSON column. */
     fun restoreExchange(message: Message): List<ApiMessage> {
-        val tools = message.tools.orEmpty()
-        if (message.role != "assistant" || tools.isEmpty() || tools.any { it.callId == null || it.arguments == null || it.result == null }) return emptyList()
+        val tools = message.tools.orEmpty().filter { it.callId != null && it.arguments != null && it.result != null }
+        if (message.role != "assistant" || tools.isEmpty()) return emptyList()
         val calls = tools.map { StreamToolCall(id = it.callId, type = "function", function = StreamToolFunction(it.name, it.arguments?.ifBlank { "{}" })) }
         return exchange(message.content, message.reasoning, calls, tools.map { AiTools.Run(it.name, it.ok, it.label, it.result!!) })
     }

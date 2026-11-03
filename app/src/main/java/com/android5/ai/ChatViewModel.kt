@@ -65,6 +65,36 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
     private var allowToolCalls = true
     private var forceNonStream = false
     private var retryNeedsMoreTokens = false
+    private var replyBubble: ReplyBubbleState? = null
+    var activeToolName by mutableStateOf<String?>(null)
+        private set
+
+    private fun previewReply(text: String, reasoning: String?): Int {
+        val bubble = replyBubble ?: return -1
+        val index = messages.indexOfFirst { it.id == bubble.snapshot.id }
+        if (index >= 0) messages[index] = bubble.preview(text, reasoning)
+        return index
+    }
+
+    private fun publishReply() {
+        val bubble = replyBubble ?: return
+        val index = messages.indexOfFirst { it.id == bubble.snapshot.id }
+        if (index >= 0) {
+            messages[index] = bubble.snapshot
+            updateCurrentConversation()
+        }
+    }
+
+    private fun finishReply() {
+        val bubble = replyBubble ?: return
+        val index = messages.indexOfFirst { it.id == bubble.snapshot.id }
+        if (index >= 0) {
+            val finished = bubble.finish(messages[index])
+            if (finished.content.isBlank() && finished.tools.isNullOrEmpty()) messages.removeAt(index)
+            else messages[index] = finished
+            updateCurrentConversation()
+        }
+    }
 
     private fun getApi(): OpenRouterApi = Providers.api(requestProvider ?: settingsManager.selectedProvider, settingsManager.customProviders)
 
@@ -252,7 +282,10 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         if (messages.none { it.role == "user" }) return
         while (messages.isNotEmpty() && messages.last().role != "user") {
             // Keep completed actions when retrying the answer, so writes are not repeated.
-            if (messages.last().tools.orEmpty().any { it.result != null }) break
+            if (messages.last().tools.orEmpty().any { it.result != null }) {
+                messages[messages.lastIndex] = messages.last().copy(content = "", isError = false)
+                break
+            }
             messages.removeAt(messages.lastIndex)
         }
         updateCurrentConversation()
@@ -275,7 +308,13 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         requestModel = settingsManager.selectedModel
         requestTranscript = messages.toList()
         toolHistory.clear()
+        val reusableReply = messages.lastOrNull()?.takeIf {
+            it.role == "assistant" && it.content.isBlank() && it.tools.orEmpty().any { tool -> tool.result != null }
+        }
         currentJob = viewModelScope.launch {
+            replyBubble = ReplyBubbleState(reusableReply)
+            if (reusableReply == null) messages.add(replyBubble!!.snapshot)
+            else messages[messages.lastIndex] = replyBubble!!.snapshot
             val webSearchOn = settingsManager.webSearchEnabled
             // Only fire the automatic image search for a prompt that clearly asks
             // for a picture, so ordinary text questions do not pay for it.
@@ -318,10 +357,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                         if (turn != null && turn.raw.isBlank() && turn.calls.isEmpty()) {
                             retryNeedsMoreTokens = ReplyRecovery.needsMoreTokens(turn)
                             android.util.Log.w("AIChat", "Empty reply: provider=$requestProvider model=$requestModel finish=${turn.finishReason} reasoningChars=${turn.reasoning?.length ?: 0}")
-                            if (turn.index in messages.indices) {
-                                messages.removeAt(turn.index)
-                                updateCurrentConversation()
-                            }
+                            previewReply("", null)
                         }
                         turn
                     },
@@ -333,15 +369,6 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 if (currentConversation?.id != conversationId) return@launch
-                val lastIdx = messages.lastIndex
-                if (lastIdx >= 0 && messages[lastIdx].isStreaming) {
-                    if (messages[lastIdx].content.isBlank()) {
-                        messages.removeAt(lastIdx)
-                    } else {
-                        messages[lastIdx] = messages[lastIdx].copy(isStreaming = false)
-                    }
-                    updateCurrentConversation()
-                }
             } catch (e: EmptyReplyException) {
                 val error = when (e.finishReason) {
                     "length", "max_tokens" -> context.getString(R.string.err_reply_token_limit)
@@ -370,6 +397,9 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 android.util.Log.e("AIChat", "Request failed", e)
                 showReplyError(context.getString(R.string.err_network, e.localizedMessage ?: "Unknown error"))
             } finally {
+                finishReply()
+                replyBubble = null
+                activeToolName = null
                 loadingStatus = LoadingStatus.IDLE
                 rateLimitRetryIn = 0
                 activeStream = null
@@ -432,7 +462,9 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             apiMessages.add(ApiMessage(role = "system", content = systemContent))
         }
 
-        apiMessages.addAll((requestTranscript ?: messages.toList()).filterNot { it.isError }.flatMap { msg ->
+        apiMessages.addAll((requestTranscript ?: messages.toList()).filterNot {
+            it.isError && it.tools.orEmpty().none { tool -> tool.result != null }
+        }.flatMap { msg ->
             val exchange = NativeTools.restoreExchange(msg)
             if (exchange.isNotEmpty()) return@flatMap exchange
             listOf(if (msg.localImageUrl != null && msg.role == "user") {
@@ -616,16 +648,8 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             StreamToolCall(id = it.id, type = "function", function = StreamToolFunction(it.name, it.input?.toString() ?: "{}"))
         }
         val reasoning = response.thinking
-        messages.add(
-            Message(
-                role = "assistant",
-                content = visibleText(raw, streaming = false),
-                reasoning = reasoning,
-                isStreaming = false
-            )
-        )
-        updateCurrentConversation()
-        return ToolReply(raw, messages.lastIndex, reasoning, calls, response.stopReason)
+        val index = previewReply(visibleText(raw, streaming = false), reasoning)
+        return ToolReply(raw, index, reasoning, calls, response.stopReason)
     }
 
     private suspend fun anthropicStreamResponse(
@@ -639,10 +663,8 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             request = request
         )
         activeStream = body
-        val streamingMessage = Message(role = "assistant", content = "", isStreaming = true)
-        messages.add(streamingMessage)
-        val msgIndex = messages.lastIndex
-        loadingStatus = LoadingStatus.STREAMING
+        val msgIndex = previewReply("", null)
+        loadingStatus = LoadingStatus.THINKING
 
         val contentBuilder = StringBuilder()
         val thinkingBuilder = StringBuilder()
@@ -686,13 +708,8 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                             val currentContent = contentBuilder.toString()
                             val currentReasoning = thinkingBuilder.toString().takeIf { it.isNotBlank() }
                             withContext(Dispatchers.Main) {
-                                if (msgIndex in messages.indices) {
-                                    messages[msgIndex] = messages[msgIndex].copy(
-                                        content = visibleText(currentContent, streaming = true),
-                                        reasoning = currentReasoning,
-                                        isStreaming = true
-                                    )
-                                }
+                                loadingStatus = if (currentContent.isBlank()) LoadingStatus.THINKING else LoadingStatus.STREAMING
+                                previewReply(visibleText(currentContent, streaming = true), currentReasoning)
                             }
                         }
                     } catch (e: kotlinx.coroutines.CancellationException) {
@@ -707,13 +724,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         val raw = contentBuilder.toString()
         val reasoning = thinkingBuilder.toString().takeIf { it.isNotBlank() }
         withContext(Dispatchers.Main) {
-            if (msgIndex in messages.indices) {
-                messages[msgIndex] = messages[msgIndex].copy(
-                    content = visibleText(raw, streaming = false),
-                    reasoning = reasoning,
-                    isStreaming = false
-                )
-            }
+            previewReply(visibleText(raw, streaming = false), reasoning)
         }
         return ToolReply(raw, msgIndex, reasoning, toolCalls.complete(), finishReason)
     }
@@ -794,10 +805,8 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             return appendOpenAiResponse(response)
         }
         // Add placeholder streaming message
-        val streamingMessage = Message(role = "assistant", content = "", isStreaming = true)
-        messages.add(streamingMessage)
-        val msgIndex = messages.lastIndex
-        loadingStatus = LoadingStatus.STREAMING
+        val msgIndex = previewReply("", null)
+        loadingStatus = LoadingStatus.THINKING
 
         val contentBuilder = StringBuilder()
         val reasoningBuilder = StringBuilder()
@@ -852,13 +861,8 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                             val currentContent = contentBuilder.toString()
                             val currentReasoning = reasoningBuilder.toString().takeIf { it.isNotBlank() }
                             withContext(Dispatchers.Main) {
-                                if (msgIndex in messages.indices) {
-                                    messages[msgIndex] = messages[msgIndex].copy(
-                                        content = visibleText(currentContent, streaming = true),
-                                        reasoning = currentReasoning,
-                                        isStreaming = true
-                                    )
-                                }
+                                loadingStatus = if (currentContent.isBlank()) LoadingStatus.THINKING else LoadingStatus.STREAMING
+                                previewReply(visibleText(currentContent, streaming = true), currentReasoning)
                             }
                         }
 
@@ -878,13 +882,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         val raw = contentBuilder.toString()
         val reasoning = reasoningBuilder.toString().takeIf { it.isNotBlank() }
         withContext(Dispatchers.Main) {
-            if (msgIndex in messages.indices) {
-                messages[msgIndex] = messages[msgIndex].copy(
-                    content = visibleText(raw, streaming = false),
-                    reasoning = reasoning,
-                    isStreaming = false
-                )
-            }
+            previewReply(visibleText(raw, streaming = false), reasoning)
         }
         return ToolReply(raw, msgIndex, reasoning, toolCalls.complete(), finishReason)
     }
@@ -909,17 +907,9 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         val calls = assistantMsg.toolCalls.orEmpty()
 
         val reasoning = assistantMsg.thinking?.takeIf { it.isNotBlank() }
-        messages.add(
-            Message(
-                role = "assistant",
-                content = visibleText(assistantMsg.content?.takeIf { it.isNotBlank() } ?: assistantMsg.refusal.orEmpty(), streaming = false),
-                reasoning = reasoning,
-                isStreaming = false
-            )
-        )
-        updateCurrentConversation()
-        return ToolReply(assistantMsg.content?.takeIf { it.isNotBlank() } ?: assistantMsg.refusal.orEmpty(),
-            messages.lastIndex, reasoning, calls, ReplyRecovery.finishReason(choice.finishReason))
+        val raw = assistantMsg.content?.takeIf { it.isNotBlank() } ?: assistantMsg.refusal.orEmpty()
+        val index = previewReply(visibleText(raw, streaming = false), reasoning)
+        return ToolReply(raw, index, reasoning, calls, ReplyRecovery.finishReason(choice.finishReason))
     }
 
     /**
@@ -935,39 +925,33 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         require(calls.size <= 32 && calls.all { !it.id.isNullOrBlank() } && calls.map { it.id }.distinct().size == calls.size) {
             "Invalid tool call IDs or too many tool calls"
         }
-        if (calls.isNotEmpty()) loadingStatus = LoadingStatus.EXECUTING
-        val runs = calls.map { call ->
-            try { withContext(Dispatchers.IO) { AiTools.execute(NativeTools.decode(call), toolScope) } }
-            catch (e: kotlinx.coroutines.CancellationException) { throw e }
-            catch (e: Exception) { AiTools.Run(call.function?.name.orEmpty(), false, "", e.message ?: "Invalid arguments") }
+        val bubble = replyBubble ?: return emptyList()
+        bubble.commit(withoutMemory.trim(), turn.reasoning)
+        val queued = calls.map { call ->
+            ToolRun(call.function?.name.orEmpty(), callId = call.id,
+                arguments = call.function?.arguments?.takeIf { it.isNotBlank() } ?: "{}", state = "queued")
         }
+        bubble.queue(queued)
+        publishReply()
+        val runs = mutableListOf<AiTools.Run>()
+        for ((index, call) in calls.withIndex()) {
+            currentCoroutineContext().ensureActive()
+            loadingStatus = LoadingStatus.EXECUTING
+            activeToolName = call.function?.name
+            bubble.update(queued[index].copy(state = "running"))
+            publishReply()
+            val run = try { withContext(Dispatchers.IO) { AiTools.execute(NativeTools.decode(call), toolScope) } }
+                catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                catch (e: Exception) { AiTools.Run(call.function?.name.orEmpty(), false, "", e.message ?: "Invalid arguments") }
+            runs += run
+            val filePath = run.label.takeIf { run.name in AiTools.fileTools && !it.startsWith("/") }
+            bubble.update(ToolRun(run.name, run.label, run.ok, filePath,
+                callId = call.id, arguments = queued[index].arguments, result = run.result,
+                state = if (run.ok) "completed" else "failed"))
+            publishReply()
+        }
+        activeToolName = null
         if (calls.isNotEmpty()) toolHistory.addAll(NativeTools.exchange(turn.raw, turn.reasoning, calls, runs))
-
-        withContext(Dispatchers.Main) {
-            if (turn.index in messages.indices) {
-                messages[turn.index] = messages[turn.index].copy(
-                    content = withoutMemory.trim(),
-                    reasoning = turn.reasoning,
-                    isStreaming = false,
-                    tools = runs.mapIndexed { index, run ->
-                        // `label` is the path for the file tools, which is exactly
-                        // what the transcript needs to link a run back to the file
-                        // it touched. Device paths are absolute and live outside
-                        // the file history screen, so they are shown without a link.
-                        val filePath = if (run.name in AiTools.fileTools &&
-                            !run.label.startsWith("/")
-                        ) {
-                            run.label
-                        } else {
-                            null
-                        }
-                        ToolRun(run.name, run.label, run.ok, filePath,
-                            callId = calls[index].id, arguments = calls[index].function?.arguments?.takeIf { it.isNotBlank() } ?: "{}", result = run.result)
-                    }.ifEmpty { null }
-                )
-            }
-        }
-        updateCurrentConversation()
         return runs
     }
 
@@ -991,15 +975,8 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         currentJob?.cancel()
         try { activeStream?.close() } catch (_: Exception) { }
         activeStream = null
-        val lastIdx = messages.lastIndex
-        if (lastIdx >= 0 && messages[lastIdx].isStreaming) {
-            if (messages[lastIdx].content.isBlank()) {
-                messages.removeAt(lastIdx)
-            } else {
-                messages[lastIdx] = messages[lastIdx].copy(isStreaming = false)
-            }
-            updateCurrentConversation()
-        }
+        finishReply()
+        activeToolName = null
         loadingStatus = LoadingStatus.IDLE
     }
 
@@ -1113,12 +1090,13 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
      * starts one when the request failed before anything was shown.
      */
     private fun showReplyError(errorMsg: String) {
-        val streamIdx = messages.indexOfLast { it.isStreaming }
-        if (streamIdx != -1) {
-            messages[streamIdx] = Message(role = "assistant", content = errorMsg, isStreaming = false, isError = true)
-        } else {
-            messages.add(Message(role = "assistant", content = errorMsg, isError = true))
-        }
+        val streamIdx = replyBubble?.let { bubble -> messages.indexOfFirst { it.id == bubble.snapshot.id } } ?: -1
+        if (streamIdx >= 0) {
+            val current = messages[streamIdx]
+            messages[streamIdx] = current.copy(
+                content = listOf(current.content, errorMsg).filter { it.isNotBlank() }.joinToString("\n\n"),
+                isStreaming = false, isError = true)
+        } else messages.add(Message(role = "assistant", content = errorMsg, isError = true))
         updateCurrentConversation()
     }
 }

@@ -124,7 +124,9 @@ class ConversationStore(context: Context) {
                             // A saved conversation never has a reply still arriving.
                             isStreaming = false,
                             isError = it.getInt(errorIdx) == 1,
-                            tools = tools,
+                            tools = tools?.map { tool ->
+                                if (tool.state == "queued" || tool.state == "running") tool.copy(state = "cancelled", ok = false) else tool
+                            },
                             timestamp = it.getLong(tsIdx)
                         )
                     )

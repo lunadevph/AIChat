@@ -672,21 +672,6 @@ fun ChatScreen(
                             vertical = 6.dp
                         )
                 ) {
-                    AnimatedVisibility(
-                        visible = viewModel.isLoading && viewModel.messages.lastOrNull()?.isStreaming != true,
-                        enter = fadeIn() + expandVertically(),
-                        exit = fadeOut() + shrinkVertically(),
-                        modifier = Modifier.padding(
-                            start = 8.dp,
-                            bottom = 6.dp
-                        )
-                    ) {
-                        ThinkingIndicator(
-                            viewModel.loadingStatus,
-                            viewModel.rateLimitRetryIn
-                        )
-                    }
-
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(28.dp),
@@ -1094,6 +1079,9 @@ fun ChatScreen(
                                 message = message,
                                 settingsManager = settingsManager,
                                 actionsEnabled = !viewModel.isLoading,
+                                activity = viewModel.loadingStatus.takeIf { viewModel.isLoading && message.id == viewModel.messages.lastOrNull()?.id },
+                                activityTool = viewModel.activeToolName,
+                                retryIn = viewModel.rateLimitRetryIn,
                                 onRetry = { viewModel.regenerateLast() },
                                 onEdit = { content ->
                                     inputText = content
@@ -1322,6 +1310,9 @@ fun MessageBubble(
     message: Message,
     settingsManager: SettingsManager,
     actionsEnabled: Boolean = true,
+    activity: LoadingStatus? = null,
+    activityTool: String? = null,
+    retryIn: Int = 0,
     onRetry: () -> Unit = {},
     onEdit: (String) -> Unit = {}
 ) {
@@ -1494,32 +1485,7 @@ fun MessageBubble(
                     }
                 }
 
-                if (
-                    message.content.isBlank() &&
-                    message.isStreaming &&
-                    !isUser
-                ) {
-                    Surface(
-                        color = bubbleColor,
-                        contentColor = contentColor,
-                        shape = shape,
-                        border = BorderStroke(
-                            1.dp,
-                            MaterialTheme.colorScheme.outlineVariant
-                                .copy(alpha = 0.4f)
-                        ),
-                        tonalElevation = 1.dp,
-                        modifier = Modifier.widthIn(max = 340.dp)
-                    ) {
-                        TypingIndicatorRow()
-                    }
-                }
-
-                if (!isUser && !message.tools.isNullOrEmpty()) {
-                    ToolRunRow(message.tools, Alignment.Start)
-                }
-
-                if (message.content.isNotBlank()) {
+                if (message.content.isNotBlank() || (!isUser && (activity != null || !message.tools.isNullOrEmpty()))) {
                     Surface(
                         color = bubbleColor,
                         contentColor = contentColor,
@@ -1539,7 +1505,13 @@ fun MessageBubble(
                     ) {
                         Column {
                             val content = message.content
+                            if (!isUser && activity != null) ReplyActivity(activity,
+                                activityTool?.let { stringResource(toolTitleRes(it)) }, retryIn)
+                            if (!isUser && !message.tools.isNullOrEmpty()) {
+                                ToolRunRow(message.tools, Alignment.Start, settingsManager.showToolOutput)
+                            }
 
+                            if (content.isNotBlank()) {
                             if (!isUser && message.isStreaming) {
                                 StreamingText(
                                     content = content,
@@ -1688,6 +1660,8 @@ fun MessageBubble(
                                 )
                             }
 
+                            }
+                            if (content.isNotBlank() && activity == null) {
                             val context = LocalContext.current
                             Row(
                                 modifier = Modifier
@@ -1775,6 +1749,7 @@ fun MessageBubble(
                                     }
                                 }
                             }
+                            }
                         }
                     }
                 }
@@ -1833,9 +1808,9 @@ private fun toolTitleRes(name: String): Int = when (name) {
  * rather than hidden: running on the device is the whole point of it.
  */
 @Composable
-fun ToolRunRow(tools: List<ToolRun>, alignment: Alignment.Horizontal) {
-    var expandedIndex by remember(tools) { mutableStateOf(-1) }
-    var copiedIndex by remember(tools) { mutableStateOf(-1) }
+fun ToolRunRow(tools: List<ToolRun>, alignment: Alignment.Horizontal, showOutput: Boolean = true) {
+    var expandedIndex by remember { mutableStateOf(-1) }
+    var copiedIndex by remember { mutableStateOf(-1) }
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
 
@@ -1845,8 +1820,11 @@ fun ToolRunRow(tools: List<ToolRun>, alignment: Alignment.Horizontal) {
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         tools.forEachIndexed { index, tool ->
-            val expanded = expandedIndex == index
-            val inspectable = !tool.path.isNullOrBlank() || !tool.result.isNullOrBlank()
+            val expanded = showOutput && expandedIndex == index
+            val running = tool.state == "running"
+            val queued = tool.state == "queued"
+            val cancelled = tool.state == "cancelled"
+            val inspectable = showOutput && (!tool.path.isNullOrBlank() || !tool.result.isNullOrBlank())
             val stateLabel = stringResource(if (expanded) R.string.tool_collapse else R.string.tool_expand)
             val statusColor = if (tool.ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
             Surface(
@@ -1880,11 +1858,23 @@ fun ToolRunRow(tools: List<ToolRun>, alignment: Alignment.Horizontal) {
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                Text(stringResource(if (tool.ok) R.string.tool_status_completed else R.string.tool_status_failed),
-                                    style = MaterialTheme.typography.labelSmall, color = statusColor)
+                                val statusText = stringResource(when {
+                                    running -> R.string.tool_status_running
+                                    queued -> R.string.tool_status_queued
+                                    cancelled -> R.string.tool_status_cancelled
+                                    tool.ok -> R.string.tool_status_completed
+                                    else -> R.string.tool_status_failed
+                                })
+                                if (running) ShiningActivityText(statusText)
+                                else Text(statusText, style = MaterialTheme.typography.labelSmall, color = statusColor)
                             }
-                            Icon(if (tool.ok) Icons.Rounded.CheckCircle else Icons.Rounded.ErrorOutline,
-                                null, Modifier.size(18.dp), tint = statusColor)
+                            if (running) LoadingIndicator(Modifier.size(18.dp), color = statusColor)
+                            else Icon(when {
+                                queued -> Icons.Rounded.Schedule
+                                cancelled -> Icons.Rounded.Stop
+                                tool.ok -> Icons.Rounded.CheckCircle
+                                else -> Icons.Rounded.ErrorOutline
+                            }, null, Modifier.size(18.dp), tint = statusColor)
                             if (inspectable) Icon(if (expanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
                                 null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }

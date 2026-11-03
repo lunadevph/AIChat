@@ -1,4 +1,4 @@
-- Empty-reply retries now request a text answer without rerunning tools.
-- Replies that run out of tokens get more room on retry, and blocked or truncated replies show a specific explanation.
-- More provider response formats are read correctly, including text blocks and non-streamed responses returned during streaming.
-- Empty-reply recovery reduces reasoning on supported providers so the retry can produce a visible answer.
+- Thinking, searching, tool execution and the answer now continue inside one chat bubble.
+- Live activity labels have a subtle shining effect, and each tool call shows waiting, running and completion status.
+- A new Show tool output setting hides result details while keeping activity visible.
+- Stopping or retrying a reply preserves completed tool results in the same bubble.

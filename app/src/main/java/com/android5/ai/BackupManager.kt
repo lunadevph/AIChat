@@ -32,6 +32,7 @@ object BackupManager {
         val showThinking: Boolean = true,
         val webSearchEnabled: Boolean = false,
         val toolsEnabled: Boolean = true,
+        val showToolOutput: Boolean = true,
         val customProviders: List<Providers.Custom> = emptyList(),
         val selectedProvider: String? = null,
         val selectedModel: String? = null
@@ -77,6 +78,7 @@ object BackupManager {
                 showThinking = sm.showThinking,
                 webSearchEnabled = sm.webSearchEnabled,
                 toolsEnabled = sm.toolsEnabled,
+                showToolOutput = sm.showToolOutput,
                 customProviders = sm.customProviders,
                 selectedProvider = sm.selectedProvider,
                 selectedModel = sm.selectedModel
@@ -178,6 +180,7 @@ object BackupManager {
             sm.showThinking = s.showThinking
             sm.webSearchEnabled = s.webSearchEnabled
             sm.toolsEnabled = s.toolsEnabled
+            sm.showToolOutput = s.showToolOutput
             sm.customProviders = s.customProviders
             backup.apiKeys.forEach { (p, k) -> if (!k.isNullOrBlank()) check(sm.setApiKey(p, k)) }
             val provider = s.selectedProvider?.takeIf { sm.hasApiKey(it) }

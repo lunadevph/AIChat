@@ -1057,6 +1057,7 @@ fun AISettingsSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
     var showThinking by remember { mutableStateOf(settingsManager.showThinking) }
     var webSearch by remember { mutableStateOf(settingsManager.webSearchEnabled) }
     var toolsEnabled by remember { mutableStateOf(settingsManager.toolsEnabled) }
+    var showToolOutput by remember { mutableStateOf(settingsManager.showToolOutput) }
     var streamingEnabled by remember { mutableStateOf(settingsManager.streamingEnabled) }
     var temperature by remember { mutableStateOf(settingsManager.temperature) }
     var topP by remember { mutableStateOf(settingsManager.topP) }
@@ -1073,6 +1074,7 @@ fun AISettingsSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
         settingsManager.showThinking = showThinking
         settingsManager.webSearchEnabled = webSearch
         settingsManager.toolsEnabled = toolsEnabled
+        settingsManager.showToolOutput = showToolOutput
         settingsManager.streamingEnabled = streamingEnabled
         settingsManager.temperature = temperature
         settingsManager.topP = topP
@@ -1154,6 +1156,14 @@ fun AISettingsSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
                 icon = Icons.Rounded.Build,
                 checked = toolsEnabled,
                 onCheckedChange = { toolsEnabled = it }
+            )
+
+            SettingsSwitchRow(
+                title = stringResource(R.string.setting_show_tool_output),
+                subtitle = stringResource(R.string.setting_show_tool_output_sub),
+                icon = Icons.Rounded.Subject,
+                checked = showToolOutput,
+                onCheckedChange = { showToolOutput = it }
             )
 
             ToolWorkspaceRow()
@@ -1453,6 +1463,7 @@ fun AISettingsSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
                     settingsManager.showThinking = showThinking
                     settingsManager.webSearchEnabled = webSearch
                     settingsManager.toolsEnabled = toolsEnabled
+                    settingsManager.showToolOutput = showToolOutput
                     settingsManager.streamingEnabled = streamingEnabled
                     settingsManager.temperature = temperature
                     settingsManager.topP = topP
