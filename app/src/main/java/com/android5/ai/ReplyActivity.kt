@@ -1,13 +1,16 @@
 package com.android5.ai
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.stringResource
@@ -31,14 +34,29 @@ fun ReplyActivity(status: LoadingStatus, toolName: String?, retryIn: Int) {
         LoadingStatus.EXECUTING -> Icons.Rounded.Build
         LoadingStatus.STREAMING -> Icons.Rounded.Edit
         LoadingStatus.RATE_LIMITED -> Icons.Rounded.Schedule
-        else -> Icons.Rounded.Psychology
+        else -> Icons.Rounded.MoreHoriz
     }
     Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp)
         .semantics { liveRegion = LiveRegionMode.Polite },
         horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+        if (status == LoadingStatus.THINKING) ThinkingDots()
+        else Icon(icon, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
         if (status == LoadingStatus.RATE_LIMITED) Text(label, style = MaterialTheme.typography.labelLarge)
         else ShiningActivityText(label)
+    }
+}
+
+@Composable
+private fun ThinkingDots() {
+    val transition = rememberInfiniteTransition(label = "thinking_dots")
+    Row(Modifier.size(18.dp), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceEvenly) {
+        repeat(3) { index ->
+            val opacity by transition.animateFloat(0.25f, 1f,
+                infiniteRepeatable(tween(500, easing = FastOutSlowInEasing), RepeatMode.Reverse,
+                    initialStartOffset = StartOffset(index * 140)), label = "thinking_dot_$index")
+            Box(Modifier.size(3.dp).alpha(opacity).background(MaterialTheme.colorScheme.primary, CircleShape))
+        }
     }
 }
 

@@ -118,14 +118,10 @@ fun ModelPickerSheet(
                     tonalElevation = 2.dp
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Image(
-                            painter = painterResource(
-                                providerIconRes(settingsManager.selectedProvider)
-                            ),
+                        ProviderIcon(
+                            provider = settingsManager.selectedProvider,
                             contentDescription = null,
-                            modifier = Modifier
-                                .size(38.dp)
-                                .clip(CircleShape)
+                            modifier = Modifier.size(38.dp)
                         )
                     }
                 }
@@ -193,10 +189,10 @@ fun ModelPickerSheet(
                             },
                             label = { Text(info.name) },
                             leadingIcon = {
-                                Image(
-                                    painter = painterResource(providerIconRes(info.name)),
+                                ProviderIcon(
+                                    provider = info.name,
                                     contentDescription = null,
-                                    modifier = Modifier.size(18.dp).clip(CircleShape)
+                                    modifier = Modifier.size(18.dp)
                                 )
                             },
                             shape = RoundedCornerShape(12.dp)

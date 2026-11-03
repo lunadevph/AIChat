@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.automirrored.rounded.Notes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
@@ -150,7 +151,7 @@ class SettingsActivity : ComponentActivity() {
                                 SettingsGroupItem(
                                     title = stringResource(R.string.settings_ai_title),
                                     subtitle = stringResource(R.string.settings_ai_subtitle),
-                                    icon = Icons.Rounded.Psychology,
+                                    icon = Icons.AutoMirrored.Rounded.Notes,
                                     badgeColor = MaterialTheme.colorScheme.secondary,
                                     onClick = { showAISettings = true }
                                 )
@@ -375,10 +376,10 @@ fun ApiKeyManagerSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) 
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Image(
-                        painter = painterResource(providerIconRes(activeProvider)),
+                    ProviderIcon(
+                        provider = activeProvider,
                         contentDescription = activeProvider,
-                        modifier = Modifier.size(24.dp).clip(CircleShape)
+                        modifier = Modifier.size(24.dp)
                     )
                     Spacer(Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
@@ -439,10 +440,10 @@ fun ApiKeyManagerSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) 
                                     .padding(4.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Image(
-                                    painter = painterResource(providerIconRes(info.name)),
+                                ProviderIcon(
+                                    provider = info.name,
                                     contentDescription = null,
-                                    modifier = Modifier.size(28.dp).clip(CircleShape)
+                                    modifier = Modifier.size(28.dp)
                                 )
                             }
                             Spacer(Modifier.width(12.dp))
@@ -1137,7 +1138,7 @@ fun AISettingsSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
             SettingsSwitchRow(
                 title = stringResource(R.string.setting_show_thinking),
                 subtitle = stringResource(R.string.setting_show_thinking_sub),
-                icon = Icons.Rounded.Psychology,
+                icon = Icons.AutoMirrored.Rounded.Notes,
                 checked = showThinking,
                 onCheckedChange = { showThinking = it }
             )

@@ -68,12 +68,10 @@ fun ProviderPicker(
                             .padding(4.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Image(
-                            painter = painterResource(providerIconRes(info.name)),
+                        ProviderIcon(
+                            provider = info.name,
                             contentDescription = null,
-                            modifier = Modifier
-                                .size(if (compact) 28.dp else 34.dp)
-                                .clip(CircleShape)
+                            modifier = Modifier.size(if (compact) 28.dp else 34.dp)
                         )
                     }
                     Spacer(Modifier.width(14.dp))

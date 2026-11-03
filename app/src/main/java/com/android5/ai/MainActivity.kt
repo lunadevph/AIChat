@@ -29,6 +29,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.automirrored.rounded.Notes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.FormatListBulleted
@@ -522,16 +523,10 @@ fun ChatScreen(
                                         modifier = Modifier.size(22.dp)
                                     ) {
                                         Box(contentAlignment = Alignment.Center) {
-                                            Image(
-                                                painter = painterResource(
-                                                    providerIconRes(
-                                                        settingsManager.selectedProvider
-                                                    )
-                                                ),
+                                            ProviderIcon(
+                                                provider = settingsManager.selectedProvider,
                                                 contentDescription = null,
-                                                modifier = Modifier
-                                                    .size(15.dp)
-                                                    .clip(CircleShape)
+                                                modifier = Modifier.size(15.dp)
                                             )
                                         }
                                     }
@@ -1408,7 +1403,7 @@ fun MessageBubble(
                                     )
                             ) {
                                 Icon(
-                                    Icons.Rounded.Psychology,
+                                    Icons.AutoMirrored.Rounded.Notes,
                                     null,
                                     Modifier.size(18.dp),
                                     tint = MaterialTheme.colorScheme.primary
@@ -1765,7 +1760,7 @@ private fun toolIcon(name: String) = when (name) {
     "list" -> Icons.AutoMirrored.Rounded.FormatListBulleted
     "delete" -> Icons.Rounded.DeleteOutline
     "search" -> Icons.Rounded.Search
-    "memory" -> Icons.Rounded.Psychology
+    "memory" -> Icons.AutoMirrored.Rounded.Notes
     "compact" -> Icons.Rounded.Compress
     "websearch" -> Icons.Rounded.Public
     "time" -> Icons.Rounded.Schedule

@@ -1,4 +1,3 @@
-- Thinking, searching, tool execution and the answer now continue inside one chat bubble.
-- Live activity labels have a subtle shining effect, and each tool call shows waiting, running and completion status.
-- A new Show tool output setting hides result details while keeping activity visible.
-- Stopping or retrying a reply preserves completed tool results in the same bubble.
+- Provider logos have been refreshed with crisp, consistently spaced vector artwork and improved dark-mode contrast.
+- Custom providers now use a neutral connection icon instead of the OpenRouter logo.
+- A subtle animated three-dot indicator replaces the thinking icon.
