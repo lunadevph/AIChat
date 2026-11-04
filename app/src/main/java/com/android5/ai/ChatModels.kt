@@ -43,7 +43,8 @@ data class StreamToolCall(
     val index: Int? = null,
     val id: String? = null,
     val type: String? = null,
-    val function: StreamToolFunction? = null
+    val function: StreamToolFunction? = null,
+    @SerializedName("extra_content") val extraContent: com.google.gson.JsonObject? = null
 )
 
 data class StreamToolFunction(
@@ -100,7 +101,9 @@ data class ToolRun(
     val callId: String? = null,
     val arguments: String? = null,
     val result: String? = null,
-    val state: String? = null
+    val state: String? = null,
+    /** Opaque provider continuation data; never displayed as tool output. */
+    val extraContent: com.google.gson.JsonObject? = null
 )
 
 data class Message(

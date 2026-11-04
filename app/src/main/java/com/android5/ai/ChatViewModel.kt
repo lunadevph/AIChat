@@ -929,7 +929,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         bubble.commit(withoutMemory.trim(), turn.reasoning)
         val queued = calls.map { call ->
             ToolRun(call.function?.name.orEmpty(), callId = call.id,
-                arguments = call.function?.arguments?.takeIf { it.isNotBlank() } ?: "{}", state = "queued")
+                arguments = call.function?.arguments?.takeIf { it.isNotBlank() } ?: "{}", state = "queued", extraContent = call.extraContent)
         }
         bubble.queue(queued)
         publishReply()
@@ -947,7 +947,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             val filePath = run.label.takeIf { run.name in AiTools.fileTools && !it.startsWith("/") }
             bubble.update(ToolRun(run.name, run.label, run.ok, filePath,
                 callId = call.id, arguments = queued[index].arguments, result = run.result,
-                state = if (run.ok) "completed" else "failed"))
+                state = if (run.ok) "completed" else "failed", extraContent = call.extraContent))
             publishReply()
         }
         activeToolName = null

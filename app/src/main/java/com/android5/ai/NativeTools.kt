@@ -87,24 +87,38 @@ object NativeTools {
     fun restoreExchange(message: Message): List<ApiMessage> {
         val tools = message.tools.orEmpty().filter { it.callId != null && it.arguments != null && it.result != null }
         if (message.role != "assistant" || tools.isEmpty()) return emptyList()
-        val calls = tools.map { StreamToolCall(id = it.callId, type = "function", function = StreamToolFunction(it.name, it.arguments?.ifBlank { "{}" })) }
+        val calls = tools.map { StreamToolCall(id = it.callId, type = "function", function = StreamToolFunction(it.name, it.arguments?.ifBlank { "{}" }), extraContent = it.extraContent) }
         return exchange(message.content, message.reasoning, calls, tools.map { AiTools.Run(it.name, it.ok, it.label, it.result!!) })
+    }
+
+    /** Signatures are opaque values: merge objects, never concatenate signed strings. */
+    private fun mergeMetadata(previous: com.google.gson.JsonObject?, incoming: com.google.gson.JsonObject): com.google.gson.JsonObject {
+        val merged = previous?.deepCopy() ?: com.google.gson.JsonObject()
+        incoming.entrySet().forEach { (key, value) ->
+            val old = merged.get(key)
+            merged.add(key, if (old?.isJsonObject == true && value.isJsonObject)
+                mergeMetadata(old.asJsonObject, value.asJsonObject) else value.deepCopy())
+        }
+        return merged
     }
 
     /** SSE tool arguments arrive in fragments and can interleave by index. */
     class Accumulator {
-        private data class Partial(var id: String = "", var name: String = "", val arguments: StringBuilder = StringBuilder())
+        private data class Partial(var id: String = "", var name: String = "", val arguments: StringBuilder = StringBuilder(), var extraContent: com.google.gson.JsonObject? = null)
         private val partials = sortedMapOf<Int, Partial>()
         fun add(delta: StreamToolCall) {
             val partial = partials.getOrPut(delta.index ?: 0) { Partial() }
             delta.id?.let { partial.id += it }
             delta.function?.name?.let { partial.name += it }
             delta.function?.arguments?.let { partial.arguments.append(it) }
+            delta.extraContent?.let { extra ->
+                partial.extraContent = mergeMetadata(partial.extraContent, extra)
+            }
             require(partials.size <= 32 && partial.arguments.length <= 1_000_000) { "Tool call exceeds size limit" }
         }
         fun complete(): List<StreamToolCall> = partials.values.map {
             require(it.id.isNotBlank() && it.name.isNotBlank()) { "Incomplete tool call" }
-            StreamToolCall(id = it.id, type = "function", function = StreamToolFunction(it.name, it.arguments.toString().ifBlank { "{}" }))
+            StreamToolCall(id = it.id, type = "function", function = StreamToolFunction(it.name, it.arguments.toString().ifBlank { "{}" }), extraContent = it.extraContent)
         }
     }
 }

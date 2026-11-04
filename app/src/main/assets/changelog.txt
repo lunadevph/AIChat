@@ -1,5 +1,2 @@
-- Backup and restore are now available directly in Settings, with password protection and backup options.
-- Choose Outlined, Filled, Tonal or Classic chat bubbles and preview your selection.
-- New Midnight, Ocean, Forest and Sunset themes replace the retired Old Android, Holo and Compact appearances.
-- Updates now support separate Release and Debug channels, with clearer release notes, download progress and install controls.
-- The app displays build 261104 while preserving update compatibility with existing installations.
+- Fixed Gemini tool replies failing with HTTP 400 by preserving tool-call continuation data.
+- Fixed the distorted Gemini provider icon.
