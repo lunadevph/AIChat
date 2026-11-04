@@ -7,3 +7,4 @@
 - Corrected Android-incompatible curves in the other provider icons.
 - Improved configuration-aware UI messages, older Android theme support and update notification permission handling.
 - Tool activity rows are more compact and show clear action labels without directory paths.
+- Corrected the release version to 1.1.0 while preserving upgrade compatibility.
