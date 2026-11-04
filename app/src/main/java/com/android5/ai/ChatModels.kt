@@ -103,7 +103,10 @@ data class ToolRun(
     val result: String? = null,
     val state: String? = null,
     /** Opaque provider continuation data; never displayed as tool output. */
-    val extraContent: com.google.gson.JsonObject? = null
+    val extraContent: com.google.gson.JsonObject? = null,
+    val exchangeId: String? = null,
+    val assistantContent: String? = null,
+    val assistantReasoning: String? = null
 )
 
 data class Message(

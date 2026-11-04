@@ -160,7 +160,9 @@ object BackupManager {
 
             val store = ConversationStore(context)
             // Validate identifiers before any writes; imported paths never select local files.
-            require(backup.conversations.all { it.id.matches(Regex("[A-Za-z0-9_-]{1,128}")) })
+            backup.conversations.forEach { ConversationIds.requireValid(it.id) }
+            require(backup.conversations.map { it.id }.distinct().size == backup.conversations.size)
+            require(backup.conversations.all { conv -> conv.messages.map { it.id }.distinct().size == conv.messages.size })
             val restoredImages = backup.images.mapValues { (_, encoded) ->
                 val data = android.util.Base64.decode(encoded, android.util.Base64.NO_WRAP)
                 require(data.size <= 25 * 1024 * 1024)

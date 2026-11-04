@@ -17,6 +17,7 @@ object KeyStoreHelper {
     private const val GCM_TAG_LENGTH = 128
     private const val ENCRYPTED_PREFIX = "enc:v1:"
 
+    @Synchronized
     private fun getOrCreateSecretKey(): SecretKey {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
         if (!keyStore.containsAlias(KEY_ALIAS)) {

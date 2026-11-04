@@ -44,6 +44,7 @@ fun CustomProviderSheet(
     var defaultModel by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     val focusManager = LocalFocusManager.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val context = LocalContext.current
 
     /** Stores the URL with exactly one trailing slash, as the API expects. */
@@ -56,13 +57,13 @@ fun CustomProviderSheet(
         val url = normalizedUrl()
         when {
             trimmedName.isBlank() ->
-                error = context.getString(R.string.custom_provider_name_blank)
+                error = resources.getString(R.string.custom_provider_name_blank)
             Providers.ALL.any { it.name.equals(trimmedName, ignoreCase = true) } ->
-                error = context.getString(R.string.custom_provider_name_builtin)
+                error = resources.getString(R.string.custom_provider_name_builtin)
             settingsManager.customProviders.any { it.name.equals(trimmedName, ignoreCase = true) } ->
-                error = context.getString(R.string.custom_provider_name_taken)
+                error = resources.getString(R.string.custom_provider_name_taken)
             !url.startsWith("http://") && !url.startsWith("https://") ->
-                error = context.getString(R.string.custom_provider_url_invalid)
+                error = resources.getString(R.string.custom_provider_url_invalid)
             else -> {
                 settingsManager.customProviders = settingsManager.customProviders + Providers.Custom(
                     name = trimmedName,

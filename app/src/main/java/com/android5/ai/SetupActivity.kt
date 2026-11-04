@@ -124,6 +124,7 @@ fun SetupScreen(
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val scrollState = rememberScrollState()
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val context = LocalContext.current
 
     var restoreUri by remember { mutableStateOf<android.net.Uri?>(null) }
@@ -133,7 +134,7 @@ fun SetupScreen(
         scope.launch {
             try {
                 val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { BackupManager.import(context, uri, password) }
-                if (ok) onRestoreComplete() else errorText = context.getString(R.string.backup_import_failed)
+                if (ok) onRestoreComplete() else errorText = resources.getString(R.string.backup_import_failed)
             } finally { password.fill('\u0000') }
         }
     }
@@ -363,9 +364,9 @@ fun SetupScreen(
                         }
                         is Providers.KeyValidation.NetworkError -> {
                             isValidating = false
-                            errorText = context.getString(
+                            errorText = resources.getString(
                                 R.string.err_network,
-                                result.detail ?: context.getString(R.string.err_detail_connection_failed)
+                                result.detail ?: resources.getString(R.string.err_detail_connection_failed)
                             )
                             networkTrouble = true
                             shakeTrigger++

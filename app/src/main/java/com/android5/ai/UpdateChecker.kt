@@ -146,7 +146,11 @@ object UpdateChecker {
             .setAutoCancel(true)
             .build()
 
-        nm.notify(NOTIF_ID, notification)
+        if (Build.VERSION.SDK_INT >= 33 && androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) return
+        try { nm.notify(NOTIF_ID, notification) } catch (_: SecurityException) {
+            // Permission can be revoked between the check and posting.
+        }
     }
 
     fun remember(context: Context, config: AppUpdateConfig, selectedChannel: String) {

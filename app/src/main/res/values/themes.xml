@@ -13,7 +13,6 @@
         <!-- The light splash needs dark system-bar icons; the night theme
              overrides these to false. -->
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
     </style>
 
 </resources>

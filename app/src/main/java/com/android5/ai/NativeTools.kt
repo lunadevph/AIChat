@@ -87,8 +87,21 @@ object NativeTools {
     fun restoreExchange(message: Message): List<ApiMessage> {
         val tools = message.tools.orEmpty().filter { it.callId != null && it.arguments != null && it.result != null }
         if (message.role != "assistant" || tools.isEmpty()) return emptyList()
-        val calls = tools.map { StreamToolCall(id = it.callId, type = "function", function = StreamToolFunction(it.name, it.arguments?.ifBlank { "{}" }), extraContent = it.extraContent) }
-        return exchange(message.content, message.reasoning, calls, tools.map { AiTools.Run(it.name, it.ok, it.label, it.result!!) })
+        val groups = tools.groupBy { it.exchangeId }.values.toList()
+        val restored = groups.flatMap { group ->
+            val calls = group.map { StreamToolCall(id = it.callId, type = "function",
+                function = StreamToolFunction(it.name, it.arguments?.ifBlank { "{}" }), extraContent = it.extraContent) }
+            val first = group.first()
+            exchange(first.assistantContent ?: if (first.exchangeId == null && !message.isError) message.content else "",
+                first.assistantReasoning ?: message.reasoning, calls,
+                group.map { AiTools.Run(it.name, it.ok, it.label, it.result!!) })
+        }
+        if (tools.all { it.exchangeId != null } && !message.isError) {
+            val prefix = groups.mapNotNull { it.first().assistantContent?.trim()?.takeIf(String::isNotBlank) }.joinToString("\n\n")
+            val final = message.content.removePrefix(prefix).trim()
+            if (final.isNotBlank()) return restored + ApiMessage("assistant", final)
+        }
+        return restored
     }
 
     /** Signatures are opaque values: merge objects, never concatenate signed strings. */

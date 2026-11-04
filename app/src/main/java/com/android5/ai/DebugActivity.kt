@@ -48,6 +48,7 @@ class DebugActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun DebugScreen(settingsManager: SettingsManager, onBack: () -> Unit) {
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val official = AppSigning.isOfficial(context)
@@ -78,7 +79,7 @@ private fun DebugScreen(settingsManager: SettingsManager, onBack: () -> Unit) {
                 val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     if (exporting) BackupManager.export(context, uri, password) else BackupManager.import(context, uri, password)
                 }
-                status = context.getString(if (exporting) {
+                status = resources.getString(if (exporting) {
                     if (ok) R.string.backup_export_ok else R.string.backup_export_failed
                 } else {
                     if (ok) R.string.backup_import_ok else R.string.backup_import_failed
@@ -155,7 +156,7 @@ private fun DebugScreen(settingsManager: SettingsManager, onBack: () -> Unit) {
             // Version
             DebugCard(title = "Version") {
                 DebugRow("Version name", BuildConfig.VERSION_NAME)
-                DebugRow(context.getString(R.string.updates_build_label), BuildConfig.BUILD_NUMBER)
+                DebugRow(resources.getString(R.string.updates_build_label), BuildConfig.BUILD_NUMBER)
                 DebugRow("Build date", BuildConfig.BUILD_DATE)
             }
 

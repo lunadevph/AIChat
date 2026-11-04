@@ -24,6 +24,7 @@ import kotlinx.coroutines.withContext
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BackupSettingsSheet(settings: SettingsManager, onDismiss: () -> Unit) {
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var includeChats by rememberSaveable { mutableStateOf(settings.backupIncludeChats) }
@@ -53,7 +54,7 @@ fun BackupSettingsSheet(settings: SettingsManager, onDismiss: () -> Unit) {
                     else BackupManager.import(context, uri, password)
                 }
                 restored = ok && !isExport
-                status = context.getString(if (isExport) {
+                status = resources.getString(if (isExport) {
                     if (ok) R.string.backup_export_ok else R.string.backup_export_failed
                 } else if (ok) R.string.backup_import_ok else R.string.backup_import_failed)
             } finally { password.fill('\u0000'); busy = false }

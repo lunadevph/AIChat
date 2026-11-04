@@ -52,6 +52,7 @@ class ConversationStore(context: Context) {
     }
 
     fun loadConversation(id: String): Conversation? {
+        ConversationIds.requireValid(id)
         val index = SQLiteDatabase.openOrCreateDatabase(indexDb, null)
         var meta: Conversation? = null
         try {
@@ -89,9 +90,10 @@ class ConversationStore(context: Context) {
                     "reasoning TEXT, local_image_url TEXT, is_streaming INTEGER NOT NULL DEFAULT 0, " +
                     "is_error INTEGER NOT NULL DEFAULT 0, tools TEXT, timestamp INTEGER NOT NULL)"
             )
+            ensureMessageColumns(db)
             val cursor = db.rawQuery(
                 "SELECT id, role, content, reasoning, local_image_url, is_streaming, is_error, tools, timestamp " +
-                    "FROM messages ORDER BY timestamp ASC",
+                    "FROM messages ORDER BY timestamp ASC, rowid ASC",
                 null
             )
             cursor.use {
@@ -141,21 +143,7 @@ class ConversationStore(context: Context) {
     }
 
     fun saveConversation(conversation: Conversation) {
-        // Index row
-        val index = SQLiteDatabase.openOrCreateDatabase(indexDb, null)
-        try {
-            index.execSQL(
-                "CREATE TABLE IF NOT EXISTS conversations (" +
-                    "id TEXT PRIMARY KEY, title TEXT, last_updated INTEGER NOT NULL)"
-            )
-            index.execSQL(
-                "INSERT OR REPLACE INTO conversations (id, title, last_updated) VALUES (?, ?, ?)",
-                arrayOf<Any?>(conversation.id, conversation.title, conversation.lastUpdated)
-            )
-        } finally {
-            index.close()
-        }
-
+        ConversationIds.requireValid(conversation.id)
         // Messages in per-chat db
         val db = SQLiteDatabase.openOrCreateDatabase(chatDbFile(conversation.id), null)
         try {
@@ -165,6 +153,7 @@ class ConversationStore(context: Context) {
                     "reasoning TEXT, local_image_url TEXT, is_streaming INTEGER NOT NULL DEFAULT 0, " +
                     "is_error INTEGER NOT NULL DEFAULT 0, tools TEXT, timestamp INTEGER NOT NULL)"
             )
+            ensureMessageColumns(db)
             db.beginTransaction()
             try {
                 db.execSQL("DELETE FROM messages")
@@ -192,9 +181,24 @@ class ConversationStore(context: Context) {
         } finally {
             db.close()
         }
+        // Index row
+        val index = SQLiteDatabase.openOrCreateDatabase(indexDb, null)
+        try {
+            index.execSQL(
+                "CREATE TABLE IF NOT EXISTS conversations (" +
+                    "id TEXT PRIMARY KEY, title TEXT, last_updated INTEGER NOT NULL)"
+            )
+            index.execSQL(
+                "INSERT OR REPLACE INTO conversations (id, title, last_updated) VALUES (?, ?, ?)",
+                arrayOf<Any?>(conversation.id, conversation.title, conversation.lastUpdated)
+            )
+        } finally {
+            index.close()
+        }
     }
 
     fun deleteConversation(id: String) {
+        ConversationIds.requireValid(id)
         val index = SQLiteDatabase.openOrCreateDatabase(indexDb, null)
         try {
             index.execSQL("DELETE FROM conversations WHERE id = ?", arrayOf(id))
@@ -204,23 +208,37 @@ class ConversationStore(context: Context) {
         SQLiteDatabase.deleteDatabase(chatDbFile(id))
     }
 
-    private fun chatDbFile(id: String): File = File(chatsDir, "$id.db")
+    /** CREATE TABLE IF NOT EXISTS does not upgrade databases from older app builds. */
+    private fun ensureMessageColumns(db: SQLiteDatabase) {
+        val columns = mutableSetOf<String>()
+        db.rawQuery("PRAGMA table_info(messages)", null).use { cursor ->
+            val name = cursor.getColumnIndexOrThrow("name")
+            while (cursor.moveToNext()) columns += cursor.getString(name)
+        }
+        val optional = mapOf("reasoning" to "TEXT", "local_image_url" to "TEXT",
+            "is_streaming" to "INTEGER NOT NULL DEFAULT 0", "is_error" to "INTEGER NOT NULL DEFAULT 0",
+            "tools" to "TEXT", "timestamp" to "INTEGER NOT NULL DEFAULT 0")
+        optional.filterKeys { it !in columns }.forEach { (name, type) ->
+            db.execSQL("ALTER TABLE messages ADD COLUMN $name $type")
+        }
+    }
+
+    private fun chatDbFile(id: String): File {
+        ConversationIds.requireValid(id)
+        return File(chatsDir, "$id.db")
+    }
 
     private fun migrateLegacyJson() {
         val prefs = context.getSharedPreferences("ai_chat_prefs", Context.MODE_PRIVATE)
         val json = prefs.getString("conversations_list", null) ?: return
-        // If index already has rows, mark migration done without importing duplicates
-        if (!listConversations().isEmpty()) {
-            prefs.edit().remove("conversations_list").remove("conversations_migrated").apply()
-            return
-        }
         val type = object : TypeToken<List<Conversation>>() {}.type
         val old = try {
             gson.fromJson<List<Conversation>>(json, type) ?: emptyList()
         } catch (_: Exception) {
-            emptyList()
+            return
         }
-        old.forEach { conv ->
+        val existing = listConversations().map { it.id }.toSet()
+        old.filterNot { it.id in existing }.forEach { conv ->
             saveConversation(conv.copy(messages = conv.messages.map { it.copy(isStreaming = false) }))
         }
         prefs.edit().remove("conversations_list").apply()

@@ -35,6 +35,8 @@ object ToolFiles {
         if (!root.exists()) return emptyList()
 
         return root.walkTopDown()
+            .onEnter { it == root || (!isSymbolicLink(it) && relPath(root, it) != null) }
+            .take(5_000)
             .filter { it.isFile }
             .mapNotNull { file ->
                 val relPath = relPath(root, file) ?: return@mapNotNull null
@@ -71,11 +73,8 @@ object ToolFiles {
         val file = resolve(context, relPath) ?: return null
         if (!file.isFile) return null
         return try {
-            val text = file.readText()
-            if (text.length > MAX_PREVIEW_CHARS) {
-                text.take(MAX_PREVIEW_CHARS)
-            } else {
-                text
+            file.bufferedReader().use { reader ->
+                BoundedText.read(reader, MAX_PREVIEW_CHARS)
             }
         } catch (_: Exception) {
             null
@@ -85,7 +84,7 @@ object ToolFiles {
     fun delete(context: Context, relPath: String): Boolean {
         val file = resolve(context, relPath) ?: return false
         return try {
-            if (file.isDirectory) file.deleteRecursively() else file.delete()
+            deleteEntry(file)
         } catch (_: Exception) {
             false
         }
@@ -96,12 +95,17 @@ object ToolFiles {
         val root = root(context)
         if (!root.exists()) return true
         return try {
-            root.listFiles()?.forEach { it.deleteRecursively() }
-            true
+            val files = root.listFiles() ?: return false
+            files.map { deleteEntry(it) }.all { it }
         } catch (_: Exception) {
             false
         }
     }
+
+    private fun isSymbolicLink(file: File): Boolean =
+        android.system.OsConstants.S_ISLNK(android.system.Os.lstat(file.path).st_mode)
+
+    private fun deleteEntry(file: File): Boolean = SafeFileTree.delete(file, ::isSymbolicLink)
 
     private fun relPath(root: File, file: File): String? {
         val rootPath = root.canonicalFile.path

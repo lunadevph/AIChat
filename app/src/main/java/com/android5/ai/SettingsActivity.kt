@@ -123,6 +123,7 @@ class SettingsActivity : ComponentActivity() {
                             .verticalScroll(rememberScrollState())
                             .padding(horizontal = 20.dp, vertical = 12.dp)
                     ) {
+                        val resources = androidx.compose.ui.platform.LocalResources.current
                         val context = LocalContext.current
                         SettingsSectionHeader(stringResource(R.string.settings_section_provider))
                         
@@ -344,6 +345,7 @@ fun ApiKeyManagerSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) 
     var showCustomSheet by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val context = LocalContext.current
 
     ModalBottomSheet(
@@ -584,21 +586,21 @@ fun ApiKeyManagerSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) 
                                                 is Providers.KeyValidation.Valid -> {
                                                     isValidating = false
                                                     if (!settingsManager.setApiKey(info.name, providerKey.trim())) {
-                                                        statusMessage = context.getString(R.string.err_key_storage)
+                                                        statusMessage = resources.getString(R.string.err_key_storage)
                                                         isError = true
                                                     } else {
-                                                        statusMessage = context.getString(R.string.msg_key_saved)
+                                                        statusMessage = resources.getString(R.string.msg_key_saved)
                                                         isError = false
                                                     }
                                                 }
                                                 is Providers.KeyValidation.InvalidKey -> {
                                                     isValidating = false
-                                                    statusMessage = context.getString(R.string.error_invalid_key)
+                                                    statusMessage = resources.getString(R.string.error_invalid_key)
                                                     isError = true
                                                 }
                                                 is Providers.KeyValidation.NetworkError -> {
                                                     isValidating = false
-                                                    statusMessage = context.getString(R.string.err_network, result.detail ?: context.getString(R.string.err_detail_connection_failed))
+                                                    statusMessage = resources.getString(R.string.err_network, result.detail ?: resources.getString(R.string.err_detail_connection_failed))
                                                     isError = true
                                                 }
                                             }
@@ -624,7 +626,7 @@ fun ApiKeyManagerSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) 
                                             settingsManager.setApiKey(info.name, providerKey.trim())
                                             settingsManager.selectedProvider = info.name
                                             activeProvider = info.name
-                                            statusMessage = context.getString(R.string.msg_provider_activated, info.name)
+                                            statusMessage = resources.getString(R.string.msg_provider_activated, info.name)
                                             isError = false
                                         },
                                         enabled = providerKey.isNotBlank() && !isValidating,
@@ -641,7 +643,7 @@ fun ApiKeyManagerSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) 
                                             focusManager.clearFocus()
                                             settingsManager.setApiKey(info.name, null)
                                             providerKey = ""
-                                            statusMessage = context.getString(R.string.msg_key_cleared)
+                                            statusMessage = resources.getString(R.string.msg_key_cleared)
                                             isError = false
                                         },
                                         shapes = ExpressiveIconButtonShapes,
@@ -669,7 +671,7 @@ fun ApiKeyManagerSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) 
                                             statusMessage = null
                                             android.widget.Toast.makeText(
                                                 context,
-                                                context.getString(R.string.custom_provider_deleted, info.name),
+                                                resources.getString(R.string.custom_provider_deleted, info.name),
                                                 android.widget.Toast.LENGTH_SHORT
                                             ).show()
                                         },
@@ -716,7 +718,7 @@ fun ApiKeyManagerSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) 
                         expandedProvider = name
                         android.widget.Toast.makeText(
                             context,
-                            context.getString(R.string.custom_provider_saved, name),
+                            resources.getString(R.string.custom_provider_saved, name),
                             android.widget.Toast.LENGTH_SHORT
                         ).show()
                     }
@@ -838,6 +840,7 @@ fun ParameterSliderRow(
 
 @Composable
 private fun StorageAccessRow() {
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val context = LocalContext.current
     var granted by remember { mutableStateOf(DeviceStorage.granted(context)) }
 
@@ -943,6 +946,7 @@ private fun StorageAccessRow() {
 
 @Composable
 private fun ToolWorkspaceRow() {
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val context = LocalContext.current
     val dir = remember { ToolFiles.root(context) }
     var files by remember { mutableStateOf(ToolFiles.list(context)) }

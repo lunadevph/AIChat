@@ -170,6 +170,7 @@ fun ChatScreen(
     val webSearchOn = settingsManager.webSearchEnabled
     var menuExpanded by remember { mutableStateOf(false) }
 
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val context = LocalContext.current
     val webSearchDescription = stringResource(R.string.desc_web_search)
     val updateAvailable = UpdateChecker.isUpdateAvailable(context)
@@ -1323,6 +1324,7 @@ fun MessageBubble(
 
     val clipboardManager =
         LocalClipboardManager.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val context = LocalContext.current
 
     Column(
@@ -1545,7 +1547,7 @@ fun MessageBubble(
                                                             )
                                                             android.widget.Toast.makeText(
                                                                 context,
-                                                                context.getString(R.string.action_copied),
+                                                                resources.getString(R.string.action_copied),
                                                                 android.widget.Toast.LENGTH_SHORT
                                                             ).show()
                                                         },
@@ -1617,6 +1619,7 @@ fun MessageBubble(
 
                             }
                             if (content.isNotBlank() && activity == null) {
+                            val resources = androidx.compose.ui.platform.LocalResources.current
                             val context = LocalContext.current
                             Row(
                                 modifier = Modifier
@@ -1636,7 +1639,7 @@ fun MessageBubble(
                                         )
                                         android.widget.Toast.makeText(
                                             context,
-                                            context.getString(R.string.action_copied),
+                                            resources.getString(R.string.action_copied),
                                             android.widget.Toast.LENGTH_SHORT
                                         ).show()
                                     },
@@ -1766,13 +1769,14 @@ private fun toolTitleRes(name: String): Int = when (name) {
 fun ToolRunRow(tools: List<ToolRun>, alignment: Alignment.Horizontal, showOutput: Boolean = true) {
     var expandedIndex by remember { mutableStateOf(-1) }
     var copiedIndex by remember { mutableStateOf(-1) }
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
         horizontalAlignment = alignment,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         tools.forEachIndexed { index, tool ->
             val expanded = showOutput && expandedIndex == index
@@ -1783,7 +1787,7 @@ fun ToolRunRow(tools: List<ToolRun>, alignment: Alignment.Horizontal, showOutput
             val stateLabel = stringResource(if (expanded) R.string.tool_collapse else R.string.tool_expand)
             val statusColor = if (tool.ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
             Surface(
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(14.dp),
                 color = MaterialTheme.colorScheme.surfaceContainer,
                 border = BorderStroke(1.dp, if (tool.ok) MaterialTheme.colorScheme.outlineVariant else MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
                 modifier = Modifier.fillMaxWidth().animateContentSize()
@@ -1798,21 +1802,29 @@ fun ToolRunRow(tools: List<ToolRun>, alignment: Alignment.Horizontal, showOutput
                         }
                     ) {
                         Row(
-                            modifier = Modifier.heightIn(min = 64.dp).padding(12.dp),
+                            modifier = Modifier.heightIn(min = 48.dp).padding(8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Surface(shape = RoundedCornerShape(12.dp),
                                 color = if (tool.ok) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer) {
-                                Icon(toolIcon(tool.name), null, Modifier.padding(10.dp).size(20.dp), tint = statusColor)
+                                Icon(toolIcon(tool.name), null, Modifier.padding(6.dp).size(18.dp), tint = statusColor)
                             }
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text(stringResource(toolTitleRes(tool.name)), style = MaterialTheme.typography.titleSmall,
-                                    maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                if (tool.label.isNotBlank()) Text(tool.label,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Text(stringResource(if (tool.ok && !running && !queued && !cancelled) when (tool.name) {
+                                    "list", "find" -> R.string.tool_done_list
+                                    "read", "cat", "tail" -> R.string.tool_title_read
+                                    "write", "append" -> R.string.tool_done_write
+                                    "open" -> R.string.tool_done_open
+                                    "edit", "replace" -> R.string.tool_done_edit
+                                    "delete" -> R.string.tool_done_delete
+                                    "mkdir" -> R.string.tool_done_mkdir
+                                    "move" -> R.string.tool_done_move
+                                    "copy" -> R.string.tool_done_copy
+                                    "download" -> R.string.tool_done_download
+                                    else -> toolTitleRes(tool.name)
+                                } else toolTitleRes(tool.name)), style = MaterialTheme.typography.labelLarge,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 val statusText = stringResource(when {
                                     running -> R.string.tool_status_running
                                     queued -> R.string.tool_status_queued
@@ -1821,7 +1833,7 @@ fun ToolRunRow(tools: List<ToolRun>, alignment: Alignment.Horizontal, showOutput
                                     else -> R.string.tool_status_failed
                                 })
                                 if (running) ShiningActivityText(statusText)
-                                else Text(statusText, style = MaterialTheme.typography.labelSmall, color = statusColor)
+                                else if (queued || cancelled || !tool.ok) Text(statusText, style = MaterialTheme.typography.labelSmall, color = statusColor)
                             }
                             if (running) LoadingIndicator(Modifier.size(18.dp), color = statusColor)
                             else Icon(when {

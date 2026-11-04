@@ -394,4 +394,13 @@
     <string name="update_notification_description">Notifies when a newer AI Chat build is available</string>
     <string name="update_notification_title">AI Chat update available</string>
     <string name="update_notification_text">Version %1$s is ready to install.</string>
+    <string name="tool_done_list">Listed files</string>
+    <string name="tool_done_write">Wrote file</string>
+    <string name="tool_done_open">Opened file</string>
+    <string name="tool_done_edit">Edited file</string>
+    <string name="tool_done_delete">Deleted file</string>
+    <string name="tool_done_mkdir">Created folder</string>
+    <string name="tool_done_move">Moved file</string>
+    <string name="tool_done_copy">Copied file</string>
+    <string name="tool_done_download">Downloaded file</string>
 </resources>

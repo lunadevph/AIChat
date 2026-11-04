@@ -927,9 +927,11 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         }
         val bubble = replyBubble ?: return emptyList()
         bubble.commit(withoutMemory.trim(), turn.reasoning)
+        val exchangeId = UUID.randomUUID().toString()
         val queued = calls.map { call ->
             ToolRun(call.function?.name.orEmpty(), callId = call.id,
-                arguments = call.function?.arguments?.takeIf { it.isNotBlank() } ?: "{}", state = "queued", extraContent = call.extraContent)
+                arguments = call.function?.arguments?.takeIf { it.isNotBlank() } ?: "{}", state = "queued", extraContent = call.extraContent,
+                exchangeId = exchangeId, assistantContent = withoutMemory.trim(), assistantReasoning = turn.reasoning)
         }
         bubble.queue(queued)
         publishReply()
@@ -947,7 +949,8 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             val filePath = run.label.takeIf { run.name in AiTools.fileTools && !it.startsWith("/") }
             bubble.update(ToolRun(run.name, run.label, run.ok, filePath,
                 callId = call.id, arguments = queued[index].arguments, result = run.result,
-                state = if (run.ok) "completed" else "failed", extraContent = call.extraContent))
+                state = if (run.ok) "completed" else "failed", extraContent = call.extraContent,
+                exchangeId = exchangeId, assistantContent = withoutMemory.trim(), assistantReasoning = turn.reasoning))
             publishReply()
         }
         activeToolName = null
@@ -1030,8 +1033,8 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
     private fun saveImageLocally(context: Context, uri: Uri): String? {
         return try {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-                ?: return null
+            val input = context.contentResolver.openInputStream(uri) ?: return null
+            input.use { BitmapFactory.decodeStream(it, null, bounds) }
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
             var sample = 1
             while (bounds.outWidth / sample > 2048 || bounds.outHeight / sample > 2048) sample *= 2
