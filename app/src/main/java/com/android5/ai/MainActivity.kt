@@ -1316,41 +1316,10 @@ fun MessageBubble(
     val alignment =
         if (isUser) Alignment.End else Alignment.Start
 
-    val bubbleColor =
-        if (message.isError) {
-            MaterialTheme.colorScheme.errorContainer
-        } else if (isUser) {
-            MaterialTheme.colorScheme.primaryContainer
-                .copy(alpha = 0.9f)
-        } else {
-            MaterialTheme.colorScheme.surfaceContainerHigh
-        }
-
-    val contentColor =
-        if (message.isError) {
-            MaterialTheme.colorScheme.onErrorContainer
-        } else if (isUser) {
-            MaterialTheme.colorScheme.onPrimaryContainer
-        } else {
-            MaterialTheme.colorScheme.onSurface
-        }
-
-    val shape =
-        if (isUser) {
-            RoundedCornerShape(
-                topStart = 24.dp,
-                topEnd = 6.dp,
-                bottomStart = 24.dp,
-                bottomEnd = 24.dp
-            )
-        } else {
-            RoundedCornerShape(
-                topStart = 6.dp,
-                topEnd = 24.dp,
-                bottomStart = 24.dp,
-                bottomEnd = 24.dp
-            )
-        }
+    val visuals = bubbleVisuals(settingsManager.bubbleStyle, isUser, message.isError)
+    val bubbleColor = visuals.color
+    val contentColor = visuals.content
+    val shape = visuals.shape
 
     val clipboardManager =
         LocalClipboardManager.current
@@ -1485,16 +1454,7 @@ fun MessageBubble(
                         color = bubbleColor,
                         contentColor = contentColor,
                         shape = shape,
-                        border = BorderStroke(
-                            1.dp,
-                            if (isUser) {
-                                MaterialTheme.colorScheme.primary
-                                    .copy(alpha = 0.3f)
-                            } else {
-                                MaterialTheme.colorScheme.outlineVariant
-                                    .copy(alpha = 0.4f)
-                            }
-                        ),
+                        border = visuals.border,
                         tonalElevation = 1.dp,
                         modifier = Modifier.widthIn(max = 340.dp)
                     ) {

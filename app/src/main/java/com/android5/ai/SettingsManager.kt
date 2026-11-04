@@ -16,7 +16,11 @@ class SettingsManager(context: Context) {
             _showThinkingState = mutableStateOf(_prefs!!.getBoolean("show_thinking", false))
             _showToolOutputState = mutableStateOf(_prefs!!.getBoolean("show_tool_output", true))
             _webSearchState = mutableStateOf(_prefs!!.getBoolean("web_search_enabled", false))
-            _themeModeState = mutableStateOf(_prefs!!.getString("theme_mode", "dynamic") ?: "dynamic")
+            val theme = AppearanceOptions.theme(_prefs!!.getString("theme_mode", "dynamic") ?: "dynamic")
+            _themeModeState = mutableStateOf(theme)
+            _prefs!!.edit().putString("theme_mode", theme).apply()
+            _bubbleStyleState = mutableStateOf(AppearanceOptions.bubble(_prefs!!.getString("bubble_style", "tonal") ?: "tonal"))
+            _updateChannelState = mutableStateOf(UpdateChannels.normalize(_prefs!!.getString("update_channel", BuildConfig.UPDATE_CHANNEL) ?: BuildConfig.UPDATE_CHANNEL))
 
             // A provider can be retired in a later release; fall back to the default
             // one so the app never points at an endpoint that no longer exists.
@@ -235,21 +239,38 @@ class SettingsManager(context: Context) {
     var themeMode: String
         get() = _themeModeState!!.value
         set(value) {
-            _themeModeState!!.value = value
-            _prefs!!.edit().putString("theme_mode", value).apply()
+            val normalized = AppearanceOptions.theme(value)
+            _themeModeState!!.value = normalized
+            _prefs!!.edit().putString("theme_mode", normalized).apply()
         }
 
-    /**
-     * The AppCompat theme for the selected appearance. The retro appearances have
-     * their own pre-Material window and system bars; the rest keep the default.
-     * Applied with setTheme() before the content is set.
-     */
-    fun activityThemeStyle(): Int = when (themeMode) {
-        "old_android" -> R.style.Theme_AIChat_OldAndroid
-        "holo" -> R.style.Theme_AIChat_Holo
-        "compact" -> R.style.Theme_AIChat_Compact
-        else -> R.style.Theme_AIChat
-    }
+    var backupIncludeChats: Boolean
+        get() = _prefs!!.getBoolean("backup_chats", true)
+        set(value) { _prefs!!.edit().putBoolean("backup_chats", value).apply() }
+    var backupIncludeImages: Boolean
+        get() = _prefs!!.getBoolean("backup_images", true)
+        set(value) { _prefs!!.edit().putBoolean("backup_images", value).apply() }
+    var backupIncludeKeys: Boolean
+        get() = _prefs!!.getBoolean("backup_keys", false)
+        set(value) { _prefs!!.edit().putBoolean("backup_keys", value).apply() }
+
+    var bubbleStyle: String
+        get() = _bubbleStyleState!!.value
+        set(value) {
+            val normalized = AppearanceOptions.bubble(value)
+            _bubbleStyleState!!.value = normalized
+            _prefs!!.edit().putString("bubble_style", normalized).apply()
+        }
+
+    var updateChannel: String
+        get() = _updateChannelState!!.value
+        set(value) {
+            val normalized = UpdateChannels.normalize(value)
+            _updateChannelState!!.value = normalized
+            _prefs!!.edit().putString("update_channel", normalized).apply()
+        }
+
+    fun activityThemeStyle(): Int = R.style.Theme_AIChat
 
     var currentConversationId: String?
         get() = _prefs!!.getString("current_conv_id", null)
@@ -267,6 +288,8 @@ class SettingsManager(context: Context) {
         private var _showThinkingState: MutableState<Boolean>? = null
         private var _showToolOutputState: MutableState<Boolean>? = null
         private var _webSearchState: MutableState<Boolean>? = null
+        private var _bubbleStyleState: MutableState<String>? = null
+        private var _updateChannelState: MutableState<String>? = null
         private var _themeModeState: MutableState<String>? = null
     }
 }

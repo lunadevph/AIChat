@@ -61,9 +61,7 @@ import com.android5.ai.ui.theme.AIChatTheme
 import com.android5.ai.ui.theme.AmoledBackground
 import com.android5.ai.ui.theme.ExpressiveButtonShapes
 import com.android5.ai.ui.theme.ExpressiveIconButtonShapes
-import com.android5.ai.ui.theme.HoloPrimary
 import com.android5.ai.ui.theme.LightSurface
-import com.android5.ai.ui.theme.OldAndroidPrimary
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -81,6 +79,7 @@ class SettingsActivity : ComponentActivity() {
                 var showApiKeyManager by remember { mutableStateOf(false) }
                 var showAboutApp by remember { mutableStateOf(false) }
                 var showAppearance by remember { mutableStateOf(false) }
+                var showBackup by remember { mutableStateOf(false) }
 
                 Scaffold(
                     topBar = {
@@ -194,6 +193,14 @@ class SettingsActivity : ComponentActivity() {
                                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
                                 )
                                 SettingsGroupItem(
+                                    title = stringResource(R.string.settings_backup_title),
+                                    subtitle = stringResource(R.string.settings_backup_subtitle),
+                                    icon = Icons.Rounded.Backup,
+                                    badgeColor = MaterialTheme.colorScheme.tertiary,
+                                    onClick = { showBackup = true }
+                                )
+                                HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                                SettingsGroupItem(
                                     title = stringResource(R.string.settings_about_title),
                                     subtitle = stringResource(R.string.settings_about_subtitle),
                                     icon = Icons.Rounded.Info,
@@ -230,6 +237,7 @@ class SettingsActivity : ComponentActivity() {
                     if (showAboutApp) {
                         AboutAppSheet { showAboutApp = false }
                     }
+                    if (showBackup) BackupSettingsSheet(settingsManager) { showBackup = false }
                     if (showAppearance) {
                         AppearanceSheet(settingsManager) { showAppearance = false }
                     }
@@ -1514,7 +1522,7 @@ fun AboutAppSheet(onDismiss: () -> Unit) {
                 color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
             ) {
                 Text(
-                    stringResource(R.string.about_version_code, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
+                    stringResource(R.string.about_version_code, BuildConfig.VERSION_NAME, BuildConfig.BUILD_NUMBER),
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
@@ -1579,95 +1587,4 @@ fun AboutAppSheet(onDismiss: () -> Unit) {
         }
     }
 }
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AppearanceSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
-    val options = listOf(
-        Triple("dynamic", stringResource(R.string.theme_dynamic), MaterialTheme.colorScheme.primary),
-        Triple("amoled", stringResource(R.string.theme_amoled), AmoledBackground),
-        Triple("light", stringResource(R.string.theme_light), LightSurface),
-        Triple("old_android", stringResource(R.string.theme_old_android), OldAndroidPrimary),
-        Triple("holo", stringResource(R.string.theme_holo), HoloPrimary),
-        Triple("compact", stringResource(R.string.theme_compact), MaterialTheme.colorScheme.primary)
-    )
-    val current = settingsManager.themeMode
-    val activity = LocalContext.current as? android.app.Activity
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 8.dp)
-                .verticalScroll(rememberScrollState())
-                .padding(bottom = 36.dp)
-        ) {
-            Text(stringResource(R.string.settings_appearance_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(6.dp))
-            Text(stringResource(R.string.settings_appearance_subtitle), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(20.dp))
-
-            options.forEach { (key, label, swatchColor) ->
-                val selected = current == key
-                Surface(
-                    onClick = {
-                        settingsManager.themeMode = key
-                        onDismiss()
-                        // The AppCompat window theme only applies at creation, so
-                        // recreate to pick up the new status bar / window background.
-                        activity?.recreate()
-                    },
-                    shape = RoundedCornerShape(22.dp),
-                    color = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
-                            else MaterialTheme.colorScheme.surfaceContainerHigh,
-                    border = BorderStroke(
-                        if (selected) 2.dp else 1.dp,
-                        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                    ),
-                    tonalElevation = if (selected) 3.dp else 0.dp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 5.dp)
-                        .semantics {
-                            this.role = Role.RadioButton
-                            this.selected = selected
-                        }
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 18.dp, vertical = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .background(swatchColor, CircleShape)
-                                .clip(CircleShape)
-                                .then(
-                                    // Dark swatches need a ring to stay visible on the sheet.
-                                    if (key == "light" || key == "amoled" || key == "old_android" || key == "holo")
-                                        Modifier.background(MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), CircleShape)
-                                    else Modifier
-                                )
-                        )
-                        Spacer(Modifier.width(16.dp))
-                        Text(
-                            label,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.weight(1f)
-                        )
-                        SelectionIndicator(selected)
-                    }
-                }
-            }
-        }
-    }
-}
-
 

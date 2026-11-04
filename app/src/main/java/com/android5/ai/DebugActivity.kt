@@ -155,7 +155,7 @@ private fun DebugScreen(settingsManager: SettingsManager, onBack: () -> Unit) {
             // Version
             DebugCard(title = "Version") {
                 DebugRow("Version name", BuildConfig.VERSION_NAME)
-                DebugRow("Version code", BuildConfig.VERSION_CODE.toString())
+                DebugRow(context.getString(R.string.updates_build_label), BuildConfig.BUILD_NUMBER)
                 DebugRow("Build date", BuildConfig.BUILD_DATE)
             }
 
@@ -233,7 +233,7 @@ private fun DebugScreen(settingsManager: SettingsManager, onBack: () -> Unit) {
             val diagnostics = remember(official, fingerprint, settingsManager.selectedProvider, settingsManager.selectedModel) {
                 buildString {
                     appendLine("AI Chat diagnostics")
-                    appendLine("Version: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+                    appendLine("Version: ${BuildConfig.VERSION_NAME} (${BuildConfig.BUILD_NUMBER})")
                     appendLine("Build date: ${BuildConfig.BUILD_DATE}")
                     appendLine("Official: $official")
                     appendLine("Fingerprint: $fingerprint")

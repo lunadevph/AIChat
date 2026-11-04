@@ -18,6 +18,8 @@ object BackupManager {
     private const val MAX_BACKUP_BYTES = 64 * 1024 * 1024
     private val gson = Gson()
 
+    data class ExportOptions(val conversations: Boolean = true, val images: Boolean = true, val apiKeys: Boolean = true)
+
     data class BackupSettings(
         val customInstructions: String = "",
         val aiMemory: String = "",
@@ -35,7 +37,9 @@ object BackupManager {
         val showToolOutput: Boolean = true,
         val customProviders: List<Providers.Custom> = emptyList(),
         val selectedProvider: String? = null,
-        val selectedModel: String? = null
+        val selectedModel: String? = null,
+        val bubbleStyle: String = "tonal",
+        val updateChannel: String? = null
     )
 
     data class Backup(
@@ -59,10 +63,10 @@ object BackupManager {
         return SecretKeySpec(md.digest(), "AES")
     }
 
-    fun export(context: Context, uri: Uri, password: CharArray): Boolean {
+    fun export(context: Context, uri: Uri, password: CharArray, options: ExportOptions = ExportOptions()): Boolean {
         return try {
             val store = ConversationStore(context)
-            val convs = store.listConversations().mapNotNull { store.loadConversation(it.id) }
+            val convs = if (options.conversations) store.listConversations().mapNotNull { store.loadConversation(it.id) } else emptyList()
             val sm = SettingsManager(context)
             val settings = BackupSettings(
                 customInstructions = sm.customInstructions,
@@ -81,16 +85,18 @@ object BackupManager {
                 showToolOutput = sm.showToolOutput,
                 customProviders = sm.customProviders,
                 selectedProvider = sm.selectedProvider,
-                selectedModel = sm.selectedModel
+                selectedModel = sm.selectedModel,
+                bubbleStyle = sm.bubbleStyle,
+                updateChannel = sm.updateChannel
             )
-            val apiKeys = (Providers.ALL.map { it.name } + sm.customProviders.map { it.name })
-                .associateWith { sm.getApiKey(it) }
-            val images = convs.flatMap { it.messages }.mapNotNull { it.localImageUrl }.distinct()
+            val apiKeys = if (options.apiKeys) (Providers.ALL.map { it.name } + sm.customProviders.map { it.name })
+                .associateWith { sm.getApiKey(it) } else emptyMap()
+            val images = if (options.images) convs.flatMap { it.messages }.mapNotNull { it.localImageUrl }.distinct()
                 .associateWith { path ->
                     val file = java.io.File(path).canonicalFile
                     require(file.parentFile == context.filesDir.canonicalFile && file.name.startsWith("img_"))
                     android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP)
-                }
+                } else emptyMap()
             val backup = Backup(
                 createdAt = AppClock.utcTimestamp(),
                 conversations = convs,
@@ -106,7 +112,7 @@ object BackupManager {
             cipher.init(Cipher.ENCRYPT_MODE, key)
             val iv = cipher.iv
             val ct = cipher.doFinal(json.toByteArray(Charsets.UTF_8))
-            context.contentResolver.openOutputStream(uri)?.use { out ->
+            context.contentResolver.openOutputStream(uri, "wt")?.use { out ->
                 out.write(MAGIC.toByteArray(Charsets.UTF_8))
                 out.write(VERSION)
                 out.write(salt)
@@ -171,6 +177,8 @@ object BackupManager {
             sm.aiMemory = s.aiMemory
             sm.agentMemory = s.agentMemory
             sm.themeMode = s.themeMode
+            sm.bubbleStyle = s.bubbleStyle
+            s.updateChannel?.let { sm.updateChannel = it }
             sm.temperature = s.temperature
             sm.topP = s.topP
             sm.maxTokens = s.maxTokens

@@ -8,6 +8,12 @@ import android.provider.Settings
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
@@ -30,17 +36,25 @@ object UpdateInstaller {
     private const val DIR = "updates"
 
     /** Where the APK for [versionName] is (or would be) staged. */
-    fun apkFile(context: Context, versionName: String?): File {
+    fun apkFile(context: Context, versionName: String?, channel: String = BuildConfig.UPDATE_CHANNEL): File {
         val safe = versionName
             ?.filter { it.isLetterOrDigit() || it == '.' || it == '-' || it == '_' }
             ?.takeIf { it.isNotBlank() }
             ?: "update"
-        return File(File(context.cacheDir, DIR), "ai-chat-$safe.apk")
+        return File(File(context.cacheDir, DIR), "ai-chat-${UpdateChannels.normalize(channel)}-$safe.apk")
     }
 
     /** An already-downloaded APK for this version, if the cache still has it. */
     fun cachedApk(context: Context, versionName: String?): File? =
         apkFile(context, versionName).takeIf { it.isFile && it.length() > 0 }
+
+    suspend fun verifiedCachedApk(context: Context, versionName: String?, expectedHash: String?, channel: String): File? =
+        withContext(Dispatchers.IO) {
+            val file = apkFile(context, versionName, channel)
+            if (!file.isFile || file.length() == 0L || expectedHash.isNullOrBlank()) return@withContext null
+            if (sha256(file).equals(expectedHash.trim(), ignoreCase = true)) file
+            else { file.delete(); null }
+        }
 
     /** Whether the system will let us open the installer for a downloaded APK. */
     fun canInstall(context: Context): Boolean =
@@ -83,7 +97,13 @@ object UpdateInstaller {
             .header("User-Agent", "AIChat-Android")
             .build()
 
-        client.newCall(request).execute().use { response ->
+        coroutineScope {
+        val call = client.newCall(request)
+        val cancellation = launch(start = CoroutineStart.UNDISPATCHED) {
+            try { awaitCancellation() } finally { call.cancel() }
+        }
+        try {
+        call.execute().use { response ->
             if (!response.isSuccessful) {
                 throw IOException("the server answered HTTP ${response.code}")
             }
@@ -91,7 +111,7 @@ object UpdateInstaller {
             val total = body.contentLength()
 
             destination.parentFile?.mkdirs()
-            val partial = File(destination.parentFile, destination.name + ".part")
+            val partial = File(destination.parentFile, destination.name + ".${java.util.UUID.randomUUID()}.part")
 
             try {
                 body.byteStream().use { input ->
@@ -99,6 +119,7 @@ object UpdateInstaller {
                         val buffer = ByteArray(64 * 1024)
                         var written = 0L
                         while (true) {
+                            currentCoroutineContext().ensureActive()
                             val read = input.read(buffer)
                             if (read <= 0) break
                             written += read
@@ -125,6 +146,8 @@ object UpdateInstaller {
             }
 
             destination
+        }
+        } finally { cancellation.cancel() }
         }
     }
 

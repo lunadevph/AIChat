@@ -5,6 +5,7 @@ plugins {
 
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.util.zip.ZipFile
 import java.util.Properties
 import java.util.Date
 import java.util.Locale
@@ -83,6 +84,12 @@ val bumpedVersion = incrementVersion(storedVersion, providers.gradleProperty("ve
 val currentVersion = if (shouldBump || explicitBump) bumpedVersion else storedVersion
 val currentVersionCode = currentVersion.code
 val currentVersionName = currentVersion.name
+val publishingChannel = providers.gradleProperty("updateChannel").getOrElse("release").lowercase(Locale.US)
+require(publishingChannel in setOf("release", "debug")) { "updateChannel must be release or debug" }
+val todayBuildNumber = SimpleDateFormat("yyMMdd", Locale.US).format(Date())
+val displayBuildNumber = if (shouldBump || explicitBump) todayBuildNumber else loadVersionProps().getProperty("BUILD_NUMBER", todayBuildNumber)
+require(Regex("[0-9]{6}").matches(displayBuildNumber)) { "BUILD_NUMBER must contain six digits" }
+val buildInfoDirectory = layout.buildDirectory.dir("generated/update-info/assets")
 
 android {
     namespace = "com.android5.ai"
@@ -99,6 +106,8 @@ android {
 
         val buildDate = SimpleDateFormat("MMM d, yyyy", Locale.US).format(Date())
         buildConfigField("String", "BUILD_DATE", "\"$buildDate\"")
+        buildConfigField("String", "BUILD_NUMBER", "\"$displayBuildNumber\"")
+        buildConfigField("String", "UPDATE_CHANNEL", "\"$publishingChannel\"")
     }
 
     signingConfigs {
@@ -124,7 +133,11 @@ android {
     }
 
     buildTypes {
+        getByName("debug") {
+            buildConfigField("String", "UPDATE_CHANNEL", "\"debug\"")
+        }
         release {
+            isDebuggable = publishingChannel == "debug"
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -133,6 +146,7 @@ android {
             signingConfig = signingConfigs.getByName("release")
         }
     }
+    sourceSets.getByName("main").assets.srcDir(buildInfoDirectory.get().asFile)
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -143,6 +157,18 @@ android {
     }
 }
 
+val writeUpdateBuildInfo = tasks.register("writeUpdateBuildInfo") {
+    inputs.property("channel", publishingChannel)
+    inputs.property("versionCode", currentVersionCode)
+    outputs.dir(buildInfoDirectory)
+    doLast {
+        val directory = buildInfoDirectory.get().asFile.apply { mkdirs() }
+        File(directory, "release-channel.txt").writeText(publishingChannel)
+        File(directory, "release-code.txt").writeText(currentVersionCode.toString())
+    }
+}
+tasks.named("preBuild") { dependsOn(writeUpdateBuildInfo) }
+
 val bumpAppVersionsTask = tasks.register("BumpAppVersions") {
     description = "Increments the semantic version and Android version code once"
     group = "versioning"
@@ -152,7 +178,7 @@ val bumpAppVersionsTask = tasks.register("BumpAppVersions") {
             "version.properties changed during this build; retry to avoid a version mismatch"
         }
         val temporary = File(versionPropsFile.parentFile, "version.properties.tmp")
-        temporary.writeText("VERSION_CODE=${bumpedVersion.code}\nVERSION_NAME=${bumpedVersion.name}\n")
+        temporary.writeText("VERSION_CODE=${bumpedVersion.code}\nVERSION_NAME=${bumpedVersion.name}\nBUILD_NUMBER=$displayBuildNumber\n")
         Files.move(temporary.toPath(), versionPropsFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
         println("Version: ${bumpedVersion.name} (code ${bumpedVersion.code})")
     }
@@ -212,11 +238,13 @@ tasks.register("installAndPushApk") {
 tasks.register("UpdateMirrors") {
     description = "Updates mirror.json with the latest version info and pushes changes to the update-mirror repository"
     group = "publishing"
+    dependsOn("checkChangelog")
 
     doLast {
         val props = loadVersionProps()
-        val verCode = (props["VERSION_CODE"] as? String)?.toIntOrNull() ?: 58
-        val verName = (props["VERSION_NAME"] as? String) ?: "2.0.2"
+        val publishedVersion = readAppVersion(props)
+        val verCode = publishedVersion.code
+        val verName = publishedVersion.name
 
         // Read changelog
         val changelogFile = file("changelog.txt")
@@ -228,10 +256,9 @@ tasks.register("UpdateMirrors") {
             .replace("\r", "")
 
         val mirrorDir = File(System.getProperty("user.home"), "update-mirror")
-        if (!mirrorDir.exists()) {
-            println("UpdateMirrors: Directory $mirrorDir does not exist, skipping mirror update.")
-            return@doLast
-        }
+        require(mirrorDir.isDirectory) { "Clone update-mirror to $mirrorDir before publishing" }
+        val channelPrefix = if (publishingChannel == "debug") "debug/" else ""
+        val channelDirectory = File(mirrorDir, channelPrefix).apply { mkdirs() }
 
         try {
             val isWindows = System.getProperty("os.name").lowercase().contains("windows")
@@ -239,11 +266,12 @@ tasks.register("UpdateMirrors") {
 
             // 1. Pull latest changes first before modifying files
             val pullCmd = "git pull --rebase origin main"
-            ProcessBuilder(shell + listOf(pullCmd))
+            val pullProcess = ProcessBuilder(shell + listOf(pullCmd))
                 .directory(mirrorDir)
                 .redirectErrorStream(true)
                 .start()
-                .waitFor()
+            val pullOutput = pullProcess.inputStream.bufferedReader().readText()
+            check(pullProcess.waitFor() == 0) { "Cannot synchronize update mirror: $pullOutput" }
 
             // 2. Copy APK and update mirror.json
             val apkDir = layout.buildDirectory.dir("outputs/apk/release").get().asFile
@@ -251,13 +279,19 @@ tasks.register("UpdateMirrors") {
             var apkSha256 = ""
             var apkSizeBytes = 0L
             if (apkFile != null && apkFile.exists()) {
-                val destApk = File(mirrorDir, "latest.apk")
+                ZipFile(apkFile).use { zip ->
+                    val channelEntry = zip.getEntry("assets/release-channel.txt") ?: error("Rebuild this APK with channel metadata")
+                    val codeEntry = zip.getEntry("assets/release-code.txt") ?: error("Rebuild this APK with version metadata")
+                    require(zip.getInputStream(channelEntry).bufferedReader().use { it.readText().trim() } == publishingChannel) { "APK channel differs from -PupdateChannel" }
+                    require(zip.getInputStream(codeEntry).bufferedReader().use { it.readText().trim() } == verCode.toString()) { "APK version differs from version.properties" }
+                }
+                val destApk = File(channelDirectory, "latest.apk")
                 apkFile.copyTo(destApk, overwrite = true)
                 apkSha256 = sha256Of(destApk)
                 apkSizeBytes = destApk.length()
                 println("UpdateMirrors: Copied release APK (${apkFile.name}) to ${destApk.absolutePath} (${destApk.length()} bytes, sha256 $apkSha256)")
             } else {
-                println("UpdateMirrors: Warning - release APK not found in $apkDir")
+                error("Build a signed release APK before publishing: $apkDir")
             }
 
             // Mirror format v2.
@@ -267,11 +301,13 @@ tasks.register("UpdateMirrors") {
             // shipped before this one) still parses the file and still sees an
             // update. Gson ignores fields a client has no property for, and the
             // added properties all have defaults, so both directions are safe.
-            val rawDownloadUrl = "https://raw.githubusercontent.com/lunadevph/update-mirror/main/latest.apk?v=$verCode"
-            val mirrorFile = File(mirrorDir, "mirror.json")
+            val rawDownloadUrl = "https://raw.githubusercontent.com/lunadevph/update-mirror/main/${channelPrefix}latest.apk?v=$verCode"
+            val mirrorFile = File(channelDirectory, "mirror.json")
             val jsonContent = """
 {
   "schemaVersion": 2,
+  "channel": "$publishingChannel",
+  "buildNumber": "$displayBuildNumber",
   "appPackageName": "com.android5.ai",
   "appLatestVersion": "$verName",
   "appLatestCodeVersion": $verCode,
@@ -320,7 +356,7 @@ tasks.register("UpdateMirrors") {
             // `git commit` fails when nothing changed, which would stop the chain
             // before the push and strand commits that already exist locally (a
             // backlog from an earlier refused push), so commit only if staged.
-            val commitPushCmd = "git add mirror.json latest.apk && (git diff --cached --quiet || git commit -m \"Update mirror and latest.apk to v$verName (code $verCode)\") && git push $pushRef main"
+            val commitPushCmd = "git add ${channelPrefix}mirror.json ${channelPrefix}latest.apk && (git diff --cached --quiet || git commit -m \"Update $publishingChannel mirror to v$verName (build $displayBuildNumber, code $verCode)\") && git push $pushRef main"
             val process = ProcessBuilder(shell + listOf(commitPushCmd))
                 .directory(mirrorDir)
                 .redirectErrorStream(true)
@@ -343,9 +379,10 @@ tasks.register("UpdateMirrors") {
                             "or MIRROR_TOKEN, then push $mirrorDir manually."
                     )
                 }
+                error("Update mirror push failed; local commits are retained for retry")
             }
         } catch (e: Exception) {
-            println("UpdateMirrors: Error pushing mirror: ${e.message}")
+            throw GradleException("UpdateMirrors failed; inspect the mirror checkout before retrying", e)
         }
     }
 }
@@ -415,7 +452,7 @@ tasks.register("uploadGithubRelease") {
         conn.setRequestProperty("Content-Type", "application/json")
         conn.doOutput = true
 
-        val createBody = """{"tag_name":"$tagName","name":"$tagName (Build $verCode)","body":"$bodyJson","draft":false,"prerelease":false}"""
+        val createBody = """{"tag_name":"$tagName","name":"$tagName (Build $displayBuildNumber)","body":"$bodyJson","draft":false,"prerelease":false}"""
         conn.outputStream.use { it.write(createBody.toByteArray()) }
 
         val responseCode = conn.responseCode

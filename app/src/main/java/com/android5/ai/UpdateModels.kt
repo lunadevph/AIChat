@@ -29,5 +29,7 @@ data class AppUpdateConfig(
     /** Exact size of the APK at [downloadUrl], or 0 when unknown. */
     val apkSizeBytes: Long = 0L,
     /** Lower-case hex SHA-256 of the APK at [downloadUrl], or null when unknown. */
-    val apkSha256: String? = null
+    val apkSha256: String? = null,
+    val channel: String? = null,
+    val buildNumber: String? = null
 )

@@ -25,30 +25,6 @@ private val ExpressiveShapes = Shapes(
     extraExtraLarge = RoundedCornerShape(64.dp)
 )
 
-/** Sharp corners, for the pre-Material appearances. */
-private val SharpShapes = Shapes(
-    extraSmall = RoundedCornerShape(2.dp),
-    small = RoundedCornerShape(4.dp),
-    medium = RoundedCornerShape(6.dp),
-    large = RoundedCornerShape(8.dp),
-    extraLarge = RoundedCornerShape(10.dp),
-    largeIncreased = RoundedCornerShape(12.dp),
-    extraLargeIncreased = RoundedCornerShape(14.dp),
-    extraExtraLarge = RoundedCornerShape(16.dp)
-)
-
-/** Tighter corners, for the compact appearance. */
-private val CompactShapes = Shapes(
-    extraSmall = RoundedCornerShape(8.dp),
-    small = RoundedCornerShape(10.dp),
-    medium = RoundedCornerShape(12.dp),
-    large = RoundedCornerShape(14.dp),
-    extraLarge = RoundedCornerShape(16.dp),
-    largeIncreased = RoundedCornerShape(18.dp),
-    extraLargeIncreased = RoundedCornerShape(20.dp),
-    extraExtraLarge = RoundedCornerShape(24.dp)
-)
-
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 val ExpressiveButtonShapes = ButtonShapes(
     shape = RoundedCornerShape(20.dp),
@@ -73,14 +49,12 @@ fun AIChatTheme(
     // The retro appearances — Old Android and Holo — are dark by nature.
     val darkTheme = when (themeMode) {
         "light" -> false
-        "amoled", "old_android", "holo" -> true
+        "amoled", "midnight", "ocean", "forest" -> true
+        "sunset" -> false
         else -> isSystemInDarkTheme()
     }
-    val useDynamic = themeMode == "dynamic" || themeMode == "compact"
+    val useDynamic = themeMode == "dynamic"
     val isAmoled = themeMode == "amoled"
-    val isOldAndroid = themeMode == "old_android"
-    val isHolo = themeMode == "holo"
-    val isCompact = themeMode == "compact"
 
     val colorScheme = when {
         isAmoled -> darkColorScheme(
@@ -110,50 +84,18 @@ fun AIChatTheme(
             outline = AmoledOutline,
             outlineVariant = AmoledOutlineVariant
         )
-        isOldAndroid -> darkColorScheme(
-            primary = OldAndroidPrimary,
-            onPrimary = OldAndroidOnPrimary,
-            primaryContainer = OldAndroidPrimaryContainer,
-            onPrimaryContainer = OldAndroidOnPrimaryContainer,
-            secondary = OldAndroidSecondary,
-            onSecondary = OldAndroidOnSecondary,
-            secondaryContainer = OldAndroidSecondaryContainer,
-            onSecondaryContainer = OldAndroidOnSecondaryContainer,
-            tertiary = OldAndroidTertiary,
-            onTertiary = OldAndroidOnTertiary,
-            background = OldAndroidBackground,
-            onBackground = Color.White,
-            surface = OldAndroidSurface,
-            onSurface = Color.White,
-            surfaceVariant = OldAndroidSurfaceVariant,
-            onSurfaceVariant = Color(0xFFC4C7D4),
-            error = OldAndroidError,
-            onError = OldAndroidOnError,
-            outline = OldAndroidOutline,
-            outlineVariant = OldAndroidOutlineVariant
-        )
-        isHolo -> darkColorScheme(
-            primary = HoloPrimary,
-            onPrimary = HoloOnPrimary,
-            primaryContainer = HoloPrimaryContainer,
-            onPrimaryContainer = HoloOnPrimaryContainer,
-            secondary = HoloSecondary,
-            onSecondary = HoloOnSecondary,
-            secondaryContainer = HoloSecondaryContainer,
-            onSecondaryContainer = HoloOnSecondaryContainer,
-            tertiary = HoloTertiary,
-            onTertiary = HoloOnTertiary,
-            background = HoloBackground,
-            onBackground = Color.White,
-            surface = HoloSurface,
-            onSurface = Color.White,
-            surfaceVariant = HoloSurfaceVariant,
-            onSurfaceVariant = Color(0xFFC4C7D4),
-            error = HoloError,
-            onError = HoloOnError,
-            outline = HoloOutline,
-            outlineVariant = HoloOutlineVariant
-        )
+        themeMode == "midnight" -> accentDark(Color(0xFFC6B9FF), Color(0xFF15121F), Color(0xFF30274B))
+        themeMode == "ocean" -> accentDark(Color(0xFF8AD5FF), Color(0xFF0B1924), Color(0xFF143E54))
+        themeMode == "forest" -> accentDark(Color(0xFFA6D9B0), Color(0xFF111C15), Color(0xFF254532))
+        themeMode == "sunset" -> expressiveLightColorScheme().copy(
+            primary = Color(0xFF963E4B), onPrimary = Color.White,
+            primaryContainer = Color(0xFFFFD9DD), onPrimaryContainer = Color(0xFF3D0714),
+            secondary = Color(0xFF775847), onSecondary = Color.White,
+            secondaryContainer = Color(0xFFFFDCC8), onSecondaryContainer = Color(0xFF2D160B),
+            background = Color(0xFFFFF8F5), surface = Color(0xFFFFF8F5),
+            surfaceContainerLowest = Color.White, surfaceContainerLow = Color(0xFFFFF0EA),
+            surfaceContainer = Color(0xFFFCE8E0), surfaceContainerHigh = Color(0xFFF7E0D8),
+            surfaceContainerHighest = Color(0xFFF0D7CF), outlineVariant = Color(0xFFDCC0B9))
         useDynamic && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
@@ -197,20 +139,24 @@ fun AIChatTheme(
         }
     }
 
-    // The retro appearances are pre-Material, so they carry sharp corners; the
-    // compact one tightens everything instead.
-    val shapes = when {
-        isCompact -> CompactShapes
-        isOldAndroid || isHolo -> SharpShapes
-        else -> ExpressiveShapes
-    }
-
     MaterialExpressiveTheme(
         colorScheme = colorScheme,
         motionScheme = MotionScheme.expressive(),
-        shapes = shapes,
-        typography = if (isCompact) CompactTypography else Typography,
+        shapes = ExpressiveShapes,
+        typography = Typography,
         content = content
     )
 }
 
+
+private fun accentDark(accent: Color, background: Color, container: Color): ColorScheme = darkColorScheme(
+    primary = accent, onPrimary = Color(0xFF102018), primaryContainer = container, onPrimaryContainer = Color(0xFFF2F1F8),
+    secondary = accent, onSecondary = Color(0xFF102018), secondaryContainer = container, onSecondaryContainer = Color(0xFFF2F1F8),
+    background = background, onBackground = Color(0xFFE9E8EF), surface = background, onSurface = Color(0xFFE9E8EF),
+    onSurfaceVariant = Color(0xFFC8C7CF), surfaceContainerLowest = androidx.compose.ui.graphics.lerp(background, Color.Black, 0.25f),
+    surfaceContainerLow = androidx.compose.ui.graphics.lerp(background, accent, 0.04f),
+    surfaceContainer = androidx.compose.ui.graphics.lerp(background, accent, 0.07f),
+    surfaceContainerHigh = androidx.compose.ui.graphics.lerp(background, accent, 0.11f),
+    surfaceContainerHighest = androidx.compose.ui.graphics.lerp(background, accent, 0.16f),
+    surfaceVariant = container, outline = Color(0xFF92939B), outlineVariant = androidx.compose.ui.graphics.lerp(background, accent, 0.25f)
+)

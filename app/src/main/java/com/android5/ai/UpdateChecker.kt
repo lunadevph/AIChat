@@ -33,7 +33,10 @@ object UpdateChecker {
     private const val CHANNEL_ID = "ai_chat_updates"
     private const val NOTIF_ID = 42
 
-    private const val MIRROR_URL = "https://raw.githubusercontent.com/LunaDevPH/update-mirror/main/"
+    private const val MIRROR_URL = UpdateChannels.BASE_URL
+
+    private fun channel(context: Context) = SettingsManager(context).updateChannel
+    private fun key(context: Context, value: String) = UpdateChannels.cacheKey(value, channel(context))
 
     /** Minimum gap between checks, so launching the app ten times a minute does
      *  not hammer the mirror. */
@@ -41,11 +44,11 @@ object UpdateChecker {
 
     fun latestAvailableCode(context: Context): Int =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt(KEY_LATEST_CODE, 0)
+            .getInt(key(context, KEY_LATEST_CODE), 0)
 
     fun latestAvailableName(context: Context): String? =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(KEY_LATEST_NAME, null)
+            .getString(key(context, KEY_LATEST_NAME), null)
 
     /** True when the mirror's latest build is newer than the running one. */
     fun isUpdateAvailable(context: Context): Boolean {
@@ -66,8 +69,12 @@ object UpdateChecker {
     fun checkInBackground(context: Context, scope: CoroutineScope) {
         val appCtx = context.applicationContext
         val prefs = appCtx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val selectedChannel = channel(appCtx)
+        val lastKey = UpdateChannels.cacheKey(KEY_LAST_CHECK, selectedChannel)
+        val codeKey = UpdateChannels.cacheKey(KEY_LATEST_CODE, selectedChannel)
+        val nameKey = UpdateChannels.cacheKey(KEY_LATEST_NAME, selectedChannel)
         val now = System.currentTimeMillis()
-        val last = prefs.getLong(KEY_LAST_CHECK, 0L)
+        val last = prefs.getLong(lastKey, 0L)
         if (now - last < MIN_CHECK_GAP_MS) return
 
         scope.launch(Dispatchers.IO) {
@@ -84,21 +91,24 @@ object UpdateChecker {
                     .build()
                     .create(UpdateApi::class.java)
 
-                val config = api.getUpdateConfig("mirror.json")
+                val config = api.getUpdateConfig(UpdateChannels.feed(selectedChannel))
+                if (!UpdateChannels.accepts(config, selectedChannel, appCtx.packageName)) return@launch
                 val latestCode = config.appLatestCodeVersion
                 val latestName = config.appLatestVersion
 
                 prefs.edit()
-                    .putLong(KEY_LAST_CHECK, System.currentTimeMillis())
-                    .putInt(KEY_LATEST_CODE, latestCode)
-                    .putString(KEY_LATEST_NAME, latestName)
+                    .putLong(lastKey, System.currentTimeMillis())
+                    .putInt(codeKey, latestCode)
+                    .putString(nameKey, latestName)
                     .apply()
 
-                if (latestCode > currentCode(appCtx)) {
+                if (latestCode > currentCode(appCtx) && channel(appCtx) == selectedChannel) {
                     withContext(Dispatchers.Main) {
                         postNotification(appCtx, latestName ?: "newer build", latestCode)
                     }
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 // Offline or mirror unreachable: leave the cached result alone.
             }
@@ -111,10 +121,10 @@ object UpdateChecker {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "App updates",
+                context.getString(R.string.update_notification_channel),
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "Notifies when a newer build of AI Chat is available"
+                description = context.getString(R.string.update_notification_description)
             }
             nm.createNotificationChannel(channel)
         }
@@ -129,8 +139,8 @@ object UpdateChecker {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_download)
-            .setContentTitle("AI Chat update available")
-            .setContentText("Version $versionName (build $versionCode) is ready to install.")
+            .setContentTitle(context.getString(R.string.update_notification_title))
+            .setContentText(context.getString(R.string.update_notification_text, versionName))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(pi)
             .setAutoCancel(true)
@@ -139,11 +149,21 @@ object UpdateChecker {
         nm.notify(NOTIF_ID, notification)
     }
 
+    fun remember(context: Context, config: AppUpdateConfig, selectedChannel: String) {
+        if (!UpdateChannels.accepts(config, selectedChannel, context.packageName)) return
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putLong(UpdateChannels.cacheKey(KEY_LAST_CHECK, selectedChannel), System.currentTimeMillis())
+            .putInt(UpdateChannels.cacheKey(KEY_LATEST_CODE, selectedChannel), config.appLatestCodeVersion)
+            .putString(UpdateChannels.cacheKey(KEY_LATEST_NAME, selectedChannel), config.appLatestVersion).apply()
+    }
+
     /** Clears the cached "update available" state (e.g. after a successful install). */
     fun clear(context: Context) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .remove(KEY_LATEST_CODE)
-            .remove(KEY_LATEST_NAME)
+            .remove(key(context, KEY_LATEST_CODE))
+            .remove(key(context, KEY_LATEST_NAME))
+            .remove(key(context, KEY_LAST_CHECK))
             .apply()
+        (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(NOTIF_ID)
     }
 }
