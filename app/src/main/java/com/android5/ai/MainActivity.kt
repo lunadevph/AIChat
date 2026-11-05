@@ -1731,7 +1731,7 @@ private fun toolIcon(name: String) = when (name) {
     else -> Icons.Rounded.Build
 }
 
-private fun toolTitleRes(name: String): Int = when (name) {
+internal fun toolTitleRes(name: String): Int = when (name) {
     "read" -> R.string.tool_title_read
     "cat" -> R.string.tool_title_cat
     "write" -> R.string.tool_title_write

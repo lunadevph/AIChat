@@ -259,6 +259,7 @@ object AiTools {
     }
 
     suspend fun execute(call: Call, scope: Scope): Run = try {
+        scope.settings.requireToolEnabled(call.name)
         prepareWorkspace(scope.root)
         when (call.name) {
             "read" -> read(call, scope)
@@ -1178,9 +1179,13 @@ object AiTools {
             append("Absolute paths may access these shared roots: ")
             append(scope.deviceRoots.joinToString { it.absolutePath })
         } else append("Device storage access is off; absolute paths are unavailable.")
+        if (ToolPolicy.isAllowed("shell", true, scope.settings.disabledTools)) {
         append(" The shell and exec tools run commands with this app's Android permissions, including access to its private data. ")
         append("Their working directory is not a filesystem sandbox. They cannot gain root or bypass Android permissions. ")
         append("Use command for the command text, cwd for an optional allowed starting directory, and timeout for 1-60 seconds. ")
         append("Use shell commands when the task needs them; report the actual exit code and output, and never claim a command succeeded without its result.")
+        }
+        append(" Available tools: ").append(names.filter { ToolPolicy.isAllowed(it, true, scope.settings.disabledTools) }.joinToString(", "))
+        append(". Tools omitted from this list are disabled by the user; do not request or simulate them.")
     }
 }

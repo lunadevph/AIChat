@@ -1070,6 +1070,8 @@ fun AISettingsSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
     var showThinking by remember { mutableStateOf(settingsManager.showThinking) }
     var webSearch by remember { mutableStateOf(settingsManager.webSearchEnabled) }
     var toolsEnabled by remember { mutableStateOf(settingsManager.toolsEnabled) }
+    var disabledTools by remember { mutableStateOf(settingsManager.disabledTools) }
+    var showToolPermissions by remember { mutableStateOf(false) }
     var showToolOutput by remember { mutableStateOf(settingsManager.showToolOutput) }
     var streamingEnabled by remember { mutableStateOf(settingsManager.streamingEnabled) }
     var temperature by remember { mutableStateOf(settingsManager.temperature) }
@@ -1087,6 +1089,7 @@ fun AISettingsSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
         settingsManager.showThinking = showThinking
         settingsManager.webSearchEnabled = webSearch
         settingsManager.toolsEnabled = toolsEnabled
+        settingsManager.disabledTools = disabledTools
         settingsManager.showToolOutput = showToolOutput
         settingsManager.streamingEnabled = streamingEnabled
         settingsManager.temperature = temperature
@@ -1095,6 +1098,8 @@ fun AISettingsSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
         settingsManager.frequencyPenalty = frequencyPenalty
         settingsManager.presencePenalty = presencePenalty
     }
+
+    if (showToolPermissions) ToolPermissionsDialog(disabledTools, { disabledTools = it }, { showToolPermissions = false })
 
     if (memoryToClear != null) {
         AlertDialog(
@@ -1170,6 +1175,11 @@ fun AISettingsSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
                 checked = toolsEnabled,
                 onCheckedChange = { toolsEnabled = it }
             )
+
+            OutlinedButton(onClick = { showToolPermissions = true }, enabled = toolsEnabled,
+                modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.tool_permissions_manage))
+            }
 
             SettingsSwitchRow(
                 title = stringResource(R.string.setting_show_tool_output),
@@ -1470,19 +1480,7 @@ fun AISettingsSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
 
             Button(
                 onClick = {
-                    settingsManager.customInstructions = customInstructions
-                    settingsManager.aiMemory = aiMemory
-                    settingsManager.agentMemory = agentMemory
-                    settingsManager.showThinking = showThinking
-                    settingsManager.webSearchEnabled = webSearch
-                    settingsManager.toolsEnabled = toolsEnabled
-                    settingsManager.showToolOutput = showToolOutput
-                    settingsManager.streamingEnabled = streamingEnabled
-                    settingsManager.temperature = temperature
-                    settingsManager.topP = topP
-                    settingsManager.maxTokens = maxTokens
-                    settingsManager.frequencyPenalty = frequencyPenalty
-                    settingsManager.presencePenalty = presencePenalty
+                    saveSettings()
                     onDismiss()
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),

@@ -54,12 +54,12 @@ object NativeTools {
         }, "required" to required(name), "additionalProperties" to false
     )
 
-    fun openAiDefinitions(): List<Map<String, Any>> = descriptions.map { (name, description) ->
+    fun openAiDefinitions(disabled: Set<String> = emptySet()): List<Map<String, Any>> = descriptions.filterKeys { ToolPolicy.isAllowed(it, true, disabled) }.map { (name, description) ->
         mapOf("type" to "function", "function" to mapOf("name" to name,
             "description" to description, "parameters" to schema(name)))
     }
 
-    fun anthropicDefinitions(): List<Map<String, Any>> = descriptions.map { (name, description) ->
+    fun anthropicDefinitions(disabled: Set<String> = emptySet()): List<Map<String, Any>> = descriptions.filterKeys { ToolPolicy.isAllowed(it, true, disabled) }.map { (name, description) ->
         mapOf("name" to name, "description" to description, "input_schema" to schema(name))
     }
 

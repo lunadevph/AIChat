@@ -236,6 +236,15 @@ class SettingsManager(context: Context) {
         get() = _prefs!!.getBoolean("tools_enabled", true)
         set(value) = _prefs!!.edit().putBoolean("tools_enabled", value).apply()
 
+    var disabledTools: Set<String>
+        get() = _prefs!!.getStringSet("disabled_tools", emptySet())!!.toSet()
+        set(value) = _prefs!!.edit().putStringSet("disabled_tools", value.toSet()).apply()
+
+    val hasEnabledTools: Boolean
+        get() = toolsEnabled && AiTools.names.any { ToolPolicy.isAllowed(it, true, disabledTools) }
+
+    fun requireToolEnabled(name: String) = ToolPolicy.requireAllowed(name, toolsEnabled, disabledTools)
+
     var themeMode: String
         get() = _themeModeState!!.value
         set(value) {

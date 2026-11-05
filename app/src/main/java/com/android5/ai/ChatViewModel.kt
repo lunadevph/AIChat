@@ -339,9 +339,9 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 }
 
                 ToolReplyLoop.run(
-                    maxToolRounds = if (settingsManager.toolsEnabled) MAX_TOOL_STEPS else 0,
+                    maxToolRounds = if (settingsManager.hasEnabledTools) MAX_TOOL_STEPS else 0,
                     request = { allowTools, retryEmpty ->
-                        allowToolCalls = settingsManager.toolsEnabled && allowTools
+                        allowToolCalls = settingsManager.hasEnabledTools && allowTools
                         forceNonStream = retryEmpty
                         loadingStatus = LoadingStatus.THINKING
                         val correction = when {
@@ -436,7 +436,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             if (toolsEnabled) {
                 append("\n\n").append(if (allowToolCalls) AiTools.describe(toolScope)
                     else "Tool execution is paused for this response. Answer the user's request using any existing tool results. Do not request or simulate additional tool calls.")
-            } else {
+            } else if (ToolPolicy.isAllowed("memory", true, settingsManager.disabledTools)) {
                 // With tools switched off the model can still keep memory; it just
                 // does so with the older fenced block instead of the <memory> tool.
                 append("\n\n")
@@ -511,12 +511,13 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         val isGoogle = (requestProvider ?: settingsManager.selectedProvider) == "Google"
         val apiMessages = buildApiMessages(searchGrounding, toolResults, correction)
         val hasToolContext = apiMessages.any { !it.toolCalls.isNullOrEmpty() }
+        val toolDefinitions = if (settingsManager.toolsEnabled && (allowToolCalls || hasToolContext)) NativeTools.openAiDefinitions(settingsManager.disabledTools) else emptyList()
         val outputLimit = ReplyRecovery.tokenLimit(settingsManager.maxTokens, forceNonStream, retryNeedsMoreTokens)
         val request = ReplyRecovery.retryRequest(ChatRequest(
             model = (requestModel ?: settingsManager.selectedModel),
             messages = apiMessages,
-            tools = if (allowToolCalls || hasToolContext) NativeTools.openAiDefinitions() else null,
-            toolChoice = if (!allowToolCalls && hasToolContext) "none" else null,
+            tools = toolDefinitions.takeIf { it.isNotEmpty() },
+            toolChoice = if (!allowToolCalls && toolDefinitions.isNotEmpty()) "none" else null,
             stream = if (settingsManager.streamingEnabled && !forceNonStream) true else null,
             temperature = if (isReasoning) null else settingsManager.temperature.toDouble(),
             topP = if (isReasoning) null else settingsManager.topP.toDouble(),
@@ -558,13 +559,14 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         val apiMessages = buildApiMessages(searchGrounding, toolResults, correction)
         val (system, messages) = buildAnthropicMessages(apiMessages)
         val hasToolContext = apiMessages.any { !it.toolCalls.isNullOrEmpty() }
+        val toolDefinitions = if (settingsManager.toolsEnabled && (allowToolCalls || hasToolContext)) NativeTools.anthropicDefinitions(settingsManager.disabledTools) else emptyList()
 
         val request = AnthropicRequest(
             model = (requestModel ?: settingsManager.selectedModel),
             messages = messages,
             system = system,
-            tools = if (allowToolCalls || hasToolContext) NativeTools.anthropicDefinitions() else null,
-            toolChoice = if (!allowToolCalls && hasToolContext) mapOf("type" to "none") else null,
+            tools = toolDefinitions.takeIf { it.isNotEmpty() },
+            toolChoice = if (!allowToolCalls && toolDefinitions.isNotEmpty()) mapOf("type" to "none") else null,
             maxTokens = ReplyRecovery.tokenLimit(settingsManager.maxTokens, forceNonStream, retryNeedsMoreTokens),
             stream = if (settingsManager.streamingEnabled && !forceNonStream) true else null,
             temperature = if (isReasoning) null else settingsManager.temperature.toDouble(),
@@ -919,7 +921,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
      */
     private suspend fun finalizeTurn(turn: ToolReply): List<AiTools.Run> {
         val (withoutMemory, newMemory) = extractMemory(turn.raw)
-        if (newMemory != null) settingsManager.agentMemory = newMemory
+        if (newMemory != null && ToolPolicy.isAllowed("memory", true, settingsManager.disabledTools)) settingsManager.agentMemory = newMemory
 
         val calls = if (settingsManager.toolsEnabled && allowToolCalls) turn.calls else emptyList()
         require(calls.size <= 32 && calls.all { !it.id.isNullOrBlank() } && calls.map { it.id }.distinct().size == calls.size) {

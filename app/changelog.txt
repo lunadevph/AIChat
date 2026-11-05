@@ -1,10 +1,3 @@
-- Fixed image attachments failing before they could be added to a chat.
-- Fixed saved multi-step tool conversations replaying in the wrong order.
-- File previews now read a limited amount of data and avoid following links outside the workspace.
-- Improved conversation path validation, database ordering and API-key initialization reliability.
-- Interrupted imports of older chats now resume without dropping chats that were not imported yet.
-- Older chat databases now gain missing message fields instead of opening as empty chats.
-- Corrected Android-incompatible curves in the other provider icons.
-- Improved configuration-aware UI messages, older Android theme support and update notification permission handling.
-- Tool activity rows are more compact and show clear action labels without directory paths.
-- Corrected the release version to 1.1.0 while preserving upgrade compatibility.
+- Choose which individual tools the assistant may use in AI settings.
+- Disabled tools are excluded from provider requests and blocked at execution, including their aliases.
+- Tool selections are saved on the device and included in configuration backups.

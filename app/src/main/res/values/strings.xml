@@ -403,4 +403,9 @@
     <string name="tool_done_move">Moved file</string>
     <string name="tool_done_copy">Copied file</string>
     <string name="tool_done_download">Downloaded file</string>
+    <string name="tool_permissions_manage">Choose allowed tools</string>
+    <string name="tool_permissions_title">Allowed tools</string>
+    <string name="tool_permissions_description">Turn off tools you do not want the assistant to call. Equivalent commands share a switch. Shell commands can perform file operations independently of the file tools.</string>
+    <string name="tool_permissions_count">%1$d of %2$d enabled</string>
+    <string name="tool_permissions_enable_all">Enable all</string>
 </resources>
