@@ -39,6 +39,23 @@ internal class ChatGptAuth private constructor(private val context: Context) {
     val revision = MutableStateFlow(0L)
     val busy = MutableStateFlow(false)
     val error = MutableStateFlow<String?>(null)
+    private val networkPrefs = context.getSharedPreferences("chatgpt_network", Context.MODE_PRIVATE)
+    val secureDns = MutableStateFlow(networkPrefs.getBoolean("secure_dns_fallback", false))
+    init { ChatGptHttp.secureDnsFallback = secureDns.value }
+    fun setSecureDns(enabled: Boolean) {
+        secureDns.value = enabled
+        ChatGptHttp.secureDnsFallback = enabled
+        networkPrefs.edit().putBoolean("secure_dns_fallback", enabled).apply()
+    }
+    val browserReturn = ChatGptBrowserReturn()
+    val networkProblem = MutableStateFlow(false)
+    val checkingConnection = MutableStateFlow(false)
+    private fun describeError(e: Exception): String {
+        val dns = e.chatGptDnsFailure()
+        networkProblem.value = dns != null
+        return if (dns != null) context.getString(R.string.chatgpt_dns_error, dns.host)
+            else e.message?.take(800) ?: context.getString(R.string.chatgpt_signin_error)
+    }
     private var job: Job? = null
     private val signingOut = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     val profiles: List<Profile> get() = store.accounts.map { Profile(it.clientId, it.subject, it.email,
@@ -68,28 +85,28 @@ internal class ChatGptAuth private constructor(private val context: Context) {
         revision.value++
     }
 
-    fun cancelSignIn() { job?.cancel() }
-    fun signIn(clientId: String? = null, requestPlanConsent: Boolean = false) {
+    fun cancelSignIn() { browserReturn.cancel(); job?.cancel() }
+    fun signIn(clientId: String? = null, requestPlanConsent: Boolean = false, returnTo: ChatGptBrowserReturn.Target = ChatGptBrowserReturn.Target.SETTINGS) {
         if (busy.value) return
-        busy.value = true; error.value = null
+        busy.value = true; error.value = null; networkProblem.value = false
         val previousProvider = SettingsManager(context).selectedProvider
         job = scope.launch {
             try {
-                val id = performSignIn(clientId, requestPlanConsent)
+                val id = performSignIn(clientId, requestPlanConsent, returnTo)
                 if (profiles.first { it.clientId == id }.planEnabled && SettingsManager(context).selectedProvider == previousProvider) activate(id)
             } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { error.value = e.message?.take(800) ?: context.getString(R.string.chatgpt_signin_error) }
+            catch (e: Exception) { error.value = describeError(e) }
             finally { busy.value = false; job = null }
         }
     }
 
     fun select(clientId: String) {
         if (busy.value) return
-        busy.value = true; error.value = null
+        busy.value = true; error.value = null; networkProblem.value = false
         job = scope.launch {
             try { activate(clientId) }
             catch (e: CancellationException) { throw e }
-            catch (e: Exception) { error.value = e.message?.take(800) }
+            catch (e: Exception) { error.value = describeError(e) }
             finally { busy.value = false; job = null }
         }
     }
@@ -150,7 +167,7 @@ internal class ChatGptAuth private constructor(private val context: Context) {
 
     fun signOut(clientId: String) {
         if (busy.value) return
-        busy.value = true; error.value = null
+        busy.value = true; error.value = null; networkProblem.value = false
         signingOut.add(clientId)
         revision.value++
         ChatGptHttp.cancelAccount(clientId)
@@ -184,12 +201,16 @@ internal class ChatGptAuth private constructor(private val context: Context) {
                 error.value = context.getString(if (cleared) R.string.chatgpt_revoke_unconfirmed else R.string.chatgpt_local_signout_failed)
                 throw e
             }
-            catch (e: Exception) { error.value = e.message?.take(800) ?: context.getString(R.string.chatgpt_signin_error) }
+            catch (e: Exception) { error.value = describeError(e) }
             finally { busy.value = false; job = null }
         }
     }
 
-    private suspend fun performSignIn(selected: String?, consent: Boolean): String = withContext(Dispatchers.IO) {
+    private suspend fun performSignIn(selected: String?, consent: Boolean, returnTo: ChatGptBrowserReturn.Target): String = withContext(Dispatchers.IO) {
+        // Fail before browser consent if the app cannot reach the authentication service.
+        // This GET is public and does not consume an authorization code or send credentials.
+        checkingConnection.value = true
+        try { discovery() } finally { checkingConnection.value = false }
         val previous = store.accounts.firstOrNull { it.clientId == selected }
         val client = previous?.clientId ?: store.pendingClient
         mutex.withLock { save(store) } // Persist this installation's stable host identifier before authorization.
@@ -203,6 +224,7 @@ internal class ChatGptAuth private constructor(private val context: Context) {
                     previous?.tokens?.id, previous?.email).newBuilder().apply {
                     if (consent) addQueryParameter("prompt", "consent")
                 }.build()
+                val returnTicket = browserReturn.begin(returnTo)
                 withContext(Dispatchers.Main) {
                     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(authorize.toString())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 }
@@ -223,12 +245,20 @@ internal class ChatGptAuth private constructor(private val context: Context) {
                         val url = runCatching { if (target.size == 3 && target[0] == "GET" && target[1].startsWith("/")) ("http://127.0.0.1:${server.localPort}" + target[1]).toHttpUrl() else null }.getOrNull()
                         val matches = url != null && url.encodedPath == "/auth/callback" &&
                             url.queryParameterValues("state").size == 1 && ChatGptOAuth.same(url.queryParameter("state").orEmpty(), state)
-                        val body = context.getString(if (matches) R.string.chatgpt_browser_done else R.string.chatgpt_browser_invalid)
+                        val parsed = if (matches) runCatching { ChatGptOAuth.callback(url!!, state, client) } else null
+                        val message = context.getString(if (matches) R.string.chatgpt_browser_done else R.string.chatgpt_browser_invalid)
+                        val body = if (matches) {
+                            browserReturn.ready(returnTicket)
+                            val returnUrl = "intent://auth-return?ticket=$returnTicket#Intent;scheme=aichat;package=${context.packageName};end"
+                            val escapedMessage = android.text.TextUtils.htmlEncode(message)
+                            val linkText = android.text.TextUtils.htmlEncode(context.getString(R.string.chatgpt_return_app))
+                            """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>$linkText</title></head><body><p>$escapedMessage</p><p><a href="$returnUrl">$linkText</a></p><script>location.replace(${gson.toJson(returnUrl)});</script></body></html>"""
+                        } else android.text.TextUtils.htmlEncode(message)
                         val bytes = body.toByteArray(Charsets.UTF_8)
                         runCatching { incoming.getOutputStream().apply {
-                            write("HTTP/1.1 ${if (matches) "200 OK" else "400 Bad Request"}\r\nContent-Type: text/plain; charset=utf-8\r\nCache-Control: no-store\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray()); write(bytes); flush()
+                            write("HTTP/1.1 ${if (matches) "200 OK" else "400 Bad Request"}\r\nContent-Type: text/html; charset=utf-8\r\nCache-Control: no-store\r\nReferrer-Policy: no-referrer\r\nX-Content-Type-Options: nosniff\r\nContent-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; frame-ancestors 'none'\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray()); write(bytes); flush()
                         } }
-                        if (matches) callback = ChatGptOAuth.callback(url!!, state, client)
+                        if (matches) callback = parsed!!.getOrThrow()
                     }
                 }
                 val result = callback ?: error(context.getString(R.string.chatgpt_timeout))

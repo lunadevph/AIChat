@@ -428,7 +428,9 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             } catch (e: Exception) {
                 if (currentJob?.isCancelled == true || currentConversation?.id != conversationId) return@launch
                 android.util.Log.e("AIChat", "Request failed", e)
-                showReplyError(context.getString(R.string.err_network, e.localizedMessage ?: "Unknown error"))
+                val dns = if (requestProvider == ChatGptOAuth.PROVIDER) e.chatGptDnsFailure() else null
+                showReplyError(if (dns != null) context.getString(R.string.chatgpt_dns_error, dns.host)
+                    else context.getString(R.string.err_network, e.localizedMessage ?: "Unknown error"))
             } finally {
                 finishReply()
                 replyBubble = null

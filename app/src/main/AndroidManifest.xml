@@ -81,6 +81,20 @@
             android:label="Diagnostics"
             android:theme="@style/Theme.AIChat" />
 
+        <activity
+            android:name=".ChatGptReturnActivity"
+            android:launchMode="singleTask"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="aichat" android:host="auth-return" />
+            </intent-filter>
+        </activity>
+
         <!-- Shares the downloaded update APK with the package installer. -->
         <provider
             android:name="androidx.core.content.FileProvider"

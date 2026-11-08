@@ -476,4 +476,10 @@
     <string name="app_logger_export_failed">Could not export logs. Check that logs exist and the destination is writable.</string>
     <string name="app_logger_cleared">Saved logs cleared. Capture continues.</string>
     <string name="app_logger_clear_failed">Could not clear all log files.</string>
+    <string name="chatgpt_dns_error">DNS could not find %1$s. Switch between Wi-Fi and mobile data, or check Private DNS, VPN and firewall settings, then try again. Saved connections are kept.</string>
+    <string name="chatgpt_checking_network">Checking the ChatGPT connection…</string>
+    <string name="chatgpt_network_settings">Network settings</string>
+    <string name="chatgpt_return_app">Return to AI Chat</string>
+    <string name="chatgpt_secure_dns">Secure DNS fallback</string>
+    <string name="chatgpt_secure_dns_description">If system DNS fails, resolve OpenAI hostnames through Cloudflare over HTTPS. Only DNS names are shared; account credentials stay with OpenAI. Enable this, then retry sign-in.</string>
 </resources>

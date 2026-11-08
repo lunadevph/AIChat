@@ -18,10 +18,18 @@ import com.android5.ai.ui.theme.ExpressiveButtonShapes
 @Composable
 internal fun ChatGptConnectionCard(onConnected: (() -> Unit)? = null) {
     val context = LocalContext.current
+    val returnTarget = remember(context) {
+        var current = context
+        while (current is android.content.ContextWrapper && current !is android.app.Activity) current = current.baseContext
+        if (current is SetupActivity) ChatGptBrowserReturn.Target.SETUP else ChatGptBrowserReturn.Target.SETTINGS
+    }
     val auth = remember { ChatGptAuth.get(context) }
     val revision by auth.revision.collectAsState()
     val busy by auth.busy.collectAsState()
     val error by auth.error.collectAsState()
+    val networkProblem by auth.networkProblem.collectAsState()
+    val secureDns by auth.secureDns.collectAsState()
+    val checkingConnection by auth.checkingConnection.collectAsState()
     val profiles = remember(revision) { auth.profiles }
     LaunchedEffect(revision) { if (auth.usable && SettingsManager(context).selectedProvider == ChatGptOAuth.PROVIDER) onConnected?.invoke() }
     Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
@@ -44,10 +52,10 @@ internal fun ChatGptConnectionCard(onConnected: (() -> Unit)? = null) {
                 }), style = MaterialTheme.typography.bodySmall)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(enabled = !busy, onClick = {
-                        if (!profile.connected || !profile.planEnabled) auth.signIn(profile.clientId, requestPlanConsent = profile.connected && !profile.planEnabled)
+                        if (!profile.connected || !profile.planEnabled) auth.signIn(profile.clientId, requestPlanConsent = profile.connected && !profile.planEnabled, returnTo = returnTarget)
                         else auth.select(profile.clientId)
                     }) { Text(stringResource(if (profile.connected && profile.planEnabled) R.string.chatgpt_use_account else R.string.chatgpt_continue)) }
-                    if (profile.connected) TextButton(enabled = !busy, onClick = { auth.signIn(profile.clientId) }) {
+                    if (profile.connected) TextButton(enabled = !busy, onClick = { auth.signIn(profile.clientId, returnTo = returnTarget) }) {
                         Text(stringResource(R.string.chatgpt_reconnect))
                     }
                     if (profile.connected) TextButton(enabled = !busy, onClick = { auth.signOut(profile.clientId) }) {
@@ -55,18 +63,31 @@ internal fun ChatGptConnectionCard(onConnected: (() -> Unit)? = null) {
                     }
                 }
             }
-            Button(shapes = ExpressiveButtonShapes, enabled = !busy, onClick = { auth.signIn() }, modifier = Modifier.fillMaxWidth()) {
+            Button(shapes = ExpressiveButtonShapes, enabled = !busy, onClick = { auth.signIn(returnTo = returnTarget) }, modifier = Modifier.fillMaxWidth()) {
                 Icon(androidx.compose.ui.res.painterResource(R.drawable.ic_provider_openai), null, Modifier.size(20.dp))
                 Spacer(Modifier.width(10.dp))
                 Text(stringResource(if (profiles.isEmpty()) R.string.chatgpt_continue else R.string.chatgpt_add_account))
             }
             if (busy) {
                 LinearProgressIndicator(Modifier.fillMaxWidth())
-                Text(stringResource(R.string.chatgpt_waiting), style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(if (checkingConnection) R.string.chatgpt_checking_network else R.string.chatgpt_waiting), style = MaterialTheme.typography.bodySmall)
                 TextButton(onClick = { auth.cancelSignIn() }) { Text(stringResource(android.R.string.cancel)) }
             }
             error?.let { Text(stringResource(R.string.chatgpt_signin_detail, it), color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall) }
+            if (networkProblem || secureDns) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.chatgpt_secure_dns), style = MaterialTheme.typography.titleSmall)
+                        Text(stringResource(R.string.chatgpt_secure_dns_description), style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(checked = secureDns, enabled = !busy, onCheckedChange = auth::setSecureDns)
+                }
+            }
+            if (networkProblem) OutlinedButton(enabled = !busy, onClick = {
+                runCatching { context.startActivity(Intent(android.provider.Settings.ACTION_WIRELESS_SETTINGS)) }
+                    .recoverCatching { context.startActivity(Intent(android.provider.Settings.ACTION_SETTINGS)) }
+            }) { Text(stringResource(R.string.chatgpt_network_settings)) }
             TextButton(onClick = { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://chatgpt.com/settings/usage"))) } }) {
                 Text(stringResource(R.string.chatgpt_manage_access))
             }

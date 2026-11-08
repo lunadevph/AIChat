@@ -9,7 +9,10 @@ import java.util.concurrent.TimeUnit
 internal class ChatGptApiException(val status: Int, val errorCode: String?, message: String, val requestId: String? = null) : Exception(message)
 
 internal object ChatGptHttp {
-    val client = OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS).readTimeout(120, TimeUnit.SECONDS)
+    @Volatile var secureDnsFallback = false
+    val client = OkHttpClient.Builder().dns(ChatGptDns(fallback = { host ->
+        if (secureDnsFallback) ChatGptSecureDns.lookup(host) else throw java.net.UnknownHostException(host)
+    })).connectTimeout(15, TimeUnit.SECONDS).readTimeout(120, TimeUnit.SECONDS)
         .callTimeout(10, TimeUnit.MINUTES).followRedirects(false).build()
     private val accountCalls = ConcurrentHashMap<Call, String>()
     fun cancelAccount(id: String) { accountCalls.forEach { (call, account) -> if (account == id) call.cancel() } }
@@ -21,7 +24,20 @@ internal object ChatGptHttp {
             val cancellation = launch(start = CoroutineStart.UNDISPATCHED) {
                 try { awaitCancellation() } finally { call.cancel() }
             }
-            try { guard(); currentCoroutineContext().ensureActive(); call.execute().use { block(it) } }
+            try {
+                guard(); currentCoroutineContext().ensureActive()
+                if (BuildConfig.DEBUG) android.util.Log.d("ChatGptHttp", "Request ${request.method} host=${request.url.host} path=${request.url.encodedPath}")
+                call.execute().use {
+                    if (BuildConfig.DEBUG) android.util.Log.d("ChatGptHttp", "Response host=${request.url.host} status=${it.code}")
+                    block(it)
+                }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                currentCoroutineContext().ensureActive()
+                // Never log headers, query strings, response bodies, credentials or exception messages.
+                if (BuildConfig.DEBUG) android.util.Log.w("ChatGptHttp", "Failure ${request.method} host=${request.url.host} path=${request.url.encodedPath} type=${e.javaClass.simpleName}")
+                throw e
+            }
             finally { accountCalls.remove(call); cancellation.cancel() }
         }
     }

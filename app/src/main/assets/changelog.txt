@@ -1,6 +1,5 @@
-- Large code-writing requests now recover from provider size limits without repeating completed actions or discarding saved files.
-- Refreshed app surfaces, controls and layouts with consistent Material You Expressive styling.
-- Improved large-screen layouts, text scaling, chat action contrast and workspace loading and error states.
-- Connect eligible ChatGPT accounts through browser sign-in and use ChatGPT-plan models without an API key.
-- Redesigned Accounts & API keys with search, saved-provider filters, a focused key editor and confirmation before removing credentials.
-- Debug builds now capture app logs with AppLogger, with rotating files and export or clear controls in Diagnostics.
+- ChatGPT sign-in now checks the connection before opening the browser and retries temporary DNS failures once.
+- DNS errors now explain how to reconnect and offer a shortcut to network settings while keeping saved connections.
+- Debug logs now include credential-free ChatGPT request stages, response codes and failure types.
+- Optional secure DNS fallback helps ChatGPT connect when the device cannot resolve OpenAI hostnames.
+- Browser authentication now returns to AI Chat, with a return button when automatic navigation is blocked.

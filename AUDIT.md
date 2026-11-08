@@ -60,3 +60,20 @@ Final local verification for the 2026-11-08 follow-up: debug APK builds, all 79 
 - Diagnostics offers status/path/size, ZIP export and confirmed clearing. Local tests cover redaction, append/rotation/clear, Unicode bounds and PID filtering. Actual device Logcat capture and document-provider export remain unverified without a connected device.
 
 AppLogger verification: debug APK compiles and all 83 unit tests pass with zero failures; whitespace checks pass. No connected-device capture/export test has been performed.
+
+
+# ChatGPT DNS failure follow-up — 2026-11-08
+
+- The supplied AppLogger ZIP contains 337 lines for v1.1.2 and confirms device collection and export. No authentication/DNS exception appears in it: the authentication handler previously surfaced failures without logging request stages. Platform rendering warnings in this export do not establish the reported DNS failure's cause.
+- Authentication now checks public OIDC discovery before opening browser consent. System DNS resolution retries once before any connection/request body; persistent failures retain hostname/cause and show actionable network guidance with a settings shortcut. TLS validation, system DNS choice and saved credentials remain unchanged. No OAuth exchange or tool execution is replayed by this retry.
+- Debug-only ChatGPT request diagnostics record method, host, path, response status and failure class, excluding query strings, headers, credentials, response bodies and exception messages.
+- Debug APK compiles; all 86 tests pass, including transient/persistent/empty DNS results and cause preservation. The host resolves from this workstation. The phone's network and an end-to-end sign-in remain unverified; no claim is made that source changes repair a persistent device DNS block. Changes are local and unpublished.
+
+
+# DNS recovery and browser return — 2026-11-08
+
+- Added opt-in Cloudflare HTTPS DNS fallback for the two official OpenAI hosts, after bounded system-resolution retries. Resolution requests contain no account headers or credentials. Responses are bounded and checked against the requested question/type; only public IP literals are accepted. Original OpenAI TLS validation remains enabled. Browser/network DNS is unchanged.
+- State-matching loopback callbacks now return an HTML handoff page with automatic package-targeted navigation and a manual return link. A separate exported activity validates a short-lived, current, ready, single-use foreground ticket and reorders the initiating Setup/Settings activity. It never consumes OAuth codes, credentials or arbitrary navigation destinations from deep links.
+- Local HTTPS resolver preflight succeeded with a public DNS answer. Automated tests cover DNS fallback gating, public answer validation, ticket readiness/binding/expiry/cancellation and single use. Browser-specific auto-navigation and live OAuth still need device validation.
+
+Final verification: debug APK builds successfully, all 90 unit tests pass, and whitespace checks pass. This follow-up is local and unpublished.

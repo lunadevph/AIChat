@@ -148,3 +148,8 @@ Browser sign-in, Android Keystore persistence and an authorized live ChatGPT res
 Debug builds, including signed Debug-channel builds, automatically capture all available Logcat levels for the app process into `files/app_logs/` in the app's private directory. Ordinary Release-channel builds do not start AppLogger. Files rotate at 1 MiB with up to eight retained files, and fatal exceptions are also written directly before crash handling. Common credential headers, token fields and OAuth callback parameters are redacted before writing; review diagnostic exports before sharing them.
 
 Open **Diagnostics → AppLogger** to inspect the directory/status, export a ZIP or clear captured logs. Collection continues after clearing. Log files are excluded from Android cloud backup and device transfer. Android restricts logs from other processes; this is app-process capture, not unrestricted device logging. Device capture and document-provider export still require a connected-device check.
+
+
+ChatGPT connection errors now distinguish DNS failures. After a DNS error, **Secure DNS fallback** can be enabled in the ChatGPT connection card; retry sign-in afterward. It uses Cloudflare HTTPS DNS only after system DNS fails, and only for `auth.openai.com` and `api.openai.com`. OpenAI HTTPS hostname/certificate checks remain enabled. This does not change Android or the browser's DNS settings.
+
+The loopback callback page attempts to reopen the initiating Setup or Settings screen through a package-targeted Android intent. If a browser blocks automatic navigation, tap **Return to AI Chat**. The app accepts only a short-lived, single-use foreground ticket created for the active flow; OAuth codes/tokens remain on the state-checked loopback exchange.
