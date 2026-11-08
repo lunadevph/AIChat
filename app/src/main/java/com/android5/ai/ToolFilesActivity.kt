@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -40,8 +42,12 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -52,6 +58,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,6 +77,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.android5.ai.ui.theme.AIChatTheme
 import com.android5.ai.ui.theme.ExpressiveIconButtonShapes
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -107,17 +117,44 @@ class ToolFilesActivity : ComponentActivity() {
 @Composable
 private fun ToolFilesScreen(initialFile: String?, onBack: () -> Unit) {
     val context = LocalContext.current
-    var entries by remember { mutableStateOf(ToolFiles.list(context)) }
+    val resources = androidx.compose.ui.platform.LocalResources.current
+    val scope = rememberCoroutineScope()
+    val snackbar = remember { SnackbarHostState() }
+    var entries by remember { mutableStateOf<List<ToolFiles.Entry>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var busy by remember { mutableStateOf(false) }
+    var loadFailed by remember { mutableStateOf(false) }
     var previewing by remember { mutableStateOf(initialFile?.takeIf { it.isNotBlank() }) }
     var confirmClear by remember { mutableStateOf(false) }
 
-    fun refresh() {
-        entries = ToolFiles.list(context)
+    suspend fun refresh() {
+        loading = true
+        try {
+            entries = withContext(Dispatchers.IO) { ToolFiles.list(context) }
+            loadFailed = false
+        } catch (e: CancellationException) { throw e }
+        catch (_: Exception) { loadFailed = true }
+        finally { loading = false }
     }
 
+    fun mutate(operation: () -> Boolean) {
+        if (busy) return
+        busy = true
+        scope.launch {
+            try {
+                val ok = withContext(Dispatchers.IO) { runCatching(operation).getOrDefault(false) }
+                if (!ok) snackbar.showSnackbar(resources.getString(R.string.workspace_operation_failed))
+                refresh()
+            } finally { busy = false }
+        }
+    }
+    LaunchedEffect(Unit) { refresh() }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
@@ -145,7 +182,7 @@ private fun ToolFilesScreen(initialFile: String?, onBack: () -> Unit) {
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(shapes = ExpressiveIconButtonShapes, onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Rounded.ArrowBack,
                             contentDescription = stringResource(R.string.desc_back)
@@ -154,7 +191,7 @@ private fun ToolFilesScreen(initialFile: String?, onBack: () -> Unit) {
                 },
                 actions = {
                     if (entries.isNotEmpty()) {
-                        IconButton(onClick = { confirmClear = true }) {
+                        IconButton(enabled = !busy, shapes = ExpressiveIconButtonShapes, onClick = { confirmClear = true }) {
                             Icon(
                                 Icons.Rounded.DeleteSweep,
                                 contentDescription = stringResource(R.string.desc_delete_all_files),
@@ -171,11 +208,22 @@ private fun ToolFilesScreen(initialFile: String?, onBack: () -> Unit) {
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            if (entries.isEmpty()) {
+            if (loading && entries.isEmpty()) {
+                Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    LoadingIndicator(Modifier.size(48.dp))
+                    Text(stringResource(R.string.workspace_loading))
+                }
+            } else if (loadFailed) {
+                Column(Modifier.align(Alignment.Center).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(stringResource(R.string.workspace_operation_failed), style = MaterialTheme.typography.bodyLarge)
+                    TextButton(onClick = { scope.launch { refresh() } }) { Text(stringResource(R.string.btn_retry)) }
+                }
+            } else if (entries.isEmpty()) {
                 EmptyToolFiles()
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 960.dp),
                     contentPadding = PaddingValues(
                         start = 16.dp,
                         end = 16.dp,
@@ -184,13 +232,19 @@ private fun ToolFilesScreen(initialFile: String?, onBack: () -> Unit) {
                     ),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    item {
+                        ExpressivePageHeader(stringResource(R.string.title_tool_files),
+                            stringResource(R.string.workspace_summary, entries.size,
+                                Formatter.formatShortFileSize(context, entries.sumOf { it.size })), Icons.Rounded.FolderOpen)
+                        Spacer(Modifier.height(12.dp))
+                    }
+                    if (busy) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
                     items(entries, key = { it.relPath }) { entry ->
                         ToolFileRow(
                             entry = entry,
                             onOpen = { previewing = entry.relPath },
                             onDelete = {
-                                ToolFiles.delete(context, entry.relPath)
-                                refresh()
+                                mutate { ToolFiles.delete(context, entry.relPath) }
                             }
                         )
                     }
@@ -204,9 +258,8 @@ private fun ToolFilesScreen(initialFile: String?, onBack: () -> Unit) {
             relPath = relPath,
             onDismiss = { previewing = null },
             onDelete = {
-                ToolFiles.delete(context, relPath)
                 previewing = null
-                refresh()
+                mutate { ToolFiles.delete(context, relPath) }
             }
         )
     }
@@ -219,9 +272,8 @@ private fun ToolFilesScreen(initialFile: String?, onBack: () -> Unit) {
             confirmButton = {
                 TextButton(
                     onClick = {
-                        ToolFiles.clear(context)
                         confirmClear = false
-                        refresh()
+                        mutate { ToolFiles.clear(context) }
                     }
                 ) {
                     Text(
@@ -296,7 +348,7 @@ private fun ToolFileRow(
 
     Surface(
         onClick = onOpen,
-        shape = RoundedCornerShape(18.dp),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(
             1.dp,
@@ -401,7 +453,7 @@ private fun FilePreviewDialog(
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
-            shape = RoundedCornerShape(28.dp),
+            shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surfaceContainerLow,
             tonalElevation = 6.dp
         ) {

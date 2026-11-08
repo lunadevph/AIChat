@@ -15,6 +15,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import retrofit2.HttpException
@@ -58,11 +59,13 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
     /** Title shown for a conversation that has not been auto-titled yet. */
     private val defaultChatTitle = context.getString(R.string.chat_default_title)
 
+    private var requestChatGptAccount: String? = null
     private var requestProvider: String? = null
     private var requestModel: String? = null
     private var requestTranscript: List<Message>? = null
     private val toolHistory = mutableListOf<ApiMessage>()
     private var allowToolCalls = true
+    private var payloadStage = 0
     private var forceNonStream = false
     private var retryNeedsMoreTokens = false
     private var replyBubble: ReplyBubbleState? = null
@@ -125,6 +128,13 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
     var selectedImageUri by mutableStateOf<Uri?>(null)
 
     init {
+        viewModelScope.launch {
+            val auth = ChatGptAuth.get(context)
+            auth.revision.collect {
+                if (requestProvider == ChatGptOAuth.PROVIDER &&
+                    (auth.activeClientId != requestChatGptAccount || !auth.usable)) stopGeneration()
+            }
+        }
         loadConversations()
         fetchModels()
     }
@@ -189,6 +199,9 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         val custom = settingsManager.customProviders
         viewModelScope.launch {
             val fetched = try {
+                if (provider == ChatGptOAuth.PROVIDER) {
+                    ChatGptAuth.get(context).listModels()
+                } else {
                 val response = if (!apiKey.isNullOrBlank()) {
                     if (Providers.isAnthropic(provider)) {
                         getAnthropicApi().getModels(
@@ -203,6 +216,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                     getApi().getModels(Providers.modelsUrl(provider, custom))
                 }
                 response.data.orEmpty()
+                }
             } catch (e: Exception) {
                 null
             }
@@ -212,7 +226,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
 
             if (fetched != null && fetched.isNotEmpty()) {
                 availableModels.clear()
-                availableModels.addAll(fetched.distinctBy { it.id }.sortedBy { it.displayName })
+                availableModels.addAll(fetched.distinctBy { it.id }.let { if (provider == ChatGptOAuth.PROVIDER) it else it.sortedBy { model -> model.displayName } })
                 modelsProvider = provider
             } else if (fetched != null || modelsProvider != provider || availableModels.isEmpty()) {
                 // Empty catalog, or a failed fetch with nothing usable on screen:
@@ -232,7 +246,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 availableModels.isNotEmpty() &&
                 availableModels.none { it.id == settingsManager.selectedModel }
             ) {
-                val dm = Providers.defaultModel(provider, custom)
+                val dm = ChatGptModels.select(Providers.defaultModel(provider, custom), availableModels)
                 if (dm.isNotBlank()) settingsManager.selectedModel = dm
             }
         }
@@ -294,16 +308,19 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
 
     private fun runCompletion() {
         val prompt = messages.lastOrNull { it.role == "user" }?.content ?: return
-        val apiKey = settingsManager.apiKey
+        val chatGpt = ChatGptAuth.get(context)
+        val usesChatGpt = settingsManager.selectedProvider == ChatGptOAuth.PROVIDER
+        val apiKey = if (usesChatGpt && chatGpt.usable) "chatgpt-oauth" else settingsManager.apiKey
         if (apiKey.isNullOrBlank()) {
             // Surface the problem instead of silently doing nothing when the
             // selected provider has no usable key.
-            messages.add(Message(role = "assistant", content = context.getString(R.string.err_unauthorized), isError = true))
+            messages.add(Message(role = "assistant", content = context.getString(if (usesChatGpt) R.string.chatgpt_signin_required else R.string.err_unauthorized), isError = true))
             updateCurrentConversation()
             return
         }
 
         val conversationId = currentConversation?.id
+        requestChatGptAccount = if (usesChatGpt) chatGpt.activeClientId else null
         requestProvider = settingsManager.selectedProvider
         requestModel = settingsManager.selectedModel
         requestTranscript = messages.toList()
@@ -349,10 +366,21 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                             !allowTools -> context.getString(R.string.tool_followup_instruction)
                             else -> null
                         }
-                        val turn = if (Providers.isAnthropic(requestProvider.orEmpty())) {
-                            requestAnthropicTurn(apiKey, searchGrounding, null, correction)
-                        } else {
-                            requestTurn(apiKey, searchGrounding, null, correction)
+                        val turn = RequestBudget.recover(isTooLarge = {
+                            ((it is HttpException && it.code() == 413) || (it is ChatGptApiException && it.status == 413)).also { tooLarge ->
+                                if (tooLarge && it is HttpException) it.response()?.errorBody()?.close()
+                            }
+                        }) { stage ->
+                            payloadStage = stage
+                            allowToolCalls = settingsManager.hasEnabledTools && allowTools && stage < 2
+                            if (stage > 0) lastErrorBody = null
+                            if (requestProvider == ChatGptOAuth.PROVIDER) {
+                                requestChatGptTurn(searchGrounding, correction)
+                            } else if (Providers.isAnthropic(requestProvider.orEmpty())) {
+                                requestAnthropicTurn(apiKey, searchGrounding, null, correction)
+                            } else {
+                                requestTurn(apiKey, searchGrounding, null, correction)
+                            }
                         }
                         if (turn != null && turn.raw.isBlank() && turn.calls.isEmpty()) {
                             retryNeedsMoreTokens = ReplyRecovery.needsMoreTokens(turn)
@@ -364,7 +392,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                     apply = { turn -> finalizeTurn(turn) }
                 )
 
-                if (currentConversation?.title == defaultChatTitle && messages.size >= 2) {
+                if (requestProvider != ChatGptOAuth.PROVIDER && currentConversation?.title == defaultChatTitle && messages.size >= 2) {
                     generateChatTitle(apiKey)
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -377,6 +405,10 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                         requestProvider ?: settingsManager.selectedProvider, requestModel ?: settingsManager.selectedModel)
                 }
                 showReplyError(error)
+            } catch (e: ChatGptApiException) {
+                if (currentConversation?.id != conversationId) return@launch
+                showReplyError(if (e.status == 413) context.getString(R.string.err_payload_too_large)
+                    else context.getString(R.string.chatgpt_request_error, e.message.orEmpty(), e.errorCode ?: e.status.toString()))
             } catch (e: HttpException) {
                 if (currentJob?.isCancelled == true || currentConversation?.id != conversationId) return@launch
                 val body = lastErrorBody ?: try { e.response()?.errorBody()?.string() } catch (_: Exception) { null }
@@ -387,6 +419,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                     402 -> context.getString(R.string.err_insufficient_credits)
                     403 -> context.getString(R.string.err_forbidden)
                     404 -> context.getString(R.string.err_not_found)
+                    413 -> context.getString(R.string.err_payload_too_large)
                     429 -> context.getString(R.string.err_rate_limit)
                     500, 502, 503 -> context.getString(R.string.err_server)
                     else -> context.getString(R.string.err_api_code, e.code())
@@ -404,10 +437,12 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
                 rateLimitRetryIn = 0
                 activeStream = null
                 currentJob = null
+                requestChatGptAccount = null
                 requestProvider = null
                 requestModel = null
                 requestTranscript = null
                 toolHistory.clear()
+                payloadStage = 0
                 forceNonStream = false
                 retryNeedsMoreTokens = false
             }
@@ -490,13 +525,34 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         })
         apiMessages.addAll(toolHistory)
         val needsReasoning = requestProvider == "DeepSeek" || requestModel.orEmpty().contains("deepseek", ignoreCase = true)
-        return if (needsReasoning) apiMessages else apiMessages.map { it.copy(reasoningContent = null) }
+        val prepared = if (needsReasoning) apiMessages else apiMessages.map { it.copy(reasoningContent = null) }
+        return when (payloadStage) {
+            2 -> RequestBudget.completionContext(prepared)
+            1 -> RequestBudget.compact(prepared, maxBytes = 96_000, outputLimit = 3_000)
+            else -> RequestBudget.compact(prepared)
+        }
     }
 
     private fun isReasoningModel(modelId: String): Boolean {
         val lower = modelId.lowercase()
         return lower.startsWith("o1") || lower.startsWith("o3") || lower.startsWith("o4") ||
                lower.contains("/o1") || lower.contains("/o3") || lower.contains("/o4")
+    }
+
+    private suspend fun requestChatGptTurn(search: String?, correction: String?): ToolReply {
+        val id = requestChatGptAccount ?: error(context.getString(R.string.chatgpt_signin_required))
+        val messages = withContext(Dispatchers.IO) { buildApiMessages(search, null, correction) }
+        val index = previewReply("", null)
+        var lastUpdate = 0L
+        val result = ChatGptResponses.turn(ChatGptAuth.get(context), id, requireNotNull(requestModel), messages,
+            settingsManager.disabledTools, allowToolCalls) { text ->
+            if (settingsManager.streamingEnabled && System.currentTimeMillis() - lastUpdate >= 40) {
+                lastUpdate = System.currentTimeMillis()
+                withContext(Dispatchers.Main) { loadingStatus = LoadingStatus.STREAMING; previewReply(visibleText(text, true), null) }
+            }
+        }
+        previewReply(visibleText(result.text, false), null)
+        return ToolReply(result.text, index, null, result.calls, "stop", result.items)
     }
 
     /** One request round — streaming or not — with the current model's parameters. */
@@ -509,7 +565,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         lastErrorBody = null
         val isReasoning = isReasoningModel((requestModel ?: settingsManager.selectedModel))
         val isGoogle = (requestProvider ?: settingsManager.selectedProvider) == "Google"
-        val apiMessages = buildApiMessages(searchGrounding, toolResults, correction)
+        val apiMessages = withContext(Dispatchers.IO) { buildApiMessages(searchGrounding, toolResults, correction) }
         val hasToolContext = apiMessages.any { !it.toolCalls.isNullOrEmpty() }
         val toolDefinitions = if (settingsManager.toolsEnabled && (allowToolCalls || hasToolContext)) NativeTools.openAiDefinitions(settingsManager.disabledTools) else emptyList()
         val outputLimit = ReplyRecovery.tokenLimit(settingsManager.maxTokens, forceNonStream, retryNeedsMoreTokens)
@@ -556,7 +612,7 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
     ): ToolReply? {
         lastErrorBody = null
         val isReasoning = isReasoningModel((requestModel ?: settingsManager.selectedModel))
-        val apiMessages = buildApiMessages(searchGrounding, toolResults, correction)
+        val apiMessages = withContext(Dispatchers.IO) { buildApiMessages(searchGrounding, toolResults, correction) }
         val (system, messages) = buildAnthropicMessages(apiMessages)
         val hasToolContext = apiMessages.any { !it.toolCalls.isNullOrEmpty() }
         val toolDefinitions = if (settingsManager.toolsEnabled && (allowToolCalls || hasToolContext)) NativeTools.anthropicDefinitions(settingsManager.disabledTools) else emptyList()
@@ -930,10 +986,11 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
         val bubble = replyBubble ?: return emptyList()
         bubble.commit(withoutMemory.trim(), turn.reasoning)
         val exchangeId = UUID.randomUUID().toString()
-        val queued = calls.map { call ->
+        val queued = calls.mapIndexed { index, call ->
             ToolRun(call.function?.name.orEmpty(), callId = call.id,
                 arguments = call.function?.arguments?.takeIf { it.isNotBlank() } ?: "{}", state = "queued", extraContent = call.extraContent,
-                exchangeId = exchangeId, assistantContent = withoutMemory.trim(), assistantReasoning = turn.reasoning)
+                exchangeId = exchangeId, assistantContent = withoutMemory.trim(), assistantReasoning = turn.reasoning,
+                responseItems = turn.responseItems.takeIf { index == 0 })
         }
         bubble.queue(queued)
         publishReply()
@@ -952,11 +1009,12 @@ class ChatViewModel(application: Application, private val settingsManager: Setti
             bubble.update(ToolRun(run.name, run.label, run.ok, filePath,
                 callId = call.id, arguments = queued[index].arguments, result = run.result,
                 state = if (run.ok) "completed" else "failed", extraContent = call.extraContent,
-                exchangeId = exchangeId, assistantContent = withoutMemory.trim(), assistantReasoning = turn.reasoning))
+                exchangeId = exchangeId, assistantContent = withoutMemory.trim(), assistantReasoning = turn.reasoning,
+                responseItems = queued[index].responseItems))
             publishReply()
         }
         activeToolName = null
-        if (calls.isNotEmpty()) toolHistory.addAll(NativeTools.exchange(turn.raw, turn.reasoning, calls, runs))
+        if (calls.isNotEmpty()) toolHistory.addAll(NativeTools.exchange(turn.raw, turn.reasoning, calls, runs, turn.responseItems))
         return runs
     }
 

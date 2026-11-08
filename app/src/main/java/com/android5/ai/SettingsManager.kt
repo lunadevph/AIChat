@@ -8,6 +8,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 
 class SettingsManager(context: Context) {
+    private val appContext = context.applicationContext
 
     init {
         if (_prefs == null) {
@@ -39,6 +40,7 @@ class SettingsManager(context: Context) {
     }
 
     fun getApiKey(provider: String): String? {
+        if (provider == ChatGptOAuth.PROVIDER) return null
         val raw = _prefs!!.getString("api_key_${provider.lowercase()}", null)
         if (!raw.isNullOrBlank()) {
             val decrypted = KeyStoreHelper.decrypt(raw)
@@ -61,6 +63,7 @@ class SettingsManager(context: Context) {
     }
 
     fun setApiKey(provider: String, key: String?): Boolean {
+        if (provider == ChatGptOAuth.PROVIDER) return key.isNullOrBlank()
         val edit = _prefs!!.edit()
         val keyName = "api_key_${provider.lowercase()}"
         if (key.isNullOrBlank()) {
@@ -88,7 +91,10 @@ class SettingsManager(context: Context) {
         return true
     }
 
-    fun hasApiKey(provider: String): Boolean = !getApiKey(provider).isNullOrBlank()
+    fun hasStoredApiKey(provider: String): Boolean =
+        provider != ChatGptOAuth.PROVIDER && !_prefs!!.getString("api_key_${provider.lowercase()}", null).isNullOrBlank()
+
+    fun hasApiKey(provider: String): Boolean = if (provider == ChatGptOAuth.PROVIDER) ChatGptAuth.get(appContext).usable else !getApiKey(provider).isNullOrBlank()
 
     fun getAllConfiguredProviders(): List<String> =
         (Providers.ALL.map { it.name } + customProviders.map { it.name }).filter { hasApiKey(it) }

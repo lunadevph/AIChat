@@ -160,6 +160,8 @@ private fun DebugScreen(settingsManager: SettingsManager, onBack: () -> Unit) {
                 DebugRow("Build date", BuildConfig.BUILD_DATE)
             }
 
+            AppLoggerCard()
+
             // Provider / model
             DebugCard(title = "AI") {
                 DebugRow("Provider", settingsManager.selectedProvider)

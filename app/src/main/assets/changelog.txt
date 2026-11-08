@@ -1,3 +1,6 @@
-- Choose which individual tools the assistant may use in AI settings.
-- Disabled tools are excluded from provider requests and blocked at execution, including their aliases.
-- Tool selections are saved on the device and included in configuration backups.
+- Large code-writing requests now recover from provider size limits without repeating completed actions or discarding saved files.
+- Refreshed app surfaces, controls and layouts with consistent Material You Expressive styling.
+- Improved large-screen layouts, text scaling, chat action contrast and workspace loading and error states.
+- Connect eligible ChatGPT accounts through browser sign-in and use ChatGPT-plan models without an API key.
+- Redesigned Accounts & API keys with search, saved-provider filters, a focused key editor and confirmation before removing credentials.
+- Debug builds now capture app logs with AppLogger, with rotating files and export or clear controls in Diagnostics.

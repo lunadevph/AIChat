@@ -8,7 +8,8 @@ internal data class ToolReply(
     val index: Int,
     val reasoning: String?,
     val calls: List<StreamToolCall> = emptyList(),
-    val finishReason: String? = null
+    val finishReason: String? = null,
+    val responseItems: com.google.gson.JsonArray? = null
 )
 
 internal class EmptyReplyException(val finishReason: String? = null) : Exception()

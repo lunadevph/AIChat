@@ -74,7 +74,8 @@ data class ApiMessage(
     val content: Any? = null,
     @SerializedName("tool_calls") val toolCalls: List<StreamToolCall>? = null,
     @SerializedName("tool_call_id") val toolCallId: String? = null,
-    @SerializedName("reasoning_content") val reasoningContent: String? = null
+    @SerializedName("reasoning_content") val reasoningContent: String? = null,
+    @Transient val responseItems: com.google.gson.JsonArray? = null
 )
 
 data class ContentPart(
@@ -106,7 +107,8 @@ data class ToolRun(
     val extraContent: com.google.gson.JsonObject? = null,
     val exchangeId: String? = null,
     val assistantContent: String? = null,
-    val assistantReasoning: String? = null
+    val assistantReasoning: String? = null,
+    val responseItems: com.google.gson.JsonArray? = null
 )
 
 data class Message(

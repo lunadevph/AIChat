@@ -15,6 +15,7 @@ object Providers {
     )
 
     val ALL: List<Info> = listOf(
+        Info("ChatGPT", "Connect your ChatGPT account", "", ""),
         Info("OpenRouter", "500+ models, including free tiers", "sk-or-", "https://openrouter.ai/keys"),
         Info("OpenAI", "GPT-5.6, o-series reasoning & GPT-OSS", "sk-", "https://platform.openai.com/api-keys"),
         Info("Google", "Gemini 3.x Flash, Pro & Omni models", "AIza", "https://aistudio.google.com/app/apikey"),
@@ -31,7 +32,7 @@ object Providers {
     fun info(provider: String, custom: List<Custom> = emptyList()): Info =
         ALL.firstOrNull { it.name == provider }
             ?: custom(custom, provider)?.info()
-            ?: ALL.first()
+            ?: ALL.first { it.name == "OpenRouter" }
 
     /**
      * A provider the user added themselves: any OpenAI-compatible endpoint, with
@@ -129,7 +130,7 @@ object Providers {
             when (provider) {
                 "OpenRouter" -> {
                     val response = api(provider, forValidation = true).checkKey("Bearer $key")
-                    if (response.isSuccessful) KeyValidation.Valid else KeyValidation.InvalidKey
+                    if (response.isSuccessful) KeyValidation.Valid else if (response.code() == 401) KeyValidation.InvalidKey else KeyValidation.NetworkError("HTTP ${response.code()}")
                 }
                 "Claude" -> try {
                     val models = api(provider, forValidation = true).getModels(
@@ -158,6 +159,7 @@ object Providers {
     }
 
     fun defaultModel(provider: String, custom: List<Custom> = emptyList()): String = when (provider) {
+        "ChatGPT" -> ""
         "OpenRouter" -> "openrouter/free"
         "OpenAI" -> "gpt-5.6-sol"
         "Google" -> "gemini-3.8-flash"
@@ -173,6 +175,7 @@ object Providers {
     }
 
     fun defaultModels(provider: String, custom: List<Custom> = emptyList()): List<ModelInfo> = when (provider) {
+        "ChatGPT" -> emptyList()
         "OpenRouter" -> listOf(
             ModelInfo(id = "openrouter/free", name = "Auto (Free Router)", description = "Auto-selects the best free model for your request", architecture = Architecture(modality = "text+image->text"))
         )
@@ -287,7 +290,7 @@ object Providers {
     }
 
     private fun handleHttpError(e: HttpException): Providers.KeyValidation = when (e.code()) {
-        401, 403 -> KeyValidation.InvalidKey
+        401 -> KeyValidation.InvalidKey
         else -> KeyValidation.NetworkError("HTTP ${e.code()}")
     }
 

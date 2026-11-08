@@ -72,7 +72,7 @@ class SetupActivity : ComponentActivity() {
                             allKeys.forEach { (p, k) ->
                                 if (k.isNotBlank()) settingsManager.setApiKey(p, k)
                             }
-                            settingsManager.setApiKey(provider, apiKey)
+                            if (provider != ChatGptOAuth.PROVIDER) settingsManager.setApiKey(provider, apiKey)
                             settingsManager.selectedProvider = provider
                             startMainActivity()
                         },
@@ -105,7 +105,7 @@ fun SetupScreen(
     onComplete: (String, String, Map<String, String>) -> Unit,
     onRestoreComplete: () -> Unit = {}
 ) {
-    var selectedProvider by remember { mutableStateOf(settingsManager.selectedProvider) }
+    var selectedProvider by remember { mutableStateOf(settingsManager.selectedProvider.takeUnless { it == ChatGptOAuth.PROVIDER } ?: "OpenRouter") }
     var customProviders by remember { mutableStateOf(settingsManager.customProviders) }
     val providerKeys = remember {
         mutableStateMapOf<String, String>().apply {
@@ -151,6 +151,7 @@ fun SetupScreen(
     var shakeTrigger by remember { mutableStateOf(0) }
 
     fun finish(key: String) {
+        ChatGptAuth.get(context).cancelSignIn()
         val trimmed = key.trim()
         if (trimmed.isNotBlank()) providerKeys[selectedProvider] = trimmed
         onComplete(trimmed, selectedProvider, providerKeys.toMap())
@@ -178,6 +179,8 @@ fun SetupScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .wrapContentWidth(Alignment.CenterHorizontally)
+            .widthIn(max = 680.dp)
             .verticalScroll(scrollState)
             .imePadding()
             .padding(horizontal = 20.dp, vertical = 20.dp),
@@ -234,6 +237,10 @@ fun SetupScreen(
 
         Spacer(modifier = Modifier.height(22.dp))
 
+        ChatGptConnectionCard(onConnected = {
+            onComplete("", ChatGptOAuth.PROVIDER, providerKeys.toMap())
+        })
+        Spacer(Modifier.height(20.dp))
         SetupSectionTitle(
             step = 1,
             title = stringResource(R.string.setup_step_provider),
@@ -254,7 +261,7 @@ fun SetupScreen(
             },
             compact = true,
             modifier = Modifier.fillMaxWidth(),
-            providers = Providers.all(customProviders)
+            providers = Providers.all(customProviders).filterNot { it.name == ChatGptOAuth.PROVIDER }
         )
 
         Spacer(modifier = Modifier.height(22.dp))
@@ -310,7 +317,7 @@ fun SetupScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .graphicsLayer(translationX = animatableOffset.value),
-            shape = RoundedCornerShape(20.dp),
+            shape = MaterialTheme.shapes.medium,
             supportingText = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (errorText != null) {
@@ -377,7 +384,7 @@ fun SetupScreen(
             enabled = apiKey.isNotBlank() && !isValidating && !isConnected,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp),
+                .heightIn(min = 56.dp),
             shapes = ExpressiveButtonShapes
         ) {
             if (isValidating) {
@@ -451,8 +458,8 @@ fun SetupScreen(
         Spacer(modifier = Modifier.height(6.dp))
         OutlinedButton(
             onClick = { onRestoreBackup() },
-            shape = RoundedCornerShape(18.dp),
-            modifier = Modifier.fillMaxWidth().height(44.dp)
+            shape = MaterialTheme.shapes.medium,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
         ) {
             Icon(Icons.Rounded.Restore, null, Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))

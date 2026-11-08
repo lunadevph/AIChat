@@ -72,7 +72,7 @@ fun AppearanceSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
                             val chosen = theme == key
                             Surface(onClick = { settingsManager.themeMode = key },
                                 modifier = Modifier.weight(1f).semantics { role = Role.RadioButton; selected = chosen },
-                                shape = RoundedCornerShape(18.dp),
+                                shape = MaterialTheme.shapes.medium,
                                 color = if (chosen) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
                                 border = BorderStroke(if (chosen) 2.dp else 1.dp, if (chosen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)) {
                                 Row(Modifier.heightIn(min = 72.dp).padding(12.dp), verticalAlignment = Alignment.CenterVertically,

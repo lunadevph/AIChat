@@ -8,12 +8,14 @@ class AIApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        AppLogger.start(this)
         installCrashHandler()
     }
 
     private fun installCrashHandler() {
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
-        Thread.setDefaultUncaughtExceptionHandler { _, throwable ->
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            AppLogger.recordCrash(thread, throwable)
             try {
                 val stackTrace = CrashActivity.buildStackTrace(throwable)
                 val message = throwable.localizedMessage ?: throwable.javaClass.simpleName

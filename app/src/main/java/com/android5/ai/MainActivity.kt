@@ -1650,7 +1650,7 @@ fun MessageBubble(
                                         Icons.Rounded.ContentCopy,
                                         contentDescription = stringResource(R.string.desc_action_copy),
                                         modifier = Modifier.size(17.dp),
-                                        tint = if (isUser) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                        tint = LocalContentColor.current.copy(alpha = 0.8f)
                                     )
                                 }
 
@@ -1671,7 +1671,7 @@ fun MessageBubble(
                                         Icons.Rounded.Share,
                                         contentDescription = stringResource(R.string.desc_action_share),
                                         modifier = Modifier.size(17.dp),
-                                        tint = if (isUser) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                        tint = LocalContentColor.current.copy(alpha = 0.8f)
                                     )
                                 }
 
@@ -1702,7 +1702,7 @@ fun MessageBubble(
                                             Icons.Rounded.Edit,
                                             contentDescription = stringResource(R.string.desc_action_edit),
                                             modifier = Modifier.size(17.dp),
-                                            tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                            tint = LocalContentColor.current.copy(alpha = 0.8f)
                                         )
                                     }
                                 }

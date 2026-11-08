@@ -75,10 +75,10 @@ object NativeTools {
         return AiTools.Call(name, attrs, "", "")
     }
 
-    fun exchange(text: String, reasoning: String?, calls: List<StreamToolCall>, runs: List<AiTools.Run>): List<ApiMessage> {
+    fun exchange(text: String, reasoning: String?, calls: List<StreamToolCall>, runs: List<AiTools.Run>, responseItems: com.google.gson.JsonArray? = null): List<ApiMessage> {
         require(calls.size == runs.size)
         return listOf(ApiMessage("assistant", text.takeIf { it.isNotBlank() }, toolCalls = calls,
-            reasoningContent = reasoning ?: "")) + calls.zip(runs).map { (call, run) ->
+            reasoningContent = reasoning ?: "", responseItems = responseItems)) + calls.zip(runs).map { (call, run) ->
             ApiMessage("tool", com.google.gson.Gson().toJson(mapOf("ok" to run.ok, "result" to run.result)), toolCallId = call.id)
         }
     }
@@ -94,7 +94,7 @@ object NativeTools {
             val first = group.first()
             exchange(first.assistantContent ?: if (first.exchangeId == null && !message.isError) message.content else "",
                 first.assistantReasoning ?: message.reasoning, calls,
-                group.map { AiTools.Run(it.name, it.ok, it.label, it.result!!) })
+                group.map { AiTools.Run(it.name, it.ok, it.label, it.result!!) }, first.responseItems)
         }
         if (tools.all { it.exchangeId != null } && !message.isError) {
             val prefix = groups.mapNotNull { it.first().assistantContent?.trim()?.takeIf(String::isNotBlank) }.joinToString("\n\n")

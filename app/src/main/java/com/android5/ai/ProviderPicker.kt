@@ -40,7 +40,7 @@ fun ProviderPicker(
         providers.forEach { info ->
             val isSelected = info.name == selected
             Surface(
-                shape = RoundedCornerShape(18.dp),
+                shape = MaterialTheme.shapes.medium,
                 color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
                         else MaterialTheme.colorScheme.surfaceContainerHigh,
                 border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary)

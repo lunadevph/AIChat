@@ -130,3 +130,21 @@ app/src/main/java/com/android5/ai/
 Settings includes encrypted backup and restore with options for conversations, images and API keys. API keys are excluded by default.
 
 The Updates screen offers Release and Debug channels with separate feeds and download caches. Publish a Debug-channel build with `-PupdateChannel=debug` on the release build and mirror tasks; it uses release signing for installation compatibility. The displayed six-digit `BUILD_NUMBER` is independent of the increasing Android `VERSION_CODE`.
+
+
+### ChatGPT connections
+
+Accounts & API keys offers **Continue with ChatGPT** separately from API-key providers. It uses OpenAI public-client registration, PKCE and a loopback browser callback. The issued client ID, validated identity, grant and refresh credentials stay together per account registration. Credentials are Keystore-encrypted in Android no-backup storage; portable backups do not include them.
+
+ChatGPT-plan requests use the public Responses endpoint with streaming and storage disabled, account-specific model discovery, namespaced local tools, and preserved response continuation items. They do not use ChatGPT private backend endpoints or silently fall back to API-key billing. Access depends on the account, workspace, granted permissions and current OpenAI eligibility/limits.
+
+Reference: [registration and sign-in](https://developers.openai.com/siwc/token-sharing-open-source/sign-in), [models and inference](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference), [preview limitations](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations).
+
+Browser sign-in, Android Keystore persistence and an authorized live ChatGPT response still require device/account validation before release. Automated checks cover OAuth callback binding, PKCE, ID-token signatures/claims, catalog selection, Responses request construction, and saved tool-item replay.
+
+
+### Debug AppLogger
+
+Debug builds, including signed Debug-channel builds, automatically capture all available Logcat levels for the app process into `files/app_logs/` in the app's private directory. Ordinary Release-channel builds do not start AppLogger. Files rotate at 1 MiB with up to eight retained files, and fatal exceptions are also written directly before crash handling. Common credential headers, token fields and OAuth callback parameters are redacted before writing; review diagnostic exports before sharing them.
+
+Open **Diagnostics → AppLogger** to inspect the directory/status, export a ZIP or clear captured logs. Collection continues after clearing. Log files are excluded from Android cloud backup and device transfer. Android restricts logs from other processes; this is app-process capture, not unrestricted device logging. Device capture and document-provider export still require a connected-device check.

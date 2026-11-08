@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package com.android5.ai
 
 import android.content.Intent
@@ -33,6 +35,8 @@ fun BackupSettingsSheet(settings: SettingsManager, onDismiss: () -> Unit) {
     var pendingUri by rememberSaveable { mutableStateOf<Uri?>(null) }
     var exporting by rememberSaveable { mutableStateOf(true) }
     var busy by remember { mutableStateOf(false) }
+    val backupSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true,
+        confirmValueChange = { !busy || it != SheetValue.Hidden })
     var restored by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
     val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) {
@@ -60,18 +64,18 @@ fun BackupSettingsSheet(settings: SettingsManager, onDismiss: () -> Unit) {
             } finally { password.fill('\u0000'); busy = false }
         }
     }
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(sheetState = backupSheetState, onDismissRequest = { if (!busy) onDismiss() }) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(R.string.settings_backup_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text(stringResource(R.string.backup_settings_intro), style = MaterialTheme.typography.bodyMedium)
             SettingsSwitchRow(stringResource(R.string.backup_include_chats), stringResource(R.string.backup_include_chats_sub),
-                Icons.Rounded.Chat, includeChats, { includeChats = it; settings.backupIncludeChats = it })
+                Icons.Rounded.Chat, includeChats, { if (!busy) { includeChats = it; settings.backupIncludeChats = it } })
             if (includeChats) SettingsSwitchRow(stringResource(R.string.backup_include_images), stringResource(R.string.backup_include_images_sub),
-                Icons.Rounded.Image, includeImages, { includeImages = it; settings.backupIncludeImages = it })
+                Icons.Rounded.Image, includeImages, { if (!busy) { includeImages = it; settings.backupIncludeImages = it } })
             SettingsSwitchRow(stringResource(R.string.backup_include_keys), stringResource(R.string.backup_include_keys_sub),
-                Icons.Rounded.Key, includeKeys, { includeKeys = it; settings.backupIncludeKeys = it })
-            Button(onClick = { export.launch("AIChat-${BuildConfig.BUILD_NUMBER}.ai") }, enabled = !busy,
+                Icons.Rounded.Key, includeKeys, { if (!busy) { includeKeys = it; settings.backupIncludeKeys = it } })
+            Button(shapes = com.android5.ai.ui.theme.ExpressiveButtonShapes, onClick = { export.launch("AIChat-${BuildConfig.BUILD_NUMBER}.ai") }, enabled = !busy,
                 modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Rounded.Upload, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.backup_export_button))
             }

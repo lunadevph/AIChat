@@ -8,7 +8,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 
 fun providerIconRes(provider: String): Int = when (provider) {
-    "OpenAI" -> R.drawable.ic_provider_openai
+    "ChatGPT", "OpenAI" -> R.drawable.ic_provider_openai
     "Google" -> R.drawable.ic_provider_gemini
     "Groq" -> R.drawable.ic_provider_groq
     "DeepSeek" -> R.drawable.ic_provider_deepseek

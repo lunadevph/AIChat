@@ -125,7 +125,7 @@ fun CustomProviderSheet(
                 singleLine = true,
                 isError = error != null,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                shape = RoundedCornerShape(18.dp),
+                shape = MaterialTheme.shapes.medium,
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -137,7 +137,7 @@ fun CustomProviderSheet(
                 singleLine = true,
                 isError = error != null,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                shape = RoundedCornerShape(18.dp),
+                shape = MaterialTheme.shapes.medium,
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -148,7 +148,7 @@ fun CustomProviderSheet(
                 placeholder = { Text(stringResource(R.string.custom_provider_tagline_hint)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                shape = RoundedCornerShape(18.dp),
+                shape = MaterialTheme.shapes.medium,
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -159,7 +159,7 @@ fun CustomProviderSheet(
                 supportingText = { Text(stringResource(R.string.custom_provider_key_prefix_help)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                shape = RoundedCornerShape(18.dp),
+                shape = MaterialTheme.shapes.medium,
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -170,7 +170,7 @@ fun CustomProviderSheet(
                 supportingText = { Text(stringResource(R.string.custom_provider_models_help)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                shape = RoundedCornerShape(18.dp),
+                shape = MaterialTheme.shapes.medium,
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -181,7 +181,7 @@ fun CustomProviderSheet(
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                shape = RoundedCornerShape(18.dp),
+                shape = MaterialTheme.shapes.medium,
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -198,7 +198,7 @@ fun CustomProviderSheet(
                 shapes = ExpressiveButtonShapes,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
+                    .heightIn(min = 48.dp)
             ) {
                 Text(stringResource(R.string.btn_add_provider), fontWeight = FontWeight.Bold)
             }

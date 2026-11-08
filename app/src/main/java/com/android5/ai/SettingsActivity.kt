@@ -120,15 +120,20 @@ class SettingsActivity : ComponentActivity() {
                         modifier = Modifier
                             .padding(innerPadding)
                             .fillMaxSize()
+                            .wrapContentWidth(Alignment.CenterHorizontally)
+                            .widthIn(max = 760.dp)
                             .verticalScroll(rememberScrollState())
                             .padding(horizontal = 20.dp, vertical = 12.dp)
                     ) {
                         val resources = androidx.compose.ui.platform.LocalResources.current
                         val context = LocalContext.current
+                        ExpressivePageHeader(stringResource(R.string.settings_personalize_title),
+                            stringResource(R.string.settings_personalize_body), Icons.Rounded.Tune)
+                        Spacer(Modifier.height(20.dp))
                         SettingsSectionHeader(stringResource(R.string.settings_section_provider))
                         
                         Surface(
-                            shape = RoundedCornerShape(26.dp),
+                            shape = MaterialTheme.shapes.large,
                             color = MaterialTheme.colorScheme.surfaceContainerHigh,
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
                             tonalElevation = 1.dp,
@@ -173,7 +178,7 @@ class SettingsActivity : ComponentActivity() {
                         SettingsSectionHeader(stringResource(R.string.settings_section_app))
 
                         Surface(
-                            shape = RoundedCornerShape(26.dp),
+                            shape = MaterialTheme.shapes.large,
                             color = MaterialTheme.colorScheme.surfaceContainerHigh,
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
                             tonalElevation = 1.dp,
@@ -333,401 +338,6 @@ fun SettingsGroupItem(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-fun ApiKeyManagerSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
-    var activeProvider by remember { mutableStateOf(settingsManager.selectedProvider) }
-    var expandedProvider by remember { mutableStateOf<String?>(activeProvider) }
-    // The list only changes when a provider is added or removed, so it is
-    // re-read rather than parsed on every frame.
-    var customVersion by remember { mutableIntStateOf(0) }
-    val customProviders = remember(customVersion) { settingsManager.customProviders }
-    var showCustomSheet by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    val focusManager = LocalFocusManager.current
-    val resources = androidx.compose.ui.platform.LocalResources.current
-    val context = LocalContext.current
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-    ) {
-        Column(
-            modifier = Modifier
-                .padding(horizontal = 20.dp)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .imePadding()
-                .padding(bottom = 36.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Column {
-                Text(
-                    stringResource(R.string.sheet_api_keys_title),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    stringResource(R.string.sheet_api_keys_subtitle),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Surface(
-                shape = RoundedCornerShape(22.dp),
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
-                tonalElevation = 2.dp,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    ProviderIcon(
-                        provider = activeProvider,
-                        contentDescription = activeProvider,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            stringResource(R.string.active_provider_format, activeProvider),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            stringResource(R.string.active_provider_sub),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            Providers.all(customProviders).forEach { info ->
-                val isCustom = Providers.custom(customProviders, info.name) != null
-                var providerKey by remember(info.name) {
-                    mutableStateOf(settingsManager.getApiKey(info.name) ?: "")
-                }
-                var keyVisible by remember { mutableStateOf(false) }
-                var isValidating by remember { mutableStateOf(false) }
-                var statusMessage by remember { mutableStateOf<String?>(null) }
-                var isError by remember { mutableStateOf(false) }
-                val isExpanded = expandedProvider == info.name
-                val isCurrentActive = activeProvider == info.name
-                val hasKey = settingsManager.hasApiKey(info.name)
-
-                Surface(
-                    shape = RoundedCornerShape(22.dp),
-                    color = if (isCurrentActive) MaterialTheme.colorScheme.surfaceContainerHighest
-                            else MaterialTheme.colorScheme.surfaceContainerHigh,
-                    border = BorderStroke(
-                        if (isCurrentActive) 1.5.dp else 1.dp,
-                        if (isCurrentActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                    ),
-                    tonalElevation = if (isCurrentActive) 2.dp else 0.dp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .animateContentSize()
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    expandedProvider = if (isExpanded) null else info.name
-                                }
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(38.dp)
-                                    .background(MaterialTheme.colorScheme.surface, CircleShape)
-                                    .padding(4.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                ProviderIcon(
-                                    provider = info.name,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(28.dp)
-                                )
-                            }
-                            Spacer(Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    info.name,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    info.tagline,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            Spacer(Modifier.width(8.dp))
-
-                            // Status badge
-                            Surface(
-                                shape = RoundedCornerShape(50),
-                                color = when {
-                                    isCurrentActive -> MaterialTheme.colorScheme.primaryContainer
-                                    hasKey -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
-                                    else -> MaterialTheme.colorScheme.surfaceContainerHighest
-                                },
-                                border = if (!hasKey && !isCurrentActive) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null
-                            ) {
-                                Text(
-                                    text = when {
-                                        isCurrentActive -> stringResource(R.string.badge_active)
-                                        hasKey -> stringResource(R.string.badge_configured)
-                                        else -> stringResource(R.string.badge_not_configured)
-                                    },
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = when {
-                                        isCurrentActive -> MaterialTheme.colorScheme.primary
-                                        hasKey -> MaterialTheme.colorScheme.onSecondaryContainer
-                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-                            Spacer(Modifier.width(4.dp))
-                            Icon(
-                                if (isExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        if (isExpanded) {
-                            Spacer(Modifier.height(14.dp))
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                            Spacer(Modifier.height(14.dp))
-
-                            OutlinedTextField(
-                                value = providerKey,
-                                onValueChange = {
-                                    providerKey = it
-                                    statusMessage = null
-                                    isError = false
-                                },
-                                label = { Text(stringResource(R.string.label_api_key)) },
-                                placeholder = { Text(info.keyPrefix + "…") },
-                                singleLine = true,
-                                isError = isError,
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Password,
-                                    imeAction = ImeAction.Done
-                                ),
-                                keyboardActions = KeyboardActions(
-                                    onDone = { focusManager.clearFocus() }
-                                ),
-                                visualTransformation = if (keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                                leadingIcon = {
-                                    Icon(Icons.Rounded.Key, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                },
-                                trailingIcon = {
-                                    IconButton(onClick = { keyVisible = !keyVisible }, shapes = ExpressiveIconButtonShapes) {
-                                        Icon(
-                                            if (keyVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                                            contentDescription = stringResource(
-                                                if (keyVisible) R.string.desc_hide_api_key else R.string.desc_show_api_key
-                                            ),
-                                            Modifier.size(20.dp)
-                                        )
-                                    }
-                                },
-                                shape = RoundedCornerShape(18.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-
-                            Spacer(Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                GetKeyLink(info.name, customProviders)
-                                if (statusMessage != null) {
-                                    Text(
-                                        statusMessage!!,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                                        fontWeight = FontWeight.SemiBold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-
-                            Spacer(Modifier.height(12.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Button(
-                                    onClick = {
-                                        focusManager.clearFocus()
-                                        scope.launch {
-                                            isValidating = true
-                                            statusMessage = null
-                                            when (val result = Providers.validateKey(info.name, providerKey.trim(), customProviders)) {
-                                                is Providers.KeyValidation.Valid -> {
-                                                    isValidating = false
-                                                    if (!settingsManager.setApiKey(info.name, providerKey.trim())) {
-                                                        statusMessage = resources.getString(R.string.err_key_storage)
-                                                        isError = true
-                                                    } else {
-                                                        statusMessage = resources.getString(R.string.msg_key_saved)
-                                                        isError = false
-                                                    }
-                                                }
-                                                is Providers.KeyValidation.InvalidKey -> {
-                                                    isValidating = false
-                                                    statusMessage = resources.getString(R.string.error_invalid_key)
-                                                    isError = true
-                                                }
-                                                is Providers.KeyValidation.NetworkError -> {
-                                                    isValidating = false
-                                                    statusMessage = resources.getString(R.string.err_network, result.detail ?: resources.getString(R.string.err_detail_connection_failed))
-                                                    isError = true
-                                                }
-                                            }
-                                        }
-                                    },
-                                    enabled = providerKey.isNotBlank() && !isValidating,
-                                    shapes = ExpressiveButtonShapes,
-                                    modifier = Modifier.weight(1f).height(44.dp)
-                                ) {
-                                    if (isValidating) {
-                                        LoadingIndicator(Modifier.size(18.dp), color = MaterialTheme.colorScheme.onPrimary)
-                                    } else {
-                                        Icon(Icons.Rounded.Check, null, Modifier.size(16.dp))
-                                        Spacer(Modifier.width(6.dp))
-                                        Text(stringResource(R.string.btn_test_save), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-
-                                if (!isCurrentActive) {
-                                    FilledTonalButton(
-                                        onClick = {
-                                            focusManager.clearFocus()
-                                            settingsManager.setApiKey(info.name, providerKey.trim())
-                                            settingsManager.selectedProvider = info.name
-                                            activeProvider = info.name
-                                            statusMessage = resources.getString(R.string.msg_provider_activated, info.name)
-                                            isError = false
-                                        },
-                                        enabled = providerKey.isNotBlank() && !isValidating,
-                                        shapes = ExpressiveButtonShapes,
-                                        modifier = Modifier.height(44.dp)
-                                    ) {
-                                        Text(stringResource(R.string.btn_set_active), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-
-                                if (hasKey || providerKey.isNotBlank()) {
-                                    OutlinedIconButton(
-                                        onClick = {
-                                            focusManager.clearFocus()
-                                            settingsManager.setApiKey(info.name, null)
-                                            providerKey = ""
-                                            statusMessage = resources.getString(R.string.msg_key_cleared)
-                                            isError = false
-                                        },
-                                        shapes = ExpressiveIconButtonShapes,
-                                        modifier = Modifier.size(48.dp)
-                                    ) {
-                                        Icon(Icons.Rounded.DeleteOutline, stringResource(R.string.btn_clear_key), Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
-                                    }
-                                }
-
-                                // Only the user's own providers can be removed;
-                                // a built-in is part of the app.
-                                if (isCustom) {
-                                    OutlinedIconButton(
-                                        onClick = {
-                                            focusManager.clearFocus()
-                                            settingsManager.setApiKey(info.name, null)
-                                            settingsManager.customProviders =
-                                                customProviders.filterNot { it.name == info.name }
-                                            if (activeProvider == info.name) {
-                                                settingsManager.selectedProvider = "OpenRouter"
-                                                activeProvider = "OpenRouter"
-                                            }
-                                            if (expandedProvider == info.name) expandedProvider = null
-                                            customVersion++
-                                            statusMessage = null
-                                            android.widget.Toast.makeText(
-                                                context,
-                                                resources.getString(R.string.custom_provider_deleted, info.name),
-                                                android.widget.Toast.LENGTH_SHORT
-                                            ).show()
-                                        },
-                                        shapes = ExpressiveIconButtonShapes,
-                                        modifier = Modifier.size(48.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Rounded.DeleteForever,
-                                            stringResource(R.string.desc_delete_provider, info.name),
-                                            Modifier.size(18.dp),
-                                            tint = MaterialTheme.colorScheme.error
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(6.dp))
-            OutlinedButton(
-                onClick = { showCustomSheet = true },
-                shape = RoundedCornerShape(18.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-            ) {
-                Icon(Icons.Rounded.Add, contentDescription = null, Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    stringResource(R.string.btn_add_provider),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            if (showCustomSheet) {
-                CustomProviderSheet(
-                    settingsManager = settingsManager,
-                    onDismiss = { showCustomSheet = false },
-                    onSaved = { name ->
-                        customVersion++
-                        expandedProvider = name
-                        android.widget.Toast.makeText(
-                            context,
-                            resources.getString(R.string.custom_provider_saved, name),
-                            android.widget.Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                )
-            }
-        }
-    }
-}
-
 @Composable
 fun SettingsSwitchRow(
     title: String,
@@ -741,7 +351,7 @@ fun SettingsSwitchRow(
 
     Surface(
         onClick = { onCheckedChange(!checked) },
-        shape = RoundedCornerShape(18.dp),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
         tonalElevation = 1.dp,
@@ -883,7 +493,7 @@ private fun StorageAccessRow() {
                 }
             }
         },
-        shape = RoundedCornerShape(18.dp),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
         tonalElevation = 1.dp,
@@ -973,7 +583,7 @@ private fun ToolWorkspaceRow() {
         modifier = Modifier
             .fillMaxWidth()
             .semantics { this.role = Role.Button },
-        shape = RoundedCornerShape(18.dp),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(
             1.dp,
@@ -1199,7 +809,7 @@ fun AISettingsSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
                 label = { Text(stringResource(R.string.label_custom_instructions)) },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 2,
-                shape = RoundedCornerShape(20.dp),
+                shape = MaterialTheme.shapes.medium,
                 placeholder = { Text(stringResource(R.string.hint_custom_instructions)) }
             )
 
@@ -1483,7 +1093,7 @@ fun AISettingsSheet(settingsManager: SettingsManager, onDismiss: () -> Unit) {
                     saveSettings()
                     onDismiss()
                 },
-                modifier = Modifier.fillMaxWidth().height(56.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                 shapes = ExpressiveButtonShapes
             ) {
                 Icon(Icons.Rounded.Check, null, Modifier.size(20.dp))
@@ -1569,8 +1179,8 @@ fun AboutAppSheet(onDismiss: () -> Unit) {
             ) {
                 OutlinedButton(
                     onClick = { uriHandler.openUri("https://github.com/lunadevph/AIChat") },
-                    shape = RoundedCornerShape(18.dp),
-                    modifier = Modifier.weight(1f).height(44.dp)
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                 ) {
                     Icon(Icons.Rounded.OpenInNew, contentDescription = null, Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
@@ -1578,8 +1188,8 @@ fun AboutAppSheet(onDismiss: () -> Unit) {
                 }
                 OutlinedButton(
                     onClick = { uriHandler.openUri("https://github.com/lunadevph/AIChat/issues/new") },
-                    shape = RoundedCornerShape(18.dp),
-                    modifier = Modifier.weight(1f).height(44.dp)
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                 ) {
                     Icon(Icons.Rounded.BugReport, contentDescription = null, Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))

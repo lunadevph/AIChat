@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package com.android5.ai
 
 import android.content.Intent
@@ -160,16 +162,18 @@ private fun UpdatesScreen(settings: SettingsManager, onBack: () -> Unit) {
     }
 
     Scaffold(topBar = {
-        TopAppBar(title = { Text(stringResource(R.string.settings_update_title)) }, navigationIcon = {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.desc_back)) }
+        TopAppBar(colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), title = { Text(stringResource(R.string.settings_update_title)) }, navigationIcon = {
+            IconButton(shapes = com.android5.ai.ui.theme.ExpressiveIconButtonShapes, onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.desc_back)) }
         })
     }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             Column(Modifier.widthIn(max = 680.dp).fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-                Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+                Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.primaryContainer) {
                     Column(Modifier.fillMaxWidth().padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Icon(when {
+                                state == UpdateState.Checking -> Icons.Rounded.Sync
+                                state == UpdateState.Unpublished -> Icons.Rounded.CloudQueue
                                 state == UpdateState.Failed -> Icons.Rounded.CloudOff
                                 newer -> Icons.Rounded.SystemUpdate
                                 else -> Icons.Rounded.Verified
@@ -230,7 +234,7 @@ private fun UpdatesScreen(settings: SettingsManager, onBack: () -> Unit) {
                             is DownloadState.Ready -> {
                                 if (!config.apkSha256.isNullOrBlank()) Text(stringResource(R.string.updates_download_verified),
                                     color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
-                                Button(onClick = {
+                                Button(shapes = com.android5.ai.ui.theme.ExpressiveButtonShapes, onClick = {
                                     try {
                                         context.startActivity(if (canInstall) UpdateInstaller.installIntent(context, current.file)
                                             else UpdateInstaller.unknownSourcesIntent(context))
@@ -243,7 +247,7 @@ private fun UpdatesScreen(settings: SettingsManager, onBack: () -> Unit) {
                             }
                             else -> {
                                 if (current is DownloadState.Failed) Text(stringResource(R.string.updates_download_error), color = MaterialTheme.colorScheme.error)
-                                Button(onClick = { beginDownload(config) }, enabled = !config.downloadUrl.isNullOrBlank(), modifier = Modifier.fillMaxWidth()) {
+                                Button(shapes = com.android5.ai.ui.theme.ExpressiveButtonShapes, onClick = { beginDownload(config) }, enabled = !config.downloadUrl.isNullOrBlank(), modifier = Modifier.fillMaxWidth()) {
                                     Icon(Icons.Rounded.Download, null); Spacer(Modifier.width(8.dp))
                                     Text(stringResource(if (current is DownloadState.Failed) R.string.updates_retry_download else R.string.btn_download_update))
                                 }

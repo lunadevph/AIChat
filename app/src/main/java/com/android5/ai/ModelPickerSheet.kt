@@ -230,7 +230,7 @@ fun ModelPickerSheet(
                             }
                         }
                     },
-                    shape = RoundedCornerShape(18.dp),
+                    shape = MaterialTheme.shapes.medium,
                     singleLine = true
                 )
 

@@ -15,11 +15,11 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 
 private val ExpressiveShapes = Shapes(
-    extraSmall = RoundedCornerShape(16.dp),
-    small = RoundedCornerShape(20.dp),
-    medium = RoundedCornerShape(24.dp),
-    large = RoundedCornerShape(32.dp),
-    extraLarge = RoundedCornerShape(40.dp),
+    extraSmall = RoundedCornerShape(12.dp),
+    small = RoundedCornerShape(16.dp),
+    medium = RoundedCornerShape(20.dp),
+    large = RoundedCornerShape(28.dp),
+    extraLarge = RoundedCornerShape(36.dp),
     largeIncreased = RoundedCornerShape(48.dp),
     extraLargeIncreased = RoundedCornerShape(56.dp),
     extraExtraLarge = RoundedCornerShape(64.dp)
@@ -27,8 +27,8 @@ private val ExpressiveShapes = Shapes(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 val ExpressiveButtonShapes = ButtonShapes(
-    shape = RoundedCornerShape(20.dp),
-    pressedShape = RoundedCornerShape(32.dp)
+    shape = RoundedCornerShape(50),
+    pressedShape = RoundedCornerShape(16.dp)
 )
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -46,7 +46,6 @@ fun AIChatTheme(
     // "light" is always light, "amoled" is always dark; "dynamic" follows the
     // system light/dark setting (previously it was hard-coded to dark, so the
     // "Dynamic (System)" option never respected a light system theme).
-    // The retro appearances — Old Android and Holo — are dark by nature.
     val darkTheme = when (themeMode) {
         "light" -> false
         "amoled", "midnight", "ocean", "forest" -> true
