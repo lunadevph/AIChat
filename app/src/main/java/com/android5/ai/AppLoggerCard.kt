@@ -64,7 +64,8 @@ internal fun AppLoggerCard() {
                 OutlinedButton(enabled = !busy, onClick = { revision++ }) { Text(stringResource(R.string.app_logger_refresh)) }
             }
             TextButton(enabled = !busy && (stats?.files ?: 0) > 0, onClick = { confirmClear = true }) {
-                Text(stringResource(R.string.app_logger_clear), color = MaterialTheme.colorScheme.error)
+                Text(stringResource(R.string.app_logger_clear), color = if (!busy && (stats?.files ?: 0) > 0)
+                    MaterialTheme.colorScheme.error else LocalContentColor.current)
             }
             if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             status?.let { Text(it, style = MaterialTheme.typography.bodySmall) }

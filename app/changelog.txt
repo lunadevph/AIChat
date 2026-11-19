@@ -1,5 +1,5 @@
-- ChatGPT sign-in now checks the connection before opening the browser and retries temporary DNS failures once.
-- DNS errors now explain how to reconnect and offer a shortcut to network settings while keeping saved connections.
-- Debug logs now include credential-free ChatGPT request stages, response codes and failure types.
-- Optional secure DNS fallback helps ChatGPT connect when the device cannot resolve OpenAI hostnames.
-- Browser authentication now returns to AI Chat, with a return button when automatic navigation is blocked.
+- Connect an eligible ChatGPT account from setup or settings and return to AI Chat after browser sign-in.
+- Recover from ChatGPT DNS failures with a connection check, network settings shortcut and optional secure DNS fallback.
+- Large code-writing requests recover from size limits without repeating completed actions.
+- Search saved API keys and manage provider connections in the redesigned account settings.
+- Updated chat, settings and workspace layouts improve text scaling, contrast and controls on smaller screens.

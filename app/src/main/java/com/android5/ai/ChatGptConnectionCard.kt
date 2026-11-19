@@ -5,6 +5,8 @@ package com.android5.ai
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -50,7 +52,7 @@ internal fun ChatGptConnectionCard(onConnected: (() -> Unit)? = null) {
                     auth.activeClientId == profile.clientId -> R.string.chatgpt_connected
                     else -> R.string.chatgpt_saved_account
                 }), style = MaterialTheme.typography.bodySmall)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     OutlinedButton(enabled = !busy, onClick = {
                         if (!profile.connected || !profile.planEnabled) auth.signIn(profile.clientId, requestPlanConsent = profile.connected && !profile.planEnabled, returnTo = returnTarget)
                         else auth.select(profile.clientId)
@@ -76,12 +78,14 @@ internal fun ChatGptConnectionCard(onConnected: (() -> Unit)? = null) {
             error?.let { Text(stringResource(R.string.chatgpt_signin_detail, it), color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall) }
             if (networkProblem || secureDns) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.fillMaxWidth().toggleable(value = secureDns, enabled = !busy, role = Role.Switch,
+                    onValueChange = auth::setSecureDns).padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Column(Modifier.weight(1f)) {
                         Text(stringResource(R.string.chatgpt_secure_dns), style = MaterialTheme.typography.titleSmall)
                         Text(stringResource(R.string.chatgpt_secure_dns_description), style = MaterialTheme.typography.bodySmall)
                     }
-                    Switch(checked = secureDns, enabled = !busy, onCheckedChange = auth::setSecureDns)
+                    Switch(checked = secureDns, enabled = !busy, onCheckedChange = null)
                 }
             }
             if (networkProblem) OutlinedButton(enabled = !busy, onClick = {

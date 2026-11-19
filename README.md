@@ -140,7 +140,7 @@ ChatGPT-plan requests use the public Responses endpoint with streaming and stora
 
 Reference: [registration and sign-in](https://developers.openai.com/siwc/token-sharing-open-source/sign-in), [models and inference](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference), [preview limitations](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations).
 
-Browser sign-in, Android Keystore persistence and an authorized live ChatGPT response still require device/account validation before release. Automated checks cover OAuth callback binding, PKCE, ID-token signatures/claims, catalog selection, Responses request construction, and saved tool-item replay.
+The user verified ChatGPT browser sign-in on November 19, 2026. Credential persistence across restarts and live inference still need separate verification. Automated checks cover OAuth callback binding, PKCE, ID-token signatures/claims, catalog selection, Responses request construction, and saved tool-item replay.
 
 
 ### Debug AppLogger
