@@ -36,9 +36,7 @@ import retrofit2.HttpException
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.io.File
-import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 private sealed class UpdateState {
@@ -104,7 +102,7 @@ private fun UpdatesScreen(settings: SettingsManager, onBack: () -> Unit) {
             val config = api.getUpdateConfig(UpdateChannels.feed(channel))
             require(UpdateChannels.accepts(config, channel, context.packageName))
             state = UpdateState.Ready(config)
-            checkedAt = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+            checkedAt = android.text.format.DateFormat.getTimeFormat(context).format(Date())
             UpdateChecker.remember(context, config, channel)
             if (config.appLatestCodeVersion > BuildConfig.VERSION_CODE) {
                 UpdateInstaller.verifiedCachedApk(context, config.appLatestVersion, config.apkSha256, channel)
@@ -146,6 +144,7 @@ private fun UpdatesScreen(settings: SettingsManager, onBack: () -> Unit) {
         is UpdateState.Ready -> when {
             required -> R.string.updates_required_title
             newer -> R.string.updates_available_title
+            config != null && config.appLatestCodeVersion < BuildConfig.VERSION_CODE -> R.string.updates_ahead_title
             else -> R.string.updates_current_title
         }
     }
@@ -190,7 +189,7 @@ private fun UpdatesScreen(settings: SettingsManager, onBack: () -> Unit) {
                 }
 
                 UpdateSection(stringResource(R.string.update_channel_title)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         UpdateChannels.all.forEach { key ->
                             FilterChip(selected = channel == key, enabled = !downloading,
                                 onClick = { if (channel != key) { settings.updateChannel = key; UpdateChecker.clear(context) } },
@@ -204,11 +203,15 @@ private fun UpdatesScreen(settings: SettingsManager, onBack: () -> Unit) {
                 UpdateSection(stringResource(R.string.updates_versions_title)) {
                     UpdateDetail(stringResource(R.string.update_label_installed),
                         stringResource(R.string.updates_version_build, BuildConfig.VERSION_NAME, BuildConfig.BUILD_NUMBER))
-                    UpdateDetail(stringResource(R.string.update_channel_title), channelLabel)
+                    UpdateDetail(stringResource(R.string.updates_installed_channel),
+                        stringResource(if (BuildConfig.UPDATE_CHANNEL == UpdateChannels.DEBUG) R.string.update_channel_debug else R.string.update_channel_release))
                     config?.let {
                         HorizontalDivider()
-                        UpdateDetail(stringResource(R.string.update_label_latest), it.appLatestVersion.orEmpty())
-                        it.buildNumber?.let { number -> UpdateDetail(stringResource(R.string.updates_build_label), number) }
+                        val version = it.appLatestVersion?.takeIf(String::isNotBlank) ?: it.appLatestCodeVersion.toString()
+                        UpdateDetail(stringResource(R.string.updates_latest_channel, channelLabel),
+                            it.buildNumber?.takeIf(String::isNotBlank)?.let { number ->
+                                stringResource(R.string.updates_version_build, version, number)
+                            } ?: version)
                         if (it.apkSizeBytes > 0) UpdateDetail(stringResource(R.string.updates_size_label), Formatter.formatShortFileSize(context, it.apkSizeBytes))
                     }
                 }
@@ -235,6 +238,7 @@ private fun UpdatesScreen(settings: SettingsManager, onBack: () -> Unit) {
                                 if (!config.apkSha256.isNullOrBlank()) Text(stringResource(R.string.updates_download_verified),
                                     color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
                                 Button(shapes = com.android5.ai.ui.theme.ExpressiveButtonShapes, onClick = {
+                                    installerFailed = false
                                     try {
                                         context.startActivity(if (canInstall) UpdateInstaller.installIntent(context, current.file)
                                             else UpdateInstaller.unknownSourcesIntent(context))

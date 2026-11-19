@@ -372,6 +372,9 @@
     <string name="updates_available_title">An update is ready</string>
     <string name="updates_available_body">Review what changed, then download and install when you are ready.</string>
     <string name="updates_current_title">You’re up to date</string>
+    <string name="updates_ahead_title">Your build is newer</string>
+    <string name="updates_installed_channel">Installed channel</string>
+    <string name="updates_latest_channel">Latest on %1$s</string>
     <string name="updates_current_body">You have the latest build available in this channel.</string>
     <string name="updates_ahead_body">Your installed build is newer than this channel’s current release. There is no newer update to install.</string>
     <string name="updates_last_checked">Last checked at %1$s</string>
